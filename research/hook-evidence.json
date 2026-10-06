@@ -1,0 +1,18 @@
+{
+  "pid": 20864,
+  "expectedThreadId": 20844,
+  "actualThreadId": 20844,
+  "injectedModuleBase": "0x7ffcb9800000",
+  "window": "0x6065a",
+  "handshake": true,
+  "hookRemoved": true,
+  "windowResponsive": true,
+  "gameStillRunning": true,
+  "engineCalls": 0,
+  "executablePatches": 0,
+  "scenarioEdits": 0,
+  "cleanupVerification": {
+    "editorProbeModulesLoaded": 0,
+    "readOnlyGameProbeStillSucceeded": true
+  }
+}

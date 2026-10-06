@@ -1,0 +1,36 @@
+{
+  "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+  "ui": "alternative",
+  "width": 2560,
+  "height": 1440,
+  "rowCenterFirst": 402,
+  "rowStep": 80.5,
+  "playerFields": {
+    "name": [42, -25, 220, 52],
+    "control": [274, -25, 184, 52],
+    "aiPath": [485, -25, 224, 52],
+    "civ": [880, -25, 202, 52],
+    "color": [1090, -25, 146, 52],
+    "visibility": [1262, -25, 222, 52],
+    "food": [1628, -25, 108, 52],
+    "wood": [1750, -25, 110, 52],
+    "gold": [1868, -25, 110, 52],
+    "favor": [1990, -25, 108, 52],
+    "pop": [2102, -25, 112, 52],
+    "popLimit": [2220, -25, 108, 52],
+    "handicap": [2332, -25, 112, 52]
+  },
+  "staticFields": {
+    "agePopup.title": [1560, 342, 480, 58],
+    "agePopup.startAge": [1750, 396, 268, 56],
+    "agePopup.maxAge": [1750, 448, 268, 56],
+    "agePopup.classicalGod": [1750, 546, 268, 48],
+    "agePopup.heroicGod": [1750, 596, 268, 48],
+    "agePopup.mythicGod": [1750, 646, 268, 48],
+    "fileBrowser.search": [800, 1020, 475, 52],
+    "fileBrowser.row": [414, 424, 720, 56],
+    "fileBrowser.loadInGame": [1680, 1018, 250, 52],
+    "fileBrowser.title": [760, 280, 800, 65]
+  },
+  "notes": "Only observed alternative editor UI. Rects are full-res client pixels; gated against build/UI/size before preset use. Verify OCR and checkpoint; some positions approximate until live tests. Normal UI must use a separate measured layout."
+}

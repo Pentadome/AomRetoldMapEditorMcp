@@ -1,0 +1,7 @@
+{
+  "ten_serial_ms": 705.5,
+  "ten_batch_ms": 228.2,
+  "speedup": 3.09,
+  "samples": 5,
+  "schemaPreflightStopOnErrorImageAndLiveGuardsPassed": true
+}

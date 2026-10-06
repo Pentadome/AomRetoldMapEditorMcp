@@ -1,0 +1,133 @@
+{
+  "placement": {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Hoplite",
+    "player": 1,
+    "x": 1500,
+    "y": 650,
+    "selectedProtoId": 58,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 20864,
+        "executionThread": 20844,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 20864,
+        "executionThread": 20844,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 20864,
+        "executionThread": 20844,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4969
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Hoplite\",true)",
+        "pid": 20864,
+        "executionThread": 20844,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 20864,
+        "executionThread": 20844,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4969
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  "postPlacementState": {
+    "connected": true,
+    "pid": 20864,
+    "windowThread": 20844,
+    "editor": true,
+    "ownerThread": 20844,
+    "placementProtoId": -1,
+    "placementPlayer": 1,
+    "foreground": true,
+    "width": 2560,
+    "height": 1440,
+    "build": "100.19.17020.0",
+    "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff"
+  },
+  "undo": {
+    "nativeReturned": true,
+    "semanticSuccessVerified": false,
+    "returnValueCaptured": false,
+    "command": "undo()",
+    "pid": 20864,
+    "executionThread": 20844,
+    "hookRemoved": true,
+    "elapsedDeadlineRemainingMs": 4985
+  },
+  "redo": {
+    "nativeReturned": true,
+    "semanticSuccessVerified": false,
+    "returnValueCaptured": false,
+    "command": "redo()",
+    "pid": 20864,
+    "executionThread": 20844,
+    "hookRemoved": true,
+    "elapsedDeadlineRemainingMs": 5000
+  },
+  "finalUndo": {
+    "nativeReturned": true,
+    "semanticSuccessVerified": false,
+    "returnValueCaptured": false,
+    "command": "undo()",
+    "pid": 20864,
+    "executionThread": 20844,
+    "hookRemoved": true,
+    "elapsedDeadlineRemainingMs": 4984
+  },
+  "finalState": {
+    "connected": true,
+    "pid": 20864,
+    "windowThread": 20844,
+    "editor": true,
+    "ownerThread": 20844,
+    "placementProtoId": -1,
+    "placementPlayer": 1,
+    "foreground": true,
+    "width": 2560,
+    "height": 1440,
+    "build": "100.19.17020.0",
+    "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff"
+  },
+  "independentVerification": {
+    "nativeBridgeModulesPresentAfterExit": [],
+    "windowResponsiveAfterExit": true,
+    "unitPlacementSeen": "mcp-final-placed.png: original villager + new Player 1 Hoplite",
+    "undoSeen": "mcp-final-undo.png: Hoplite absent, original villager remains",
+    "redoSeen": "mcp-final-redo.png: Hoplite restored",
+    "finalMap": "mcp-final-restored.png: original villager only",
+    "scenarioSaved": false,
+    "executablePatched": false,
+    "protectionBypass": false
+  }
+}

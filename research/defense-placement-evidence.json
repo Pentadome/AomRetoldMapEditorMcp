@@ -1,0 +1,1924 @@
+[
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "TownCenter",
+    "player": 1,
+    "x": 1280,
+    "y": 650,
+    "selectedProtoId": 308,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"TownCenter\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Fortress",
+    "player": 1,
+    "x": 1260,
+    "y": 820,
+    "selectedProtoId": 331,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Fortress\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Temple",
+    "player": 1,
+    "x": 1450,
+    "y": 720,
+    "selectedProtoId": 320,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Temple\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "ArcheryRange",
+    "player": 1,
+    "x": 1090,
+    "y": 710,
+    "selectedProtoId": 330,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4968
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"ArcheryRange\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4968
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Barracks",
+    "player": 1,
+    "x": 1130,
+    "y": 850,
+    "selectedProtoId": 340,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Barracks\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Armory",
+    "player": 1,
+    "x": 1440,
+    "y": 850,
+    "selectedProtoId": 322,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Armory\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "House",
+    "player": 1,
+    "x": 1030,
+    "y": 560,
+    "selectedProtoId": 316,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4969
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"House\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "House",
+    "player": 1,
+    "x": 1490,
+    "y": 570,
+    "selectedProtoId": 316,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"House\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "House",
+    "player": 1,
+    "x": 1010,
+    "y": 790,
+    "selectedProtoId": 316,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"House\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "House",
+    "player": 1,
+    "x": 1530,
+    "y": 790,
+    "selectedProtoId": 316,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"House\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "SentryTower",
+    "player": 1,
+    "x": 1280,
+    "y": 380,
+    "selectedProtoId": 321,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"SentryTower\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "SentryTower",
+    "player": 1,
+    "x": 930,
+    "y": 650,
+    "selectedProtoId": 321,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"SentryTower\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4969
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "SentryTower",
+    "player": 1,
+    "x": 1640,
+    "y": 650,
+    "selectedProtoId": 321,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"SentryTower\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "SentryTower",
+    "player": 1,
+    "x": 1270,
+    "y": 990,
+    "selectedProtoId": 321,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"SentryTower\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Hoplite",
+    "player": 1,
+    "x": 1160,
+    "y": 450,
+    "selectedProtoId": 58,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Hoplite\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Hoplite",
+    "player": 1,
+    "x": 1240,
+    "y": 450,
+    "selectedProtoId": 58,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Hoplite\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Hoplite",
+    "player": 1,
+    "x": 1320,
+    "y": 450,
+    "selectedProtoId": 58,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Hoplite\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Hoplite",
+    "player": 1,
+    "x": 1400,
+    "y": 450,
+    "selectedProtoId": 58,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Hoplite\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Hoplite",
+    "player": 1,
+    "x": 960,
+    "y": 540,
+    "selectedProtoId": 58,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Hoplite\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Hoplite",
+    "player": 1,
+    "x": 1560,
+    "y": 540,
+    "selectedProtoId": 58,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Hoplite\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Toxotes",
+    "player": 1,
+    "x": 1140,
+    "y": 530,
+    "selectedProtoId": 59,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Toxotes\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Toxotes",
+    "player": 1,
+    "x": 1210,
+    "y": 525,
+    "selectedProtoId": 59,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Toxotes\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Toxotes",
+    "player": 1,
+    "x": 1360,
+    "y": 525,
+    "selectedProtoId": 59,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4969
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Toxotes\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4969
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Toxotes",
+    "player": 1,
+    "x": 1430,
+    "y": 530,
+    "selectedProtoId": 59,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Toxotes\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Toxotes",
+    "player": 1,
+    "x": 1070,
+    "y": 620,
+    "selectedProtoId": 59,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Toxotes\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Toxotes",
+    "player": 1,
+    "x": 1500,
+    "y": 620,
+    "selectedProtoId": 59,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Toxotes\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Minotaur",
+    "player": 1,
+    "x": 1100,
+    "y": 460,
+    "selectedProtoId": 87,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Minotaur\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "Minotaur",
+    "player": 1,
+    "x": 1470,
+    "y": 460,
+    "selectedProtoId": 87,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4969
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"Minotaur\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4969
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "VillagerGreek",
+    "player": 1,
+    "x": 1380,
+    "y": 760,
+    "selectedProtoId": 54,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"VillagerGreek\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "VillagerGreek",
+    "player": 1,
+    "x": 1410,
+    "y": 785,
+    "selectedProtoId": 54,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"VillagerGreek\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "VillagerGreek",
+    "player": 1,
+    "x": 1380,
+    "y": 810,
+    "selectedProtoId": 54,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"VillagerGreek\",true)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 26412,
+        "executionThread": 25648,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  }
+]

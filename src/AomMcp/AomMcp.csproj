@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisMode>Recommended</AnalysisMode>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Independently game-written TR v12 controller fixture; pinned SHA-256 in TriggerCodec. -->
+    <None Include="../../research/defense-code-sample.trg" Link="trigger-controller-template.trg" CopyToOutputDirectory="PreserveNewest" />
+    <PackageReference Include="ModelContextProtocol.Core" Version="2.2.0" />
+    <PackageReference Include="Sdcb.SimdPaddleOCR" Version="1.4.2" />
+    <PackageReference Include="Sdcb.SimdPaddleOCR.Models.ChineseV6Tiny" Version="1.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <None
+      Include="../../native/AomEditorBridge.dll"
+      Link="AomEditorBridge.dll"
+      CopyToOutputDirectory="PreserveNewest"
+      Condition="Exists('../../native/AomEditorBridge.dll')"
+    />
+    <None
+      Include="../../generated/game_catalog.json"
+      Link="game_catalog.json"
+      CopyToOutputDirectory="PreserveNewest"
+      Condition="'$(IncludeGameCatalog)' != 'false' and Exists('../../generated/game_catalog.json')"
+    />
+    <None Include="../../uilayouts/*.json" Link="uilayouts/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../tests/fixtures/ocr-*.bgra" Link="fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None
+      Include="../../layouts/*.json"
+      Link="layouts/%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+    />
+  </ItemGroup>
+</Project>

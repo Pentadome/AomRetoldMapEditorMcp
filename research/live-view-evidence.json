@@ -1,0 +1,175 @@
+{
+  "sceneMutated": false,
+  "focusChanged": false,
+  "nativeCalls": false,
+  "checks": {
+    "selection": {
+      "pid": 24876,
+      "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+      "selectionPlayer": 1,
+      "total": 0,
+      "offset": 0,
+      "limit": 100,
+      "nextOffset": null,
+      "entries": [],
+      "atomic": false,
+      "limitation": "Actual selection records and simulation properties, not command acknowledgements. Non-unit selections retain kind but are not interpreted as unit IDs. Unresolved IDs may indicate changing/deleted objects. Position/health can change between reads; no atomic frame claim."
+    },
+    "map": {
+      "pid": 24876,
+      "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+      "atomic": false,
+      "dimensions": {
+        "tilesX": 128,
+        "tilesZ": 128,
+        "worldWidth": 256,
+        "worldDepth": 256,
+        "tileWorldSize": 2
+      },
+      "camera": {
+        "position": {
+          "x": 57.2303,
+          "y": 54.851547,
+          "z": 46.29825
+        },
+        "forward": {
+          "x": 0.48224548,
+          "y": -0.73135394,
+          "z": 0.48224548
+        },
+        "up": {
+          "x": 0.5171454,
+          "y": 0.68199813,
+          "z": 0.5171454
+        },
+        "right": {
+          "x": 0.7071068,
+          "y": 0,
+          "z": -0.7071068
+        },
+        "fieldOfViewRadians": 0.698132
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "width": 2560,
+        "height": 1440
+      },
+      "projection": [
+        1.5454553,
+        0,
+        0,
+        0,
+        0,
+        2.747476,
+        0,
+        0,
+        0,
+        0,
+        1.001001,
+        1,
+        0,
+        0,
+        -1.001001,
+        0
+      ],
+      "terrainSample": {
+        "x": 79,
+        "z": 89,
+        "height": 4,
+        "tileX": 39,
+        "tileZ": 44,
+        "sampling": "Native trGetTerrainHeight quantized node lookup, not bilinear or collision surface."
+      },
+      "projected": {
+        "x": 851.19495,
+        "y": 758.808,
+        "depth": 0.9863411,
+        "inFront": true,
+        "visibleInViewport": true
+      },
+      "screenRay": null,
+      "planeIntersection": null,
+      "limitation": "Measured live active-camera basis, renderer projection and full-resolution client viewport. Projection visibility is frustum-only, not occlusion/UI clickability. Screen inverse returns a ray; world point requires caller's explicit planeY, never guessed terrain intersection. Terrain height matches quantized native getter, not rendered triangle collision. Editor only; changing/unreviewed layouts refuse."
+    },
+    "inverse": {
+      "pid": 24876,
+      "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+      "atomic": false,
+      "dimensions": {
+        "tilesX": 128,
+        "tilesZ": 128,
+        "worldWidth": 256,
+        "worldDepth": 256,
+        "tileWorldSize": 2
+      },
+      "camera": {
+        "position": {
+          "x": 57.2303,
+          "y": 54.851547,
+          "z": 46.29825
+        },
+        "forward": {
+          "x": 0.48224548,
+          "y": -0.73135394,
+          "z": 0.48224548
+        },
+        "up": {
+          "x": 0.5171454,
+          "y": 0.68199813,
+          "z": 0.5171454
+        },
+        "right": {
+          "x": 0.7071068,
+          "y": 0,
+          "z": -0.7071068
+        },
+        "fieldOfViewRadians": 0.698132
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "width": 2560,
+        "height": 1440
+      },
+      "projection": [
+        1.5454553,
+        0,
+        0,
+        0,
+        0,
+        2.747476,
+        0,
+        0,
+        0,
+        0,
+        1.001001,
+        1,
+        0,
+        0,
+        -1.001001,
+        0
+      ],
+      "terrainSample": null,
+      "projected": null,
+      "screenRay": {
+        "origin": {
+          "x": 57.2303,
+          "y": 54.851547,
+          "z": 46.29825
+        },
+        "direction": {
+          "x": 0.31152892,
+          "y": -0.7276963,
+          "z": 0.611071
+        }
+      },
+      "planeIntersection": {
+        "x": 79,
+        "y": 4,
+        "z": 89
+      },
+      "limitation": "Measured live active-camera basis, renderer projection and full-resolution client viewport. Projection visibility is frustum-only, not occlusion/UI clickability. Screen inverse returns a ray; world point requires caller's explicit planeY, never guessed terrain intersection. Terrain height matches quantized native getter, not rendered triangle collision. Editor only; changing/unreviewed layouts refuse."
+    }
+  }
+}

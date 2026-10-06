@@ -1,0 +1,35 @@
+{
+  "exeSha256": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+  "pid": 20864,
+  "windowThreadId": 20844,
+  "proto": "VillagerGreek",
+  "player": 1,
+  "placementPointerScreen": [1280, 720],
+  "commands": [
+    "editMode(\"PlaceUnit\")",
+    "uiSetPlacementPlayer(1)",
+    "uiSetProtoCursor(\"VillagerGreek\", true)",
+    "uiPlaceAtPointer(false)",
+    "uiClearCursor()",
+    "editMode(\"None\")"
+  ],
+  "placementCalls": 1,
+  "placementMethod": "Native console wrapper on editor window thread; no mouse click simulated.",
+  "editorStateBeforePlacement": {
+    "editorFlag": 1,
+    "protoId": 54,
+    "protoFieldOffset": "0x3f4",
+    "playerId": 1,
+    "playerFieldOffset": "0x600",
+    "mapHover": true
+  },
+  "confirmed": "One blue Player 1 villager visible near viewport center after clearing cursor and closing placement panel; minimap dot present. Blank before screenshot.",
+  "beforeScreenshot": "before-unit.bmp",
+  "afterScreenshot": "placed-unit.png",
+  "gameResponsive": true,
+  "nativeProbeModulesRemaining": 0,
+  "executablePatches": 0,
+  "scenarioSaved": false,
+  "undoRedoIndependentlyTested": false,
+  "notes": "Uses standard editor placement route. Initial guard/field interpretation corrected before placement. No repeat placement or scenario file overwrite."
+}

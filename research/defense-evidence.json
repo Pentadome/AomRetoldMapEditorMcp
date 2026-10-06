@@ -1,0 +1,44 @@
+{
+  "status": {
+    "connected": true,
+    "pid": 26676,
+    "windowThread": 27424,
+    "editor": true,
+    "ownerThread": 27424,
+    "placementProtoId": -1,
+    "placementPlayer": 1,
+    "foreground": true,
+    "width": 2560,
+    "height": 1440,
+    "build": "100.19.17020.0",
+    "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff"
+  },
+  "editorPlacedObjects": 31,
+  "waves": [
+    {
+      "seconds": 10,
+      "count": 12
+    },
+    {
+      "seconds": 50,
+      "count": 18
+    },
+    {
+      "seconds": 90,
+      "count": 24
+    }
+  ],
+  "normalWavesAndCombatObserved": true,
+  "normalDefeatObserved": true,
+  "victoryBranchVerifiedWithSeparateValidationCleanup": true,
+  "validationCleanupAbsentFromDeliveredScenario": true,
+  "canonicalTriggerRoundtripIdentical": true,
+  "modeGuardRefusesPlacementDuringPlaytest": true,
+  "namedUserScenariosOverwritten": false,
+  "engineTestingSnapshotCreated": true,
+  "backupSha256": "381bc9b5fffaa583d17406d776fe64bd686e28ebd673275de9266cb01cb10a9f",
+  "buildSelfTestsLiveProtocolSmokePassed": true,
+  "bridgeModulesAfterTestExit": 0,
+  "nativeStartTestCrashedOnce": true,
+  "uiPlayAndQuitWorked": true
+}

@@ -1,0 +1,46 @@
+# Alternative editor UI compatibility probe
+
+User explicitly authorized destructive live tests on 2026-10-05. Game build `100.19.17020.0`, SHA-256 `dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff`, client 2560×1440. Alternative UI confirmed visually by bottom toolbars, upper-right menu and compact contextual panels.
+
+**Verdict: tested core editing flows work, but full support is not established. Direct native `loadScenario` was followed by a game crash. Use the normal Load Scenario UI instead.** No repeat of the crashing native command was attempted. After this probe, user requested removal: native `loadScenario` and shipped actions referencing it are excluded from generated catalogs and both MCP tool sets, with direct/batch preflight and typed-dispatch refusals. Normal Load Scenario UI remains available. No standard-UI comparison or crash dump was obtained; this is not proof the alternative UI caused the crash.
+
+Raw JSON, screenshots, original/edited snapshots, trigger exports and temporary probe controller: `research/extracted/alternative-ui-20261005/` (ignored). One persistent MCP host was used per game session; the original host was closed before connecting to the restarted game. Runtime IDs/PIDs below are evidence, not reusable constants.
+
+## Observed results
+
+| Check | Evidence / boundary |
+|---|---|
+| Connection and reads | Editor/hash/thread/client guards passed. Original scene was 100×100 tiles, zero objects and empty selection. Map projection and sampled terrain height were readable. |
+| Unit and building placement | Player 1 `Hoplite` and Player 2 `MilitaryAcademy` appeared with live IDs/prototypes/owners/positions and health 115/1200. Preview cursor cleared; object palette required ESC to close. |
+| Undo / redo / deletion | Building count changed 2→1→2 on undo/redo. Player 2 selection and DELETE changed 2→1; undo restored building. Restored full IDs changed across recreation. |
+| Player-specific selection | `uiSelectType` found Player 1 infantry and, after `player(2)`, Player 2 building. Calling it for an inactive player's building initially returned empty selection; not treated as cross-player selection support. |
+| Formation / multiselection | Three-row infantry placement verified three new full live IDs. All four Player 1 Hoplites were resolved in delayed selection inspection. |
+| Movement | Move Unit mode plus settled mouse drag changed positions of all four selected Hoplites; Player 2 building remained at its original position. |
+| Alternative panels | Lighting, elevation, terrain painting and object actions opened the alternative contextual controls. Trigger Editor opened its trigger/condition/effect panels. Repeated mode actions can toggle/close an already-open panel; acknowledgement alone does not establish visible state. |
+| Terrain painting | Selected `Atlantean Beach 1` through visible palette and painted a visible patch. Screenshot showed two touched locations, so precise stroke footprint is not certified. Use mouse move + a following delay before strokes; no generic pointer-hover guarantee is claimed. |
+| Elevation | A held drag changed sampled node (world X20/Z30) from height4 to 11.843503; undo restored height4. A short click did not change that sampled node. |
+| Camera | `uiWheelRotateCamera(120)` changed measured basis; wheel zoom changed camera height 54.85156→49.00073. `cameraRotate(1)` alone did not demonstrate rotation and is not counted as a passed effect. |
+| Trigger import/export | Imported inactive single Always/CodeSnippet `AlternativeUiProbe`. Game export was byte-identical to supplied controller. No XS compilation/execution claim. |
+| Save | Original and edited game-written checkpoints passed structural length/zlib/hash verification. Existing files were not overwritten. |
+| Native reload | `loadScenario("AomMcp-checkpoint-802a8902e2d5490daa28ce5470b2f3d4")` returned an acknowledgement; following read failed `ReadProcessMemory`, then status found no running game. User confirmed crash. Batch stopped before remaining export/Play steps. No retry. |
+| UI reload after restart | Loaded original checkpoint via upper-right menu → Load Scenario → filename field → Open. Then loaded the **same edited file involved in the crash** through UI: all five saved object records matched pre-save records and inactive trigger export matched exactly. This rules out an inevitably unloadable edited file, not every possible native crash cause. |
+| Playtest UI | Upper-right Play opened alternative Play-as/difficulty/Play popover. Actual gameplay transition and Quit were not exercised. Native start-test remains a separately documented unsafe path. |
+| Final recovery | Original checkpoint reloaded via UI. Zero objects, empty selection, 100×100 map, sampled height4, clear cursor and byte-identical original trigger export verified. Alternative UI remained enabled. Camera was centered by loading rather than restored to original corner view; save-name/undo history are not preserved. |
+
+## Retained backups
+
+- `research/extracted/alternative-ui-20261005/before.mythscn`: SHA-256 `4e232dc95f888520b4c0e0022a0921858e0ef9776e4e2b87ed00c96ee2a8b126`.
+- Original active-profile staging: `C:\Users\wrket\Games\Age of Mythology Retold\76561198036055929\scenario\AomMcp-checkpoint-1bb9605e0dd64cbab9a7e0f08303e897.mythscn`. This is the file used for final UI recovery.
+- `edited.mythscn`: SHA-256 `b955fe95d7872c15798efdc2e7d4d3ba0692b9d530651cd6ec99087623f6e3a8`; corresponding profile staging stem `AomMcp-checkpoint-802a8902e2d5490daa28ce5470b2f3d4`.
+- Original/final trigger exports: 60 bytes, SHA-256 `e2a132f74440d758c56904bc95eb6dbaab20ebc3562e605653884af6eae50858`.
+- Inactive supplied/imported/UI-reloaded controller: SHA-256 `b6acc4ed294b858caea7d4be60c90cce810a877f2a43ca21fb07a2f8263610b4`.
+
+## Untested / unresolved
+
+Water, forest, cliff, wall, terrain-copy/paste, cinematics, lighting value edits, complex trigger shapes, XS execution, gameplay entry/exit and full remaining-tool semantic coverage remain unverified. Native reload crash remains undiagnosed; tool removal is mitigation, not a root-cause fix. Any reintroduction requires separate diagnosis and explicitly authorized retest; do not label full alternative-UI support on the strength of tool exposure or dispatcher acknowledgements.
+
+## Guarded player UI follow-up
+
+Later om10 live tests on the same executable/build and 2560×1440 alternative UI established the Players Settings panel's fixed pixel signature plus OCR regions in `uilayouts/alt-2560x1440.json`. The `editor_player_settings` writer is **not** a general UI driver: field readback can be wrong (small `9` recognized as `6`, sometimes reversed), while game-written checkpoint values remain authoritative. P6 food 999999→999998→999999, P7 startAge Heroic→Classical→Heroic (with heroic god ID automatically 823→-1→823), and P6 AI path reselected via the `Load In-Game Asset Files` browser were checkpoint-verified. Folder traversal uses **Open**, not Open Directory; file list may need Search file. AI Name text typing did not persist. Browser cancellation returns to map and cannot safely produce a diagnostic checkpoint while open. Stop and inspect; no mutation retry.
+
+A follow-up explicitly tested the **normal editor UI** on the same build/client size. Its Player Data and Diplomacy dialogs are gray, top-menu-driven layouts—not the alternative panel. `editor_ui_read(field="players.1.food")` refused `UI_LAYOUT_UNREVIEWED`, while a bounded explicit region read the visible normal-UI `200`. Confirmed `editor_player_settings apply` refused `UI_LAYOUT_UNREVIEWED` before input or backup; `editor_set_diplomacy changes apply` refused `UI_PANEL_MISMATCH` before input or backup. Thus normal-UI **write support is not implemented**; refusal was tested rather than guessed clicks. To switch: main menu → hamburger → Settings → UI → bottom Alternate Editor UI → Save → hamburger → Editor. MCP input tools refuse outside scenario-editor mode, so the approved settings switch used a temporary PID/foreground/client-size-guarded one-click Win32 menu helper with MCP screenshots before each unreviewed choice; no scene edits were performed through that helper. Returning to Editor creates a blank map; the earlier game-written backup was reloaded through the visible Load Scenario UI (not native `loadScenario`). Final game-written checkpoint `gaps-live-final.mythscn` has PL and embedded TR sections **byte-identical to `step-03.mythscn`**; live trigger export bodies and named camera entries are identical before/after; only the export-basename header inside the 216-byte camera suffix differs between exports. No original scenario file was saved over; undo/save-name history and exact pre-switch camera view were not restored.

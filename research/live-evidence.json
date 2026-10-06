@@ -1,0 +1,98 @@
+{
+  "exe": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Age of Mythology Retold\\AoMRT_s.exe",
+  "sha256": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+  "version": "100.19.17020.0",
+  "machine": "Amd64",
+  "native": true,
+  "imageBase": "0x140000000",
+  "entryPointRva": "0x36f9e70",
+  "flags": "HighEntropyVirtualAddressSpace, DynamicBase, NxCompatible, TerminalServerAware",
+  "exportFunctions": 280,
+  "exportNames": 280,
+  "sections": [
+    {
+      "Name": ".text",
+      "rva": "0x1000",
+      "VirtualSize": 63722476,
+      "SizeOfRawData": 63722496,
+      "entropy": 7.7562,
+      "flags": "ContainsCode, MemExecute, MemRead"
+    },
+    {
+      "Name": ".rdata",
+      "rva": "0x3cc7000",
+      "VirtualSize": 20748444,
+      "SizeOfRawData": 20748800,
+      "entropy": 6.341,
+      "flags": "ContainsInitializedData, MemRead"
+    },
+    {
+      "Name": ".data",
+      "rva": "0x5091000",
+      "VirtualSize": 14108504,
+      "SizeOfRawData": 3204608,
+      "entropy": 4.1115,
+      "flags": "ContainsInitializedData, MemRead, MemWrite"
+    },
+    {
+      "Name": ".pdata",
+      "rva": "0x5e06000",
+      "VirtualSize": 2613792,
+      "SizeOfRawData": 2614272,
+      "entropy": 7.2041,
+      "flags": "ContainsInitializedData, MemRead"
+    },
+    {
+      "Name": ".rsrc",
+      "rva": "0x6085000",
+      "VirtualSize": 276376,
+      "SizeOfRawData": 276480,
+      "entropy": 7.7362,
+      "flags": "ContainsInitializedData, MemRead"
+    },
+    {
+      "Name": ".reloc",
+      "rva": "0x60c9000",
+      "VirtualSize": 503072,
+      "SizeOfRawData": 503296,
+      "entropy": 5.4812,
+      "flags": "ContainsInitializedData, MemDiscardable, MemRead"
+    }
+  ],
+  "anchors": {
+    "uiPlaceAtPointer": 2,
+    "uiChangeBrushSize": 2,
+    "uiSaveScenarioPrompt": 2,
+    "saveScenario": 2,
+    "loadScenario": 3,
+    "trExecuteConsoleCommand": 2,
+    "xsExecute": 0
+  },
+  "runningPids": [
+    20864
+  ],
+  "samples": {
+    "entryPoint": {
+      "rva": "0x36f9e70",
+      "diskHex": "4883ec28e8bf0c00004883c428e97afeffffcccc488bc44c8948204c89401848"
+    },
+    "exportedCorrelationVectorConstructor": {
+      "rva": "0x2ddc460",
+      "diskHex": "9db35c4067d2458117a27af7b3c18d17054ca764fbfdc0834f852d7623127cfa"
+    }
+  },
+  "live": {
+    "pid": 20864,
+    "readAccess": true,
+    "samples": {
+      "entryPoint": {
+        "memoryHex": "4883ec28e8bf0c00004883c428e97afeffffcccc488bc44c8948204c89401848",
+        "matchesDisk": true
+      },
+      "exportedCorrelationVectorConstructor": {
+        "memoryHex": "33c0c5f9efc0c5fc114118c5f8114138488941084889411089414cc74148ffff",
+        "matchesDisk": false
+      }
+    }
+  }
+}

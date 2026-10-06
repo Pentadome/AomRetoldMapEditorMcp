@@ -1,0 +1,565 @@
+{
+  "authorization": "User opened editor and requested live mutation tests. No automatic AFK mutation tests.",
+  "build": {
+    "connected": true,
+    "pid": 24876,
+    "windowThread": 28724,
+    "editor": true,
+    "ownerThread": 28724,
+    "placementProtoId": -1,
+    "placementPlayer": 1,
+    "foreground": true,
+    "width": 2560,
+    "height": 1440,
+    "build": "100.19.17020.0",
+    "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff"
+  },
+  "capturedAtUtc": "2026-10-05T07:09:22.0287123Z",
+  "originalObjects": [
+    {
+      "unitId": 0,
+      "protoId": 54,
+      "proto": "VillagerGreek",
+      "player": 1,
+      "position": {
+        "x": 80.20419,
+        "y": 4,
+        "z": 85.335945
+      },
+      "health": 55,
+      "maxHealth": 55
+    },
+    {
+      "unitId": 1,
+      "protoId": 54,
+      "proto": "VillagerGreek",
+      "player": 1,
+      "position": {
+        "x": 84.96241,
+        "y": 4,
+        "z": 84.28122
+      },
+      "health": 55,
+      "maxHealth": 55
+    },
+    {
+      "unitId": 2,
+      "protoId": 566,
+      "proto": "TreeGaia",
+      "player": 0,
+      "position": {
+        "x": 79,
+        "y": 4,
+        "z": 89
+      },
+      "health": 20,
+      "maxHealth": 20
+    },
+    {
+      "unitId": 3,
+      "protoId": 566,
+      "proto": "TreeGaia",
+      "player": 0,
+      "position": {
+        "x": 83,
+        "y": 4,
+        "z": 89
+      },
+      "health": 20,
+      "maxHealth": 20
+    }
+  ],
+  "originalCamera": {
+    "position": {
+      "x": 68.27363,
+      "y": 46.075302,
+      "z": 34.214233
+    },
+    "forward": {
+      "x": 0.48224548,
+      "y": -0.73135394,
+      "z": 0.48224548
+    },
+    "up": {
+      "x": 0.5171454,
+      "y": 0.68199813,
+      "z": 0.5171454
+    },
+    "right": {
+      "x": 0.7071068,
+      "y": 0,
+      "z": -0.7071068
+    },
+    "fieldOfViewRadians": 0.698132
+  },
+  "originalTriggerSha256": "3ddb48ede465c9c72e61230cdbad5162bd882ff97047e8bb2d988ac95584b628",
+  "originalTriggerBytes": 60,
+  "checkpoints": [
+    {
+      "path": "C:\\Users\\wrket\\repos\\aom\\research\\extracted\\live-mutations\\before.mythscn",
+      "bytes": 60141,
+      "decodedBytes": 3023626,
+      "sha256": "624a9e13eb021e725f005f176161f5028955dede27ee60929ecae547b6a8a3af",
+      "zlibAdlerVerified": true,
+      "opaqueTrailerBytes": 4,
+      "trailerSemanticsVerified": false
+    },
+    {
+      "path": "C:\\Users\\wrket\\repos\\aom\\research\\extracted\\live-mutations\\after.mythscn",
+      "bytes": 60151,
+      "decodedBytes": 3023638,
+      "sha256": "c61d3aec660ddf262e58ffb2a7a451c0d32df39e7125ac081b0532b6bcd4aa45",
+      "zlibAdlerVerified": true,
+      "opaqueTrailerBytes": 4,
+      "trailerSemanticsVerified": false
+    }
+  ],
+  "nativeCheckpointResults": [
+    {
+      "path": "C:\\Users\\wrket\\repos\\aom\\research\\extracted\\live-mutations\\before.mythscn",
+      "stagedPath": "C:\\Users\\wrket\\Games\\Age of Mythology Retold\\76561198036055929\\scenario\\AomMcp-checkpoint-3d0b8635ff31492cacaa92459f80f7c7.mythscn",
+      "sha256": "624a9e13eb021e725f005f176161f5028955dede27ee60929ecae547b6a8a3af",
+      "fileVerified": true,
+      "overwrite": false,
+      "limitation": "Game-written l33t/zlib snapshot with decoded length and zlib Adler-32 verified, not semantic reload validation. Four-byte game trailer preserved but not interpreted/validated. Staging file retained. Writer may change editor save-name/dirty state. No existing destination ever overwritten."
+    },
+    {
+      "path": "C:\\Users\\wrket\\repos\\aom\\research\\extracted\\live-mutations\\after.mythscn",
+      "stagedPath": "C:\\Users\\wrket\\Games\\Age of Mythology Retold\\76561198036055929\\scenario\\AomMcp-checkpoint-8f6a888af94d4d91bbfa0ed74d8efb9c.mythscn",
+      "sha256": "c61d3aec660ddf262e58ffb2a7a451c0d32df39e7125ac081b0532b6bcd4aa45",
+      "fileVerified": true,
+      "overwrite": false,
+      "limitation": "Game-written l33t/zlib snapshot with decoded length and zlib Adler-32 verified, not semantic reload validation. Four-byte game trailer preserved but not interpreted/validated. Staging file retained. Writer may change editor save-name/dirty state. No existing destination ever overwritten."
+    }
+  ],
+  "rows": {
+    "placed": {
+      "preview": false,
+      "points": [
+        {
+          "x": 1140,
+          "y": 700
+        },
+        {
+          "x": 1260,
+          "y": 700
+        }
+      ],
+      "attempted": 2,
+      "verified": 2,
+      "stoppedOnError": false,
+      "steps": [
+        {
+          "point": {
+            "x": 1140,
+            "y": 700
+          },
+          "unitId": 4,
+          "proto": "Hoplite",
+          "player": 1,
+          "position": {
+            "x": 93.67883,
+            "y": 4,
+            "z": 65.432304
+          },
+          "health": 115,
+          "maxHealth": 115
+        },
+        {
+          "point": {
+            "x": 1260,
+            "y": 700
+          },
+          "unitId": 5,
+          "proto": "Hoplite",
+          "player": 1,
+          "position": {
+            "x": 96.17006,
+            "y": 4,
+            "z": 62.941074
+          },
+          "health": 115,
+          "maxHealth": 115
+        }
+      ],
+      "error": null,
+      "limitation": "Non-atomic screen-space formation; existing Place guards/cleanup retained. Each successful step observes exactly one new full live ID, never guessed from order. Concurrent edits/async effects can cause refusal after placement. Earlier effects remain; no automatic retry/undo. Pixel spacing is not world spacing; actual positions returned. Scenario not saved.",
+      "atomic": false
+    },
+    "undos": 2,
+    "restoredAfterSettledRead": true,
+    "note": "Immediate read after final undo observed one pending deletion; subsequent read verified restoration. No extra undo/delete retry."
+  },
+  "ring": {
+    "placed": {
+      "preview": false,
+      "points": [
+        {
+          "x": 1529,
+          "y": 760
+        },
+        {
+          "x": 1425,
+          "y": 820
+        },
+        {
+          "x": 1425,
+          "y": 700
+        }
+      ],
+      "attempted": 3,
+      "verified": 3,
+      "stoppedOnError": false,
+      "steps": [
+        {
+          "point": {
+            "x": 1529,
+            "y": 760
+          },
+          "unitId": 262149,
+          "proto": "Hoplite",
+          "player": 1,
+          "position": {
+            "x": 99.93942,
+            "y": 4,
+            "z": 55.828438
+          },
+          "health": 115,
+          "maxHealth": 115
+        },
+        {
+          "point": {
+            "x": 1425,
+            "y": 820
+          },
+          "unitId": 262148,
+          "proto": "Hoplite",
+          "player": 1,
+          "position": {
+            "x": 96.17991,
+            "y": 4,
+            "z": 56.425278
+          },
+          "health": 115,
+          "maxHealth": 115
+        },
+        {
+          "point": {
+            "x": 1425,
+            "y": 700
+          },
+          "unitId": 6,
+          "proto": "Hoplite",
+          "player": 1,
+          "position": {
+            "x": 99.5955,
+            "y": 4,
+            "z": 59.51564
+          },
+          "health": 115,
+          "maxHealth": 115
+        }
+      ],
+      "error": null,
+      "limitation": "Non-atomic screen-space formation; existing Place guards/cleanup retained. Each successful step observes exactly one new full live ID, never guessed from order. Concurrent edits/async effects can cause refusal after placement. Earlier effects remain; no automatic retry/undo. Pixel spacing is not world spacing; actual positions returned. Scenario not saved.",
+      "atomic": false
+    },
+    "selectedEntries": [
+      {
+        "kind": 0,
+        "unitId": 262149,
+        "properties": {
+          "unitId": 262149,
+          "protoId": 58,
+          "proto": "Hoplite",
+          "player": 1,
+          "position": {
+            "x": 99.93942,
+            "y": 4,
+            "z": 55.828438
+          },
+          "health": 115,
+          "maxHealth": 115
+        },
+        "resolved": true
+      },
+      {
+        "kind": 0,
+        "unitId": 262148,
+        "properties": {
+          "unitId": 262148,
+          "protoId": 58,
+          "proto": "Hoplite",
+          "player": 1,
+          "position": {
+            "x": 96.17991,
+            "y": 4,
+            "z": 56.425278
+          },
+          "health": 115,
+          "maxHealth": 115
+        },
+        "resolved": true
+      },
+      {
+        "kind": 0,
+        "unitId": 6,
+        "properties": {
+          "unitId": 6,
+          "protoId": 58,
+          "proto": "Hoplite",
+          "player": 1,
+          "position": {
+            "x": 99.5955,
+            "y": 4,
+            "z": 59.51564
+          },
+          "health": 115,
+          "maxHealth": 115
+        },
+        "resolved": true
+      }
+    ],
+    "undos": 3,
+    "restoredAfter200msRead": true
+  },
+  "triggerImports": [
+    {
+      "inputPath": "C:\\Users\\wrket\\repos\\aom\\research\\extracted\\live-mutations\\inactive-probe.trg",
+      "backupPath": "C:\\Users\\wrket\\Games\\Age of Mythology Retold\\76561198036055929\\trigger\\AomMcp-before-trigger-import-16754989cd1a45b5a5d68ac8885200a4.trg",
+      "stagedPath": "C:\\Users\\wrket\\Games\\Age of Mythology Retold\\76561198036055929\\trigger\\AomMcp-trigger-import-6c35e9ebbf24463ea3007651a4d62d5b.trg",
+      "roundTripPath": "C:\\Users\\wrket\\Games\\Age of Mythology Retold\\76561198036055929\\trigger\\AomMcp-trigger-roundtrip-52fcb2ca85bc4c389ff599b9fb586ed7.trg",
+      "roundTripVerified": true,
+      "sha256": "00fe506791c8f7afae64a5b79b9286bbdbc532d3ce1d362347bdc561c1246cdc",
+      "trigger": {
+        "path": "C:\\Users\\wrket\\Games\\Age of Mythology Retold\\76561198036055929\\trigger\\AomMcp-trigger-roundtrip-52fcb2ca85bc4c389ff599b9fb586ed7.trg",
+        "sha256": "00fe506791c8f7afae64a5b79b9286bbdbc532d3ce1d362347bdc561c1246cdc",
+        "format": "TR v12 single verified controller",
+        "serializationRoundTripVerified": true,
+        "triggers": [
+          {
+            "name": "LiveMutationProbe",
+            "active": false,
+            "loop": false,
+            "conditions": [
+              {
+                "type": "Always"
+              }
+            ],
+            "effects": [
+              {
+                "type": "XS: Code Snippet",
+                "parameters": {
+                  "codeSnippet": "// Inactive serialization probe; no game effects.\r\n"
+                }
+              }
+            ]
+          }
+        ],
+        "findings": [
+          "Controller starts inactive."
+        ],
+        "limitation": "Lossless codec for verified controller shape. Not arbitrary legacy TR shapes, XS compiler validation or proof of trigger effects. Template expansion can change code before compilation."
+      },
+      "limitation": "Whole trigger set replaced explicitly. Backup retained, undo not assumed. Equality verifies serialization only, not XS compilation/effects. No automatic rollback/retry."
+    },
+    {
+      "inputPath": "C:\\Users\\wrket\\repos\\aom\\research\\extracted\\live-mutations\\inactive-probe-edited.trg",
+      "backupPath": "C:\\Users\\wrket\\Games\\Age of Mythology Retold\\76561198036055929\\trigger\\AomMcp-before-trigger-import-5c44ef257b88486baac945f9124826c5.trg",
+      "stagedPath": "C:\\Users\\wrket\\Games\\Age of Mythology Retold\\76561198036055929\\trigger\\AomMcp-trigger-import-03585478f29d44d7a9f9c0c34439ed56.trg",
+      "roundTripPath": "C:\\Users\\wrket\\Games\\Age of Mythology Retold\\76561198036055929\\trigger\\AomMcp-trigger-roundtrip-03b8b127b9b44f8694dd0db950ef2529.trg",
+      "roundTripVerified": true,
+      "sha256": "b765b39392abbe91de80ba8f9e56a9c79b7e45ba03883e9b7f9e104eda91ff81",
+      "trigger": {
+        "path": "C:\\Users\\wrket\\Games\\Age of Mythology Retold\\76561198036055929\\trigger\\AomMcp-trigger-roundtrip-03b8b127b9b44f8694dd0db950ef2529.trg",
+        "sha256": "b765b39392abbe91de80ba8f9e56a9c79b7e45ba03883e9b7f9e104eda91ff81",
+        "format": "TR v12 single verified controller",
+        "serializationRoundTripVerified": true,
+        "triggers": [
+          {
+            "name": "LiveMutationProbeEdited",
+            "active": false,
+            "loop": false,
+            "conditions": [
+              {
+                "type": "Always"
+              }
+            ],
+            "effects": [
+              {
+                "type": "XS: Code Snippet",
+                "parameters": {
+                  "codeSnippet": "// Inactive Unicode serialization probe: α.\r\n"
+                }
+              }
+            ]
+          }
+        ],
+        "findings": [
+          "Controller starts inactive."
+        ],
+        "limitation": "Lossless codec for verified controller shape. Not arbitrary legacy TR shapes, XS compiler validation or proof of trigger effects. Template expansion can change code before compilation."
+      },
+      "limitation": "Whole trigger set replaced explicitly. Backup retained, undo not assumed. Equality verifies serialization only, not XS compilation/effects. No automatic rollback/retry."
+    }
+  ],
+  "triggerRestoration": {
+    "nativeFilenameStem": "AomMcp-trigger-export-b391eca2f57b4ee2ba2be5342f2ee55d",
+    "helperCannotApplyUnknownEmptyShape": true,
+    "separatelyAuthorizedNativeImport": true,
+    "serializedBytesEqualOriginal": true,
+    "note": "Restoration used pre-hardening native schema. Raw native trigger load/save now both require confirmDestructive=true."
+  },
+  "partialStop": {
+    "steps": [
+      {
+        "name": "editor_place_formation",
+        "isError": true,
+        "structuredContent": {
+          "preview": false,
+          "points": [
+            {
+              "x": 1540,
+              "y": 880
+            },
+            {
+              "x": 1660,
+              "y": 880
+            }
+          ],
+          "attempted": 1,
+          "verified": 0,
+          "stoppedOnError": true,
+          "steps": [],
+          "error": "Unit preparation not reflected in editor state; no placement requested.",
+          "limitation": "Non-atomic screen-space formation; existing Place guards/cleanup retained. Each successful step observes exactly one new full live ID, never guessed from order. Concurrent edits/async effects can cause refusal after placement. Earlier effects remain; no automatic retry/undo. Pixel spacing is not world spacing; actual positions returned. Scenario not saved.",
+          "atomic": false
+        }
+      }
+    ],
+    "attempted": 1,
+    "completed": 0,
+    "stoppedOnError": true,
+    "atomic": false
+  },
+  "refusals": [
+    {
+      "phase": "client-bound-refusal",
+      "error": "Formation point outside actual client; entire plan refused before placement."
+    },
+    {
+      "phase": "overwrite-refusal",
+      "error": "Output must be new file with requested extension in existing directory; never silently overwrite."
+    }
+  ],
+  "validatorWithInactiveController": {
+    "pid": 24876,
+    "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+    "capturedAtUtc": "2026-10-05T07:50:29.9759096Z",
+    "totalObjects": 4,
+    "totalFindings": 2,
+    "offset": 0,
+    "limit": 100,
+    "nextOffset": null,
+    "findings": [
+      {
+        "severity": "warning",
+        "code": "controller-config",
+        "message": "Controller starts inactive.",
+        "unitId": null
+      },
+      {
+        "severity": "information",
+        "code": "no-literal-outcome",
+        "message": "No literal win/defeat call found in supplied controller. Missing objective suspected, not proven; default victory/external rules may handle outcomes.",
+        "unitId": null
+      }
+    ],
+    "automaticFixes": false,
+    "atomic": false,
+    "triggerSourceIsLive": false,
+    "skippedChecks": [
+      "Only supplied verified controller shape inspected; file is not proof of current scene trigger state.",
+      "Map bounds checked against separately measured non-atomic snapshot.",
+      "Objective UI, diplomacy, scenario modes, native trigger references in other shapes, XS compilation, dynamic/scenario-name unit references and external scripts not inspected."
+    ],
+    "limitation": "Partial diagnostics, not a valid/invalid scenario verdict. Only caller-declared full live IDs treated as required references; script literals never guessed as simulation IDs. Rule/outcome scans are textual candidates, not semantic validation."
+  },
+  "finalValidator": {
+    "pid": 24876,
+    "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+    "capturedAtUtc": "2026-10-05T07:56:34.0177277Z",
+    "totalObjects": 4,
+    "totalFindings": 0,
+    "offset": 0,
+    "limit": 100,
+    "nextOffset": null,
+    "findings": [],
+    "automaticFixes": false,
+    "atomic": false,
+    "triggerSourceIsLive": false,
+    "skippedChecks": [
+      "No exported triggerPath supplied; triggers not inspected.",
+      "Map bounds checked against separately measured non-atomic snapshot.",
+      "Objective UI, diplomacy, scenario modes, native trigger references in other shapes, XS compilation, dynamic/scenario-name unit references and external scripts not inspected."
+    ],
+    "limitation": "Partial diagnostics, not a valid/invalid scenario verdict. Only caller-declared full live IDs treated as required references; script literals never guessed as simulation IDs. Rule/outcome scans are textual candidates, not semantic validation."
+  },
+  "restorationChecks": {
+    "objectsExact": true,
+    "selectionEmpty": true,
+    "cameraExact": true,
+    "triggerBytesExact": true,
+    "beforeCheckpointUnchanged": true
+  },
+  "finalStatus": {
+    "connected": true,
+    "pid": 24876,
+    "windowThread": 28724,
+    "editor": true,
+    "ownerThread": 28724,
+    "placementProtoId": -1,
+    "placementPlayer": 1,
+    "foreground": true,
+    "width": 2560,
+    "height": 1440,
+    "build": "100.19.17020.0",
+    "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff"
+  },
+  "paletteRestoration": {
+    "nativeCleanupCanLeavePaletteOpen": true,
+    "explicitEscClosedPalette": true,
+    "image": "C:\\Users\\wrket\\repos\\aom\\research\\extracted\\live-mutations\\ui-restored-11.png"
+  },
+  "productionFixes": [
+    "Pass filename stem for native trigger load/save and scenario save; game appends extension.",
+    "Check actual zlib Adler-32 before observed four-byte opaque scenario trailer; trailer remains uninterpreted.",
+    "Classify raw uiLoadTriggers/uiSaveTriggers as confirmation-required, including batch preflight; helper callbacks retain approval."
+  ],
+  "connectionPolicy": {
+    "segments": 4,
+    "reason": "Hosts restarted only for production code fixes; known operations grouped in batches within each segment.",
+    "allProductionHostEofExitCodes": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "temporaryHarnessIssue": {
+    "closeRequestPartiallyPublished": true,
+    "failedBeforeAnyRpc": true,
+    "productionHostCleanedUpViaFinally": true,
+    "readOnlyPublicationRetryFixed": true,
+    "controllerNotProductionCode": true
+  },
+  "notValidated": [
+    "Save/reload semantics or persistence",
+    "XS compilation/effects (controllers inactive; no playtest)",
+    "Opaque scenario trailer checksum/meaning",
+    "Arbitrary TR record shapes",
+    "Undo/save-name/dirty-state preservation",
+    "General stress/reentrancy or future patches"
+  ],
+  "rawEvidenceDirectory": "C:\\Users\\wrket\\repos\\aom\\research\\extracted\\live-mutations"
+}

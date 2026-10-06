@@ -1,0 +1,22 @@
+{
+  "startup_to_first_ping": {
+    "medianMs": 433.6,
+    "maxMs": 547.0,
+    "samples": 3
+  },
+  "editor_status": {
+    "medianMs": 75.3,
+    "maxMs": 110.2,
+    "samples": 9
+  },
+  "editor_uiClearCursor": {
+    "medianMs": 75.6,
+    "maxMs": 104.4,
+    "samples": 9
+  },
+  "editor_screenshot": {
+    "medianMs": 298.7,
+    "maxMs": 392.2,
+    "samples": 9
+  }
+}

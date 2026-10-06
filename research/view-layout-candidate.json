@@ -1,0 +1,99 @@
+{
+  "selection": {
+    "player": 1,
+    "slotsOffset": 1728,
+    "slotStride": 16,
+    "groupOffset": 16,
+    "countOffset": 8,
+    "arrayOffset": 24,
+    "recordStride": 16,
+    "kindOffset": 8,
+    "idOffset": 12,
+    "signatures": [
+      {
+        "rva": 6427888,
+        "hex": "40534883ec30488b1deb38dc04488bcbe87bfbb8ff0fb6c04883c06c4803c048833cc300745d488bcbe862fbb8ff0fb6c04883c06c4803c0488b04c348837810007440488bcbe845fbb8ff0fb6c84883c16c4803c9488b0ccb488d542420488b4910e8a943e9ff90488b05e93adc04488b48084885c9740b488d542420e89e3bc4ff904883c4305bc3"
+      },
+      {
+        "rva": 1773696,
+        "hex": "4883ec2880b9090900000174634c8b1d"
+      },
+      {
+        "rva": 1773808,
+        "hex": "b0014883c428c3cccccccccccccccccc"
+      },
+      {
+        "rva": 4938034,
+        "hex": "448b41084585c075214c8d15860a24044c89128b05e5fdcb048942088b05e0fdcb0489420ce915050000488bf0488945a78bf8488945af4c8bf0488945b7448be8488945bf8bd8c5c857f6c5f8117587448be04585c00f8eaa0400006690418bcc4803c94d8b4918418b44c90885c00f85d6010000488b059af6f204488b"
+      }
+    ]
+  },
+  "map": {
+    "worldOffset": 8,
+    "terrainOffset": 608,
+    "tileOffsets": [
+      12,
+      16
+    ],
+    "vertexOffsets": [
+      20,
+      24
+    ],
+    "scaleOffset": 28,
+    "inverseScaleOffset": 32,
+    "gridOffset": 120,
+    "gridCountOffset": 0,
+    "gridDataOffset": 16,
+    "gridStrideOffset": 44,
+    "cameraOffset": 216,
+    "poseOffsets": [
+      0,
+      16,
+      32,
+      48
+    ],
+    "fovOffset": 176,
+    "rendererGlobalRva": 88251184,
+    "viewportOffsets": [
+      9240,
+      9244,
+      9248,
+      9252
+    ],
+    "projectionOffset": 4928,
+    "signatures": [
+      {
+        "rva": 29342880,
+        "hex": "40534883ec20488b1d630083034885db7442488bcbe8e69afbff48837b08007433488b1d48008303488bcbe8d09afbff488b4308488b88600200004885c97414c5f857c0c5fa2a410cc5fa59411c4883c4205bc3c5f857c0"
+      },
+      {
+        "rva": 29342976,
+        "hex": "40534883ec20488b1d030083034885db7442488bcbe8869afbff48837b08007433488b1de8ff8203488bcbe8709afbff488b4308488b88600200004885c97414c5f857c0c5fa2a4110c5fa59411c4883c4205bc3c5f857c0"
+      },
+      {
+        "rva": 34054498,
+        "hex": "c5f057c9488b8860020000c5fa104120488b01c4e37921d010c4e36921d020c4e36921d130c5e8590fc5f0c6c1aac57a2cc0c5fa2cd1488b5c24404883c4305f"
+      },
+      {
+        "rva": 4021616,
+        "hex": "4883ec480faf512c488bc1428d0c023b08730e488b4010c5fa1004884883c448c3"
+      },
+      {
+        "rva": 6259219,
+        "hex": "488b05cecbde04488b90d80000004885d27413488b050319e3048b8800240000898ab0000000"
+      },
+      {
+        "rva": 23320144,
+        "hex": "4883ec68488b0dd5c4de038b8114240000c5fa1081f4230000448b8920240000448b811c2400008b9118240000894424588b8110240000894424508b810c240000894424488b8108240000894424408b8124240000c5fa114c2438c5fa1089f0230000c5fa11442430c5fa114c242889442420e838f3ffff4883c468c3cc"
+      },
+      {
+        "rva": 23316116,
+        "hex": "c5f81022c5f811a140130000c5f8105a10c5f8119950130000c5f8104a20c5f8118960130000c5f8104230c5f8118170130000"
+      },
+      {
+        "rva": 1698944,
+        "hex": "c5f8103d18e65404c5c0540bc5c05505bce65404c5c0541514d56a04c5f056c8c4e36940d9ffc4e3694053107fc5e05ec2c57829442460c4413857c0c5b85cc8c5f0595b10c5e05813c57828442460c5f811"
+      }
+    ]
+  }
+}

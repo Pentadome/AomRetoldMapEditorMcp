@@ -1,0 +1,262 @@
+{
+  "sceneMutated": false,
+  "focusChanged": false,
+  "nativeCalls": false,
+  "gameMemoryWritten": false,
+  "checks": [
+    {
+      "arguments": {},
+      "result": {
+        "pid": 24876,
+        "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+        "capturedAtUtc": "2026-10-04T19:27:24.411426Z",
+        "totalObjects": 4,
+        "total": 4,
+        "unresolvedPrototypeCount": 0,
+        "offset": 0,
+        "limit": 100,
+        "nextOffset": null,
+        "units": [
+          {
+            "unitId": 0,
+            "protoId": 54,
+            "proto": "VillagerGreek",
+            "player": 1,
+            "position": {
+              "x": 80.20419,
+              "y": 4,
+              "z": 85.335945
+            },
+            "health": 55,
+            "maxHealth": 55
+          },
+          {
+            "unitId": 1,
+            "protoId": 54,
+            "proto": "VillagerGreek",
+            "player": 1,
+            "position": {
+              "x": 84.96241,
+              "y": 4,
+              "z": 84.28122
+            },
+            "health": 55,
+            "maxHealth": 55
+          },
+          {
+            "unitId": 2,
+            "protoId": 566,
+            "proto": "TreeGaia",
+            "player": 0,
+            "position": {
+              "x": 79,
+              "y": 4,
+              "z": 89
+            },
+            "health": 20,
+            "maxHealth": 20
+          },
+          {
+            "unitId": 3,
+            "protoId": 566,
+            "proto": "TreeGaia",
+            "player": 0,
+            "position": {
+              "x": 83,
+              "y": 4,
+              "z": 89
+            },
+            "health": 20,
+            "maxHealth": 20
+          }
+        ],
+        "atomic": false,
+        "limitation": "ReadProcessMemory only; no focus, input or game-function calls. Registry and IDs rechecked, not an atomic simulation-frame snapshot. IDs valid for current scenario/object lifetime; reload/delete/recreate can invalidate them. Positions are world X/Y/Z, area uses X/Z. Names from live base registry; player-local prototypes can be null, never guessed from XML order. Includes buildings/resources/decorations in object registry, not only military units."
+      }
+    },
+    {
+      "arguments": {
+        "proto": "villagergreek",
+        "player": 1,
+        "limit": 1
+      },
+      "result": {
+        "pid": 24876,
+        "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+        "capturedAtUtc": "2026-10-04T19:27:24.4840461Z",
+        "totalObjects": 4,
+        "total": 2,
+        "unresolvedPrototypeCount": 0,
+        "offset": 0,
+        "limit": 1,
+        "nextOffset": 1,
+        "units": [
+          {
+            "unitId": 0,
+            "protoId": 54,
+            "proto": "VillagerGreek",
+            "player": 1,
+            "position": {
+              "x": 80.20419,
+              "y": 4,
+              "z": 85.335945
+            },
+            "health": 55,
+            "maxHealth": 55
+          }
+        ],
+        "atomic": false,
+        "limitation": "ReadProcessMemory only; no focus, input or game-function calls. Registry and IDs rechecked, not an atomic simulation-frame snapshot. IDs valid for current scenario/object lifetime; reload/delete/recreate can invalidate them. Positions are world X/Y/Z, area uses X/Z. Names from live base registry; player-local prototypes can be null, never guessed from XML order. Includes buildings/resources/decorations in object registry, not only military units."
+      }
+    },
+    {
+      "arguments": {
+        "player": 0
+      },
+      "result": {
+        "pid": 24876,
+        "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+        "capturedAtUtc": "2026-10-04T19:27:24.5426072Z",
+        "totalObjects": 4,
+        "total": 2,
+        "unresolvedPrototypeCount": 0,
+        "offset": 0,
+        "limit": 100,
+        "nextOffset": null,
+        "units": [
+          {
+            "unitId": 2,
+            "protoId": 566,
+            "proto": "TreeGaia",
+            "player": 0,
+            "position": {
+              "x": 79,
+              "y": 4,
+              "z": 89
+            },
+            "health": 20,
+            "maxHealth": 20
+          },
+          {
+            "unitId": 3,
+            "protoId": 566,
+            "proto": "TreeGaia",
+            "player": 0,
+            "position": {
+              "x": 83,
+              "y": 4,
+              "z": 89
+            },
+            "health": 20,
+            "maxHealth": 20
+          }
+        ],
+        "atomic": false,
+        "limitation": "ReadProcessMemory only; no focus, input or game-function calls. Registry and IDs rechecked, not an atomic simulation-frame snapshot. IDs valid for current scenario/object lifetime; reload/delete/recreate can invalidate them. Positions are world X/Y/Z, area uses X/Z. Names from live base registry; player-local prototypes can be null, never guessed from XML order. Includes buildings/resources/decorations in object registry, not only military units."
+      }
+    },
+    {
+      "arguments": {
+        "offset": 2,
+        "limit": 2
+      },
+      "result": {
+        "pid": 24876,
+        "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+        "capturedAtUtc": "2026-10-04T19:27:24.5964658Z",
+        "totalObjects": 4,
+        "total": 4,
+        "unresolvedPrototypeCount": 0,
+        "offset": 2,
+        "limit": 2,
+        "nextOffset": null,
+        "units": [
+          {
+            "unitId": 2,
+            "protoId": 566,
+            "proto": "TreeGaia",
+            "player": 0,
+            "position": {
+              "x": 79,
+              "y": 4,
+              "z": 89
+            },
+            "health": 20,
+            "maxHealth": 20
+          },
+          {
+            "unitId": 3,
+            "protoId": 566,
+            "proto": "TreeGaia",
+            "player": 0,
+            "position": {
+              "x": 83,
+              "y": 4,
+              "z": 89
+            },
+            "health": 20,
+            "maxHealth": 20
+          }
+        ],
+        "atomic": false,
+        "limitation": "ReadProcessMemory only; no focus, input or game-function calls. Registry and IDs rechecked, not an atomic simulation-frame snapshot. IDs valid for current scenario/object lifetime; reload/delete/recreate can invalidate them. Positions are world X/Y/Z, area uses X/Z. Names from live base registry; player-local prototypes can be null, never guessed from XML order. Includes buildings/resources/decorations in object registry, not only military units."
+      }
+    },
+    {
+      "arguments": {
+        "area": {
+          "x": 79,
+          "z": 89,
+          "radius": 0
+        }
+      },
+      "result": {
+        "pid": 24876,
+        "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+        "capturedAtUtc": "2026-10-04T19:27:24.6494785Z",
+        "totalObjects": 4,
+        "total": 1,
+        "unresolvedPrototypeCount": 0,
+        "offset": 0,
+        "limit": 100,
+        "nextOffset": null,
+        "units": [
+          {
+            "unitId": 2,
+            "protoId": 566,
+            "proto": "TreeGaia",
+            "player": 0,
+            "position": {
+              "x": 79,
+              "y": 4,
+              "z": 89
+            },
+            "health": 20,
+            "maxHealth": 20
+          }
+        ],
+        "atomic": false,
+        "limitation": "ReadProcessMemory only; no focus, input or game-function calls. Registry and IDs rechecked, not an atomic simulation-frame snapshot. IDs valid for current scenario/object lifetime; reload/delete/recreate can invalidate them. Positions are world X/Y/Z, area uses X/Z. Names from live base registry; player-local prototypes can be null, never guessed from XML order. Includes buildings/resources/decorations in object registry, not only military units."
+      }
+    },
+    {
+      "arguments": {
+        "offset": 2147483647
+      },
+      "result": {
+        "pid": 24876,
+        "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+        "capturedAtUtc": "2026-10-04T19:27:24.7023071Z",
+        "totalObjects": 4,
+        "total": 4,
+        "unresolvedPrototypeCount": 0,
+        "offset": 2147483647,
+        "limit": 100,
+        "nextOffset": null,
+        "units": [],
+        "atomic": false,
+        "limitation": "ReadProcessMemory only; no focus, input or game-function calls. Registry and IDs rechecked, not an atomic simulation-frame snapshot. IDs valid for current scenario/object lifetime; reload/delete/recreate can invalidate them. Positions are world X/Y/Z, area uses X/Z. Names from live base registry; player-local prototypes can be null, never guessed from XML order. Includes buildings/resources/decorations in object registry, not only military units."
+      }
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+**/bin/
+**/obj/
+HookSmoke/bridge/*.dll
+HookSmoke/bridge/*.lib
+HookSmoke/bridge/*.exp
+HookSmoke/bridge/*.obj
+extracted/

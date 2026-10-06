@@ -1,0 +1,14 @@
+{
+  "connected": true,
+  "pid": 26676,
+  "windowThread": 27424,
+  "editor": true,
+  "ownerThread": 27424,
+  "placementProtoId": -1,
+  "placementPlayer": -1,
+  "foreground": true,
+  "width": 2560,
+  "height": 1440,
+  "build": "100.19.17020.0",
+  "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff"
+}

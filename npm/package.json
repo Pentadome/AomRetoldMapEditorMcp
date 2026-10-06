@@ -1,0 +1,35 @@
+{
+  "name": "aom-retold-editor-mcp",
+  "version": "0.1.0",
+  "description": "Unofficial Windows x64 Age of Mythology: Retold editor MCP server",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Pentadome/AomRetoldMapEditorMcp.git",
+    "directory": "npm"
+  },
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "os": ["win32"],
+  "cpu": ["x64"],
+  "bin": { "aom-editor-mcp": "bin/aom-editor-mcp.cjs" },
+  "files": [
+    "bin/",
+    "runtime/AomMcp.exe",
+    "runtime/*.dll",
+    "runtime/AomMcp.deps.json",
+    "runtime/AomMcp.runtimeconfig.json",
+    "runtime/layouts/*.json",
+    "runtime/uilayouts/*.json",
+    "runtime/fixtures/ocr-*.bgra",
+    "runtime/trigger-controller-template.trg",
+    "runtime/setup.ps1",
+    "runtime/TOOLS.md",
+    "runtime/LICENSE.txt",
+    "runtime/ThirdPartyNotices.txt"
+  ],
+  "scripts": {
+    "test": "node --test test/launcher.test.cjs",
+    "prepack": "npm test && node scripts/check-package.cjs"
+  },
+  "keywords": ["mcp", "age-of-mythology", "retold", "scenario-editor"]
+}

@@ -1,0 +1,64 @@
+{
+  "scope": "Read-only runtime analysis. Candidate RVAs, not an API or authorization to call them.",
+  "exeSha256": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+  "fileVersion": "100.19.17020.0",
+  "pid": 20864,
+  "observedModuleBase": "0x7ff6e6270000",
+  "textBytesRead": 63722476,
+  "textEntropyDisk": 7.7562,
+  "textEntropyRuntime": 6.6316,
+  "verifiedStringRipLeaReferences": {
+    "saveScenario": ["0x6056c6", "0x6056d9"],
+    "loadScenario": ["0x605888", "0x60589b", "0x7960ee", "0x796118"],
+    "uiSaveScenarioPrompt": ["0x63ea0d", "0x63ea2e"],
+    "gadgetToggle": ["0x649206", "0x64922d"],
+    "undo": ["0x68d258", "0x68d26b"],
+    "redo": ["0x68d2c6", "0x68d2d9"],
+    "uiPlaceAtPointer": ["0x68f0c9", "0x68f0dc"],
+    "uiChangeBrushSize": ["0x68f76d", "0x68f77d"],
+    "trExecuteConsoleCommand": ["0x209bb8c", "0x209bbb3"]
+  },
+  "registrationRoutineCandidateRva": "0x24fe310",
+  "registeredNativeTargetCandidates": {
+    "saveScenario": {
+      "rva": "0x5f5f30",
+      "evidence": "R8 loaded by LEA at 0x6056ba; next instruction 0x6056c1 minus displacement magnitude 0xf791."
+    },
+    "uiPlaceAtPointer": {
+      "rva": "0x689010",
+      "evidence": "R8 loaded by LEA at 0x68f0bd; next instruction 0x68f0c4 minus displacement magnitude 0x60b4."
+    },
+    "uiChangeBrushSize": {
+      "rva": "0x689820",
+      "evidence": "R8 loaded by LEA at 0x68f763; next instruction 0x68f76a minus displacement magnitude 0x5f4a."
+    },
+    "trExecuteConsoleCommand": {
+      "rva": "0x2062ec0",
+      "evidence": "LEA at 0x209bb5b resolves 0x209bb62 - 0x38ca2; stored at [rsp+0x1078] and then passed in R8 to registration."
+    }
+  },
+  "genericStringAdapterRva": "0x1d1610",
+  "genericStringAdapterNote": "mov rcx, [r8]; jmp rdx. This is an adapter, not the command executor.",
+  "commandExecutorCandidateRva": "0x1bb2fa0",
+  "threadContextHelperRva": "0x1bb57a0",
+  "commandContextGlobalRva": "0x542bd10",
+  "commandContextPointerWasNonNull": true,
+  "commandContextOffset8WasNonNull": true,
+  "threadObservations": {
+    "contextOffset0Dword": 21364,
+    "contextOffset4Dword": 20844,
+    "windowOwnerThreadId": 20844,
+    "windowClass": "MythRetold",
+    "windowHandle": "0x6065a",
+    "alternateThreadGlobalRva": "0x5116494",
+    "alternateThreadGlobalValue": 6552,
+    "helperNote": "Calls GetCurrentThreadId and conditionally invokes a context vtable method after comparisons. Not proven to reject all wrong-thread calls."
+  },
+  "stringEncodingObservation": {
+    "input": "Wrapper receives input pointer in RCX and forwards it in RDX; executor later passes bytes to MultiByteToWideChar.",
+    "codePage": 0,
+    "meaning": "CP_ACP, not proven UTF-8. Restrict initial commands to ASCII."
+  },
+  "engineMethodsInvoked": false,
+  "frameSafeExecutionPointEstablished": false
+}

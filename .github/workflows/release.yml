@@ -1,0 +1,158 @@
+name: Build Windows package on Linux
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PACKAGE_NAME: AomRetoldMapEditorMcp-win-x64
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Check npm release guards and dist-tags
+        run: python3 tests/release_workflow.py
+      - name: Install cross-compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            g++-mingw-w64-x86-64 zip
+      - name: Cross-build native bridge
+        run: |
+          bash native/build.sh
+          python3 - <<'PY'
+          import re, subprocess
+          report = subprocess.check_output([
+              'x86_64-w64-mingw32-objdump', '-p', 'native/AomEditorBridge.dll'
+          ], text=True)
+          imports = re.findall(r'DLL Name: (\S+)', report)
+          # Windows system DLLs only; no redistributable GCC runtime DLLs.
+          allowed = {'kernel32.dll', 'user32.dll', 'msvcrt.dll', 'psapi.dll'}
+          assert imports and {n.lower() for n in imports} <= allowed, imports
+          print('Native imports:', ', '.join(imports))
+          PY
+      - name: Publish self-contained Windows x64 host
+        run: |
+          dotnet publish src/AomMcp -c Release -r win-x64 \
+            --self-contained true -p:IncludeGameCatalog=false \
+            -p:GenerateDocumentationFile=true -warnaserror -o package
+          cp README.md TOOLS.md LICENSE package/
+          cp scripts/setup.ps1 package/setup.ps1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Pack npm wrapper with release payload
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          cp -r package npm/runtime
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            (cd npm && npm pkg set "version=${RELEASE_TAG#v}")
+          fi
+          mkdir artifacts
+          (cd npm && npm pack --pack-destination ../artifacts)
+          (cd artifacts && sha256sum *.tgz > npm-package.sha256)
+      - name: Create ZIP and checksum
+        run: |
+          (cd package && zip -q -r "../artifacts/$PACKAGE_NAME.zip" .)
+          (cd artifacts && sha256sum "$PACKAGE_NAME.zip" \
+            > "$PACKAGE_NAME.zip.sha256")
+      # actions/upload-artifact v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-package
+          path: artifacts/*
+          if-no-files-found: error
+          # ZIP already compressed; avoid recompressing bundled .NET runtime.
+          compression-level: 0
+
+  validate:
+    needs: build
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      # actions/download-artifact v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: windows-package
+          path: artifacts
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Validate Linux-built package without installed game
+        shell: pwsh
+        run: |
+          $npmPackage = (Get-ChildItem artifacts/*.tgz).FullName
+          ./tests/package_smoke.ps1 `
+            -Archive "artifacts/$env:PACKAGE_NAME.zip" -NpmPackage $npmPackage
+
+  publish-npm:
+    needs: validate
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # Node 24 includes npm >=11.5.1 for tokenless trusted publishing.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      # actions/download-artifact v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: windows-package
+          path: artifacts
+      - name: Publish validated npm package through OIDC
+        working-directory: artifacts
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          sha256sum --check npm-package.sha256
+          case "${RELEASE_TAG%%+*}" in
+            *-*) npm_tag=next ;;
+            *) npm_tag=latest ;;
+          esac
+          npm publish ./*.tgz --access public --ignore-scripts \
+            --tag "$npm_tag" --registry https://registry.npmjs.org
+
+  release:
+    needs: validate
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      # actions/download-artifact v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: windows-package
+          path: artifacts
+      - name: Publish verified tagged release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" --verify-tag --generate-notes \
+            "artifacts/$PACKAGE_NAME.zip" "artifacts/$PACKAGE_NAME.zip.sha256" \
+            artifacts/*.tgz artifacts/npm-package.sha256

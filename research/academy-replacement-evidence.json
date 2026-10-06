@@ -1,0 +1,66 @@
+{
+  "placement": {
+    "placementRequested": true,
+    "semanticSuccessVerified": false,
+    "proto": "MilitaryAcademy",
+    "player": 1,
+    "x": 940,
+    "y": 774,
+    "selectedProtoId": 328,
+    "steps": [
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiClearCursor()",
+        "pid": 3672,
+        "executionThread": 27664,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "editMode(\"PlaceUnit\")",
+        "pid": 3672,
+        "executionThread": 27664,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 5000
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetPlacementPlayer(1)",
+        "pid": 3672,
+        "executionThread": 27664,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4984
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiSetProtoCursor(\"MilitaryAcademy\",true)",
+        "pid": 3672,
+        "executionThread": 27664,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4985
+      },
+      {
+        "nativeReturned": true,
+        "semanticSuccessVerified": false,
+        "returnValueCaptured": false,
+        "command": "uiPlaceAtPointer(false)",
+        "pid": 3672,
+        "executionThread": 27664,
+        "hookRemoved": true,
+        "elapsedDeadlineRemainingMs": 4969
+      }
+    ],
+    "note": "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved."
+  },
+  "oldBarracksDeletionObserved": true,
+  "scenarioSaved": false
+}

@@ -1,0 +1,29 @@
+{
+  "exeSha256": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+  "pid": 20864,
+  "expectedThreadId": 20844,
+  "actualThreadId": 20844,
+  "injectedModuleBase": "0x7ffc361f0000",
+  "window": "0x6065a",
+  "handshake": true,
+  "hookRemoved": true,
+  "windowResponsive": true,
+  "gameStillRunning": true,
+  "engineCalls": 1,
+  "command": "echo(\"AOM_MCP_PROBE_16ce9d63\")",
+  "wrapperRva": "0x2062ec0",
+  "dispatcherReturned": true,
+  "parserAcceptanceIndependentlyVerified": false,
+  "consoleOutputVerified": false,
+  "retailEchoIsNoOp": true,
+  "retailEchoRva": "0x5f2ed0",
+  "retailEchoEntryBytesBeforeAndAfter": "c2 00 00",
+  "executablePatches": 0,
+  "scenarioEdits": 0,
+  "cleanupVerification": {
+    "editorProbeModulesLoaded": 0,
+    "readOnlyGameProbeStillSucceeded": true,
+    "markerFoundInMythLogOrMythCommandLog": false
+  },
+  "scope": "One native wrapper invocation returned normally on window thread. Retail echo is a no-op; no claim of visible output, independently confirmed parser acceptance, editing success, or world-mutation safety."
+}
