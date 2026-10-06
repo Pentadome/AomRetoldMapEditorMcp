@@ -6,31 +6,357 @@
   "rowCenterFirst": 402,
   "rowStep": 80.5,
   "playerFields": {
-    "name": [42, -25, 220, 52],
-    "control": [274, -25, 184, 52],
-    "aiPath": [485, -25, 224, 52],
-    "civ": [880, -25, 202, 52],
-    "color": [1090, -25, 146, 52],
-    "visibility": [1262, -25, 222, 52],
-    "food": [1628, -25, 108, 52],
-    "wood": [1750, -25, 110, 52],
-    "gold": [1868, -25, 110, 52],
-    "favor": [1990, -25, 108, 52],
-    "pop": [2102, -25, 112, 52],
-    "popLimit": [2220, -25, 108, 52],
-    "handicap": [2332, -25, 112, 52]
+    "name": [
+      42,
+      -25,
+      220,
+      52
+    ],
+    "control": [
+      274,
+      -25,
+      184,
+      52
+    ],
+    "aiPath": [
+      485,
+      -25,
+      224,
+      52
+    ],
+    "civ": [
+      880,
+      -25,
+      202,
+      52
+    ],
+    "color": [
+      1090,
+      -25,
+      146,
+      52
+    ],
+    "visibility": [
+      1262,
+      -25,
+      222,
+      52
+    ],
+    "food": [
+      1628,
+      -25,
+      108,
+      52
+    ],
+    "wood": [
+      1750,
+      -25,
+      110,
+      52
+    ],
+    "gold": [
+      1868,
+      -25,
+      110,
+      52
+    ],
+    "favor": [
+      1990,
+      -25,
+      108,
+      52
+    ],
+    "pop": [
+      2102,
+      -25,
+      112,
+      52
+    ],
+    "popLimit": [
+      2220,
+      -25,
+      108,
+      52
+    ],
+    "handicap": [
+      2332,
+      -25,
+      112,
+      52
+    ]
   },
   "staticFields": {
-    "agePopup.title": [1560, 342, 480, 58],
-    "agePopup.startAge": [1750, 396, 268, 56],
-    "agePopup.maxAge": [1750, 448, 268, 56],
-    "agePopup.classicalGod": [1750, 546, 268, 48],
-    "agePopup.heroicGod": [1750, 596, 268, 48],
-    "agePopup.mythicGod": [1750, 646, 268, 48],
-    "fileBrowser.search": [800, 1020, 475, 52],
-    "fileBrowser.row": [414, 424, 720, 56],
-    "fileBrowser.loadInGame": [1680, 1018, 250, 52],
-    "fileBrowser.title": [760, 280, 800, 65]
+    "agePopup.title": [
+      1560,
+      342,
+      480,
+      58
+    ],
+    "agePopup.startAge": [
+      1750,
+      396,
+      268,
+      56
+    ],
+    "agePopup.maxAge": [
+      1750,
+      448,
+      268,
+      56
+    ],
+    "agePopup.classicalGod": [
+      1750,
+      546,
+      268,
+      48
+    ],
+    "agePopup.heroicGod": [
+      1750,
+      596,
+      268,
+      48
+    ],
+    "agePopup.mythicGod": [
+      1750,
+      646,
+      268,
+      48
+    ],
+    "fileBrowser.search": [
+      800,
+      1020,
+      475,
+      52
+    ],
+    "fileBrowser.row": [
+      414,
+      424,
+      720,
+      56
+    ],
+    "fileBrowser.loadInGame": [
+      1680,
+      1018,
+      250,
+      52
+    ],
+    "fileBrowser.title": [
+      760,
+      280,
+      800,
+      65
+    ]
   },
-  "notes": "Only observed alternative editor UI. Rects are full-res client pixels; gated against build/UI/size before preset use. Verify OCR and checkpoint; some positions approximate until live tests. Normal UI must use a separate measured layout."
+  "notes": "Only observed alternative editor UI. Rects are full-res client pixels; gated against build/UI/size before preset use. Verify OCR and checkpoint; some positions approximate until live tests. Normal UI must use a separate measured layout.",
+  "editorScene": {
+    "notes": "Measured 2026-10-06 on blank 128x128 alternative-UI editor. Rects full-res client px [x,y,w,h]; gates are 1280x720 half-res screenshot samples (ScreenProbe frame). Minimap orientation: screen up = world +X+Z, screen right = world +X-Z; closed-loop camera reads correct residual error. Minimap gate uses diamond-frame pixels stable across 4 captures (corner buttons excluded: hover highlight changes).",
+    "minimap": {
+      "center": [
+        2318,
+        1196
+      ],
+      "halfDiagonal": 205,
+      "gate": [
+        {
+          "x": 1049,
+          "y": 596,
+          "r": 214,
+          "g": 175,
+          "b": 92
+        },
+        {
+          "x": 1145,
+          "y": 504,
+          "r": 254,
+          "g": 210,
+          "b": 117
+        },
+        {
+          "x": 1173,
+          "y": 504,
+          "r": 255,
+          "g": 241,
+          "b": 145
+        },
+        {
+          "x": 1265,
+          "y": 594,
+          "r": 219,
+          "g": 182,
+          "b": 92
+        },
+        {
+          "x": 1251,
+          "y": 616,
+          "r": 109,
+          "g": 90,
+          "b": 52
+        },
+        {
+          "x": 1175,
+          "y": 692,
+          "r": 111,
+          "g": 74,
+          "b": 34
+        },
+        {
+          "x": 1157,
+          "y": 702,
+          "r": 116,
+          "g": 71,
+          "b": 44
+        },
+        {
+          "x": 1063,
+          "y": 664,
+          "r": 144,
+          "g": 108,
+          "b": 51
+        }
+      ],
+      "minimumMatches": 7
+    },
+    "occluders": {
+      "topButtons": [
+        2304,
+        0,
+        256,
+        70
+      ],
+      "activePlayer": [
+        2050,
+        110,
+        380,
+        96
+      ],
+      "minimap": [
+        2086,
+        964,
+        474,
+        476
+      ],
+      "toolbar": [
+        680,
+        1300,
+        1200,
+        140
+      ],
+      "fpsCounter": [
+        0,
+        0,
+        40,
+        20
+      ]
+    },
+    "conditionalOccluders": {
+      "objectPalette": {
+        "rect": [
+          0,
+          0,
+          684,
+          990
+        ],
+        "gate": [
+          {
+            "x": 310,
+            "y": 60,
+            "r": 144,
+            "g": 144,
+            "b": 144
+          },
+          {
+            "x": 200,
+            "y": 30,
+            "r": 28,
+            "g": 28,
+            "b": 28
+          },
+          {
+            "x": 330,
+            "y": 15,
+            "r": 26,
+            "g": 26,
+            "b": 26
+          },
+          {
+            "x": 65,
+            "y": 23,
+            "r": 177,
+            "g": 177,
+            "b": 178
+          }
+        ],
+        "minimumMatches": 3
+      },
+      "objectToolBar": {
+        "rect": [
+          680,
+          1226,
+          1200,
+          84
+        ],
+        "gate": [
+          {
+            "x": 350,
+            "y": 624,
+            "r": 155,
+            "g": 134,
+            "b": 96
+          },
+          {
+            "x": 392,
+            "y": 636,
+            "r": 255,
+            "g": 255,
+            "b": 255
+          },
+          {
+            "x": 527,
+            "y": 636,
+            "r": 154,
+            "g": 155,
+            "b": 155
+          },
+          {
+            "x": 646,
+            "y": 634,
+            "r": 108,
+            "g": 96,
+            "b": 60
+          },
+          {
+            "x": 724,
+            "y": 631,
+            "r": 211,
+            "g": 181,
+            "b": 105
+          },
+          {
+            "x": 757,
+            "y": 641,
+            "r": 225,
+            "g": 192,
+            "b": 110
+          },
+          {
+            "x": 851,
+            "y": 639,
+            "r": 105,
+            "g": 83,
+            "b": 62
+          },
+          {
+            "x": 870,
+            "y": 636,
+            "r": 89,
+            "g": 63,
+            "b": 40
+          }
+        ],
+        "minimumMatches": 6
+      }
+    },
+    "gateTolerance": 14,
+    "safeMargin": 24
+  }
 }

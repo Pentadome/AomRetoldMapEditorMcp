@@ -70,6 +70,10 @@ def request(method, params=None, error_code=None):
     assert 'error' not in message, message
     return message['result']
 
+def full_specs_annotations(tools):
+    return {t['name']: t.get('annotations', {}).get('readOnlyHint') for t in tools}
+
+
 def tool(name, args=None):
     return request('tools/call', {'name': name, 'arguments': args or {}})
 
@@ -827,7 +831,34 @@ try:
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
     expected_core = (helper_names - workflow_names) | core_native
-    assert len(expected_core) == 49 and len(names) == 899
+    assert len(expected_core) == 60 and len(names) == 910
+    scene_tools = {'editor_camera_look_at', 'editor_view_info', 'editor_ui_state', 'editor_place_at_world',
+                   'editor_units_snapshot', 'editor_units_diff', 'editor_scene_summary', 'editor_delete_units',
+                   'editor_check_footprints', 'editor_terrain_grid', 'editor_apply_layout'}
+    assert scene_tools <= expected_core, scene_tools - expected_core
+    # Scene helper guards refuse in preflight, before any game connection (impossible PID here).
+    def preflight_refusal(name, args, code):
+        response = tool(name, args)
+        content = response['structuredContent']
+        assert response['isError'] and content['code'] == code and content['nativeDispatched'] is False \
+            and content['retrySafe'], (name, response)
+    preflight_refusal('editor_delete_units', {'units': [{'unitId': 1, 'proto': 'Hoplite', 'player': 1}]}, 'INVALID_ARGUMENT')
+    preflight_refusal('editor_delete_units', {'units': [{'unitId': 1, 'proto': 'Hoplite', 'player': 1}] * 2,
+                                              'confirmDestructive': True}, 'INVALID_ARGUMENT')
+    preflight_refusal('editor_apply_layout', {}, 'INVALID_ARGUMENT')
+    preflight_refusal('editor_apply_layout', {'items': [{'proto': 'Hoplite', 'x': 1, 'z': 1}], 'preview': False}, 'INVALID_ARGUMENT')
+    preflight_refusal('editor_apply_layout', {'formation': {'proto': 'Hoplite', 'shape': 'ring', 'count': 3, 'spacing': 2,
+                                                            'x': 5, 'z': 5, 'columns': 2}}, 'INVALID_ARGUMENT')
+    preflight_refusal('editor_terrain_grid', {'minX': 5, 'minZ': 0, 'maxX': 5, 'maxZ': 9}, 'INVALID_ARGUMENT')
+    preflight_refusal('editor_terrain_grid', {'minX': 0, 'minZ': 0, 'maxX': 5, 'maxZ': 9, 'flatSize': 4}, 'INVALID_ARGUMENT')
+    preflight_refusal('editor_place_at_world', {'proto': 'Hopilte', 'x': 5, 'z': 5}, 'UNKNOWN_PROTO')
+    assert 'Hoplite' in tool('editor_place_at_world', {'proto': 'Hopilte', 'x': 5, 'z': 5})['structuredContent']['message']
+    preflight_refusal('editor_apply_layout', {'items': [{'proto': 'TownCentre', 'x': 5, 'z': 5}]}, 'UNKNOWN_PROTO')
+    for name in ('editor_view_info', 'editor_ui_state', 'editor_scene_summary', 'editor_units_snapshot',
+                 'editor_check_footprints', 'editor_terrain_grid', 'editor_units_diff'):
+        assert full_specs_annotations(tools)[name] is True, name
+    for name in ('editor_camera_look_at', 'editor_place_at_world', 'editor_delete_units', 'editor_apply_layout'):
+        assert full_specs_annotations(tools)[name] is False, name
     full_specs = {t['name']: t for t in tools}
     assert 'editor_search_tools' in expected_core
     assert_search_isolation(full_specs, expected_core, 'full')
@@ -916,12 +947,15 @@ try:
             shutil.copytree(app.parent, deploy)
             metadata = deploy / 'game_catalog.json'
             original = json.loads(metadata.read_text())
-            for condition in ['fresh', 'wrong_hash', 'changed_exe', 'changed_archive', 'missing']:
+            for condition in ['fresh', 'touched_exe', 'wrong_hash', 'changed_exe', 'changed_archive', 'missing']:
                 altered = dict(original)
+                if condition == 'touched_exe':
+                    # Same hash/length, only timestamp differs (Steam validation touch): still fresh.
+                    altered['exeWriteTimeUtc'] = '1900-01-01T00:00:00Z'
                 if condition == 'wrong_hash':
                     altered['exeSha256'] = '0' * 64  # Deliberately wrong SHA-256 fixture.
                 if condition == 'changed_exe':
-                    altered['exeWriteTimeUtc'] = '1900-01-01T00:00:00Z'  # Stale fixture, no executable writes.
+                    altered['exeLength'] = -1  # Impossible size fixture, no executable writes.
                 if condition == 'changed_archive':
                     altered['archiveLength'] = -1  # Impossible size; do not touch real Data.bar.
                 if condition == 'missing':
@@ -936,13 +970,15 @@ try:
                                           'clientInfo': {'name': 'metadata-smoke', 'version': '1'}})
                     notify('notifications/initialized')
                     lookup = tool('editor_pantheon', {'pantheon': 'Greeks'})
-                    if condition == 'fresh':
+                    if condition in ('fresh', 'touched_exe'):
                         assert not lookup['isError'] and lookup['structuredContent'] == roster, lookup
                     else:
                         assert lookup['isError'] and '--generate' in lookup['content'][0]['text'], lookup
+                        assert lookup['structuredContent']['code'] in ('METADATA_STALE', 'FILE_NOT_FOUND'), lookup
+                        assert lookup['structuredContent']['retrySafe'] and lookup['structuredContent']['nativeDispatched'] is False, lookup
                     for catalog_name in game_catalogs:
                         lookup = tool(catalog_name, {'limit': 1})
-                        if condition == 'fresh':
+                        if condition in ('fresh', 'touched_exe'):
                             assert not lookup['isError'] and lookup['structuredContent']['entries'], lookup
                         else:
                             assert lookup['isError'] and '--generate' in lookup['content'][0]['text'], lookup

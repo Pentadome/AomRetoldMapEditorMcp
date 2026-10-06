@@ -163,9 +163,7 @@ internal sealed class Bridge : IDisposable
                 $"Native call did not acknowledge completion. started={started}; outcome unknown. Do not automatically retry a mutation."
             );
         if (result != 1)
-            throw new InvalidOperationException(
-                $"No command executed: bridge refusal {result} ({Reason(result)})."
-            );
+            throw new BridgeRefusal(result, command);
         return new
         {
             nativeReturned = true,
@@ -272,4 +270,14 @@ internal sealed class Bridge : IDisposable
             Marshal.FreeHGlobal(data);
         }
     }
+}
+
+/// <summary>Native bridge refused before dispatching the requested command (packet state finished, result != 1).</summary>
+/// <param name="code">Refusal code assigned by native/EditorBridge.cpp.</param>
+/// <param name="command">Refused command text; it was NOT dispatched.</param>
+internal sealed class BridgeRefusal(uint code, string command)
+    : InvalidOperationException($"No command executed: bridge refusal {code} ({Bridge.Reason(code)}). Refused command: {command}")
+{
+    internal uint Code { get; } = code;
+    internal string Command { get; } = command;
 }

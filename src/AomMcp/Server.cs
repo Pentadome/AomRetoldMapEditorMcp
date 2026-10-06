@@ -228,11 +228,15 @@ internal sealed partial class Server(
         catch (Exception e)
         {
             var noInput = e.Message.Contains("no input sent", StringComparison.OrdinalIgnoreCase);
-            var safeInspection = passedPreflight && (noInput || WorkflowSafeInspection(name, args) || name is "editor_search_tools" or "editor_trigger_list" or "editor_players" or "editor_player_dependency_audit"
+            // Read-only annotated helpers never dispatch native commands or write files, so their failures are inspections.
+            var readOnly = Tools.FirstOrDefault(t => t.Name == name)?.Annotations?.ReadOnlyHint == true;
+            var safeInspection = passedPreflight && (noInput || readOnly || WorkflowSafeInspection(name, args) || name is "editor_search_tools" or "editor_trigger_list" or "editor_players" or "editor_player_dependency_audit"
                 || (name is "editor_set_diplomacy" or "editor_player_settings") && args.GetProperty("operation").GetString() != "apply"
                 || (name is "editor_trigger_edit" or "editor_stage_ai")
                     && (!args.TryGetProperty("preview", out var preview) || preview.GetBoolean()));
-            var failure = e is WorkflowFailure known ? known.Details : new
+            var failure = e is WorkflowFailure known ? known.Details
+                : e is BridgeRefusal refusal && SingleCommandTool(name) ? RefusalDetails(refusal, name)
+                : new
             {
                 code = e switch
                 {
@@ -401,6 +405,7 @@ internal sealed partial class Server(
         if (name == "editor_export_recovery") EditorFiles.PreflightRecovery(args);
         if (name == "editor_trigger_edit") TriggerEdits.Preflight(args);
         PreflightWorkflow(name, args);
+        PreflightScene(name, args);
         if (name == "editor_set_diplomacy" && args.GetProperty("operation").GetString() == "apply")
             PlayerWorkflow.PreflightApply(args, exe);
         if (name == "editor_place_formation")
@@ -416,6 +421,7 @@ internal sealed partial class Server(
     object Invoke(string name, JsonElement args, Game? batchGame = null)
     {
         if (WorkflowNames.Contains(name)) return InvokeWorkflow(name, args);
+        if (SceneNames.Contains(name)) return InvokeScene(name, args, batchGame);
         if (name == "editor_search_tools") return SearchTools(args);
         if (name == "editor_toolset")
         {
@@ -438,6 +444,7 @@ internal sealed partial class Server(
                 metadataCoverage = "Command/UI counts show shipped coverage, not proof of semantic effects. Toolset resets when MCP host reconnects; call editor_toolset mode=full when needed.",
                 triggerEditing = "editor_trigger_list reads bounded TR v12 exports with player/arg/references filters. editor_trigger_player_parity audits template→target gaps. editor_trigger_edit previews/writes NEW-file patch/clone or up to 64 distinct-trigger edits in one output (value/label replacements, condition/effect removal, duplicates); requires source SHA and expected names, verifies unrelated records. editor_triggers apply requires reviewed live export/hash; game round-trip compared semantically. XS compile/runtime effects unproven.",
                 playerSettings = "editor_players/editor_player_dependency_audit read game-written checkpoints (stances 1 ally, 2 enemy, 3 neutral; 0 self/unset). editor_set_diplomacy changes batches directed cells with per-click RGB gates and one final checkpoint. editor_player_settings supports reviewed alternative-UI fields, including AI path via INSTALLPATH game\\ai file browser; startAge changes can reset minor gods, requiring observedOnly assertions. Apply is pinned to 2560x1440 alternative UI and requires backups; normal UI refuses. Direct AI-name text entry did not persist. Neither proves XS runtime.",
+                sceneTools = "Core world-space helpers: editor_place_at_world/editor_apply_layout (world X/Z, observed unitIds), editor_camera_look_at (reviewed alt-UI minimap closed loop), editor_view_info/editor_ui_state, editor_units_snapshot/diff (undo/redo reidentification), editor_scene_summary, editor_check_footprints, editor_terrain_grid, editor_delete_units (tuple-verified, confirmDestructive). Not saved; no retries.",
                 scenarioEditing = "Never edit .mythscn directly. Use game editor, game-writer checkpoints and normal Load Scenario UI; native loadScenario disabled after crash.",
                 aiScripts = "Computer-player .xs personality must be under INSTALLPATH\\game\\ai (or its subdirectory). Active-profile Games\\Age of Mythology Retold\\<id>\\ai did NOT work. Triggers belong in active-profile trigger directory; use filename stems for uiLoadTriggers/uiSaveTriggers.",
                 exportRecovery = "On unknown export outcome, use editor_export_recovery inspect on reported staging path. Recover only to a new file with expectedSha256; no second native dispatch.",
@@ -682,7 +689,15 @@ internal sealed partial class Server(
             steps.Add(_bridge.Execute(game, "editMode(\"PlaceUnit\")"));
             steps.Add(_bridge.Execute(game, $"uiSetPlacementPlayer({player})"));
             steps.Add(_bridge.Execute(game, $"uiSetProtoCursor({quoted},true)"));
-            var (selected, owner) = WaitSelection(game, clear: false, player);
+            (uint Proto, uint Player) prepared;
+            try { prepared = WaitSelection(game, clear: false, player); }
+            catch (InvalidOperationException) when (ProtoSuggestions(proto) is { Length: > 0 } suggestions
+                && !suggestions.Contains(proto, StringComparer.OrdinalIgnoreCase))
+            {
+                throw new WorkflowFailure("UNKNOWN_PROTO", "prepare", $"Prototype '{proto}' was not accepted by the placement cursor. Did you mean: {string.Join(", ", suggestions)}?",
+                    false, false, "No placement requested; cursor cleanup follows. Retry with an exact suggested name.");
+            }
+            var (selected, owner) = prepared;
             game.Move(x, y);
             Thread.Sleep(150); // Host-chosen map-hover settle time before one-shot placement.
             // Windows GetAsyncKeyState high bit 0x8000 means currently held; low bit is not used.
@@ -1045,7 +1060,7 @@ internal sealed partial class Server(
             "Save through native game writer to unique active-profile scenario staging file, verify stable l33t/zlib payload/decoded length, copy/hash-verify to caller-approved NEW absolute local .mythscn path. confirmWrite=true required. No overwrite option; original scenario files never silently overwritten. profileDirectory selects active scenario directory when ambiguous. Staging retained; native writer may change editor save-name/dirty state. Not semantic reload validation; never retry unknown outcomes.",
             Props(("path", "string"), ("profileDirectory", "string"), ("confirmWrite", "boolean")), ["path", "confirmWrite"]);
         yield return Spec("editor_place_formation",
-            "Bounded 1..32 objects in rows/ring, centered on x/y FULL-RESOLUTION CLIENT PIXELS; spacingPixels is NOT world distance. Rows columns default ceil(sqrt(count)); ring spacing is neighbor chord before rounding, no columns allowed. preview defaults true: pure local plan/no game. preview=false requires confirmPlacement=true, checks whole plan against actual client before mutation, reuses single placement guards/cleanup and independently observes actual new IDs. Stops on first error with partial progress/no retry/rollback/save. Camera/UI hover affect world layout.",
+            "Bounded 1..32 objects in rows/ring, centered on x/y FULL-RESOLUTION CLIENT PIXELS; spacingPixels is NOT world distance (use editor_apply_layout formation for world units). Rows columns default ceil(sqrt(count)); ring spacing is neighbor chord before rounding, no columns allowed. preview defaults true: pure local plan/no game. preview=false requires confirmPlacement=true, checks whole plan against actual client before mutation, reuses single placement guards/cleanup and independently observes actual new IDs. Stops on first error with partial progress/no retry/rollback/save. Camera/UI hover affect world layout.",
             new Dictionary<string, object>
             {
                 ["proto"] = new { type = "string" },
@@ -1239,9 +1254,11 @@ internal sealed partial class Server(
         );
         yield return Spec(
             "editor_place_unit",
-            "Native, one-shot unit placement using internal proto name and player. x/y game-client pixels default center. Cleans preview; does not save. Verify screenshot afterward.",
+            "Native, one-shot unit placement using internal proto name and player. x/y game-client pixels default center. Cleans preview; does not save. Prefer editor_place_at_world for world X/Z with observed unitId. Unknown names return suggestions.",
             Props(("proto", "string"), ("player", "integer"), ("x", "integer"), ("y", "integer")),
             ["proto"]
         );
+        foreach (var scene in SceneExtras())
+            yield return scene;
     }
 }

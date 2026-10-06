@@ -58,28 +58,12 @@ internal static class EditorView
     public static object InspectSelection(Game game, JsonElement args)
     {
         var layout = game.Layout.Selection ?? throw new InvalidDataException("Selection layout unavailable; passive patch review required.");
-        CheckOffsets([layout.SlotsOffset, layout.SlotStride, layout.GroupOffset, layout.CountOffset,
-            layout.ArrayOffset, layout.RecordStride, layout.KindOffset, layout.IdOffset]);
-        if (layout.Player is < 0 or > LiveUnits.MaxPlayer || layout.RecordStride < Math.Max(layout.KindOffset, layout.IdOffset) + FloatSize)
-            throw new InvalidDataException("Invalid selection layout.");
-        var editor = LiveUnits.ValidateRuntime(game, layout.Signatures);
-        var root = game.Pointer(game.Base + checked((int)game.Layout.EditorGlobalRva));
-        var holder = game.Pointer(root + layout.SlotsOffset + layout.Player * layout.SlotStride);
-        var group = holder == 0 ? 0 : game.Pointer(holder + layout.GroupOffset);
-        var count = group == 0 ? 0 : checked((int)game.UInt(group + layout.CountOffset));
-        if (count > MaxSelected)
-            throw new InvalidDataException("Selection exceeds host read bound.");
-        var table = group == 0 ? 0 : game.Pointer(group + layout.ArrayOffset);
-        if (count > 0 && table == 0) throw new InvalidDataException("Selection records unavailable.");
-        var bytes = count == 0 ? [] : game.Read(table, checked(count * layout.RecordStride));
-        var records = ParseSelection(bytes, layout);
+        var records = ReadSelection(game);
+        var count = records.Length;
         var units = LiveUnits.Read(game).ToDictionary(u => u.UnitId);
         var offset = args.TryGetProperty("offset", out var o) ? o.GetInt32() : 0;
         var limit = args.TryGetProperty("limit", out var l) ? l.GetInt32() : LiveUnits.DefaultLimit;
-        if (game.Editor() != editor || game.Pointer(root + layout.SlotsOffset + layout.Player * layout.SlotStride) != holder
-            || (holder != 0 && game.Pointer(holder + layout.GroupOffset) != group)
-            || (group != 0 && (game.UInt(group + layout.CountOffset) != count || game.Pointer(group + layout.ArrayOffset) != table))
-            || (count > 0 && !game.Read(table, bytes.Length).AsSpan().SequenceEqual(bytes)))
+        if (!ReadSelection(game).SequenceEqual(records))
             throw new InvalidDataException("Selection changed during inspection; no listing returned.");
         return new
         {
@@ -97,6 +81,33 @@ internal static class EditorView
         };
     }
 
+    /// <summary>Reads typed selection records with identity recheck; read-only process access.</summary>
+    internal static Selection[] ReadSelection(Game game)
+    {
+        var layout = game.Layout.Selection ?? throw new InvalidDataException("Selection layout unavailable; passive patch review required.");
+        CheckOffsets([layout.SlotsOffset, layout.SlotStride, layout.GroupOffset, layout.CountOffset,
+            layout.ArrayOffset, layout.RecordStride, layout.KindOffset, layout.IdOffset]);
+        if (layout.Player is < 0 or > LiveUnits.MaxPlayer || layout.RecordStride < Math.Max(layout.KindOffset, layout.IdOffset) + FloatSize)
+            throw new InvalidDataException("Invalid selection layout.");
+        var editor = LiveUnits.ValidateRuntime(game, layout.Signatures);
+        var root = game.Pointer(game.Base + checked((int)game.Layout.EditorGlobalRva));
+        var holder = game.Pointer(root + layout.SlotsOffset + layout.Player * layout.SlotStride);
+        var group = holder == 0 ? 0 : game.Pointer(holder + layout.GroupOffset);
+        var count = group == 0 ? 0 : checked((int)game.UInt(group + layout.CountOffset));
+        if (count > MaxSelected)
+            throw new InvalidDataException("Selection exceeds host read bound.");
+        var table = group == 0 ? 0 : game.Pointer(group + layout.ArrayOffset);
+        if (count > 0 && table == 0) throw new InvalidDataException("Selection records unavailable.");
+        var bytes = count == 0 ? [] : game.Read(table, checked(count * layout.RecordStride));
+        var records = ParseSelection(bytes, layout);
+        if (game.Editor() != editor || game.Pointer(root + layout.SlotsOffset + layout.Player * layout.SlotStride) != holder
+            || (holder != 0 && game.Pointer(holder + layout.GroupOffset) != group)
+            || (group != 0 && (game.UInt(group + layout.CountOffset) != count || game.Pointer(group + layout.ArrayOffset) != table))
+            || (count > 0 && !game.Read(table, bytes.Length).AsSpan().SequenceEqual(bytes)))
+            throw new InvalidDataException("Selection changed during inspection; no listing returned.");
+        return records;
+    }
+
     static Selection[] ParseSelection(byte[] bytes, SelectionReadLayout layout)
     {
         if (bytes.Length % layout.RecordStride != 0) throw new InvalidDataException("Torn selection array.");
@@ -110,11 +121,119 @@ internal static class EditorView
         if (offsets.Any(o => o is < 0 or > MaxOffset)) throw new InvalidDataException("Unbounded live map/selection field offset.");
     }
 
-    /// <summary>Reads dimensions, camera, projection and optional terrain/coordinate samples.</summary>
-    /// <param name="game">Validated read-only process connection.</param>
-    /// <param name="args">Optional terrainAt [X,Z], world [X,Y,Z], screen [clientX,clientY], planeY.</param>
-    /// <returns>Measured map/view data, projected coordinates, inverse ray and explicit plane intersection.</returns>
-    public static object MapInfo(Game game, JsonElement args)
+    /// <summary>Validated passive map/camera/projection state with bounded terrain/projection helpers.</summary>
+    internal sealed class ViewState
+    {
+        internal required Game Game { get; init; }
+        internal required MapReadLayout L { get; init; }
+        internal required nint EditorPtr { get; init; }
+        internal required nint Context { get; init; }
+        internal required nint World { get; init; }
+        internal required nint Terrain { get; init; }
+        internal required nint Root { get; init; }
+        internal required nint Camera { get; init; }
+        internal required nint Renderer { get; init; }
+        internal required int[] Tiles { get; init; }
+        internal required int[] Vertices { get; init; }
+        internal required int[] ViewValues { get; init; }
+        internal required float Scale { get; init; }
+        internal required float InverseScale { get; init; }
+        internal required float Fov { get; init; }
+        internal required byte[][] VectorBytes { get; init; }
+        internal required byte[] MatrixBytes { get; init; }
+        internal required float[] M { get; init; }
+        internal required Pose Pose { get; init; }
+        internal required Matrix4x4 Projection { get; init; }
+        internal required Viewport Viewport { get; init; }
+        internal float WorldWidth => Tiles[0] * Scale;
+        internal float WorldDepth => Tiles[1] * Scale;
+        (int Count, int Stride, nint Data)? _grid;
+
+        int Int(nint a) => BitConverter.ToInt32(Game.Read(a, FloatSize));
+        float Float(nint a) => BitConverter.ToSingle(Game.Read(a, FloatSize));
+
+        (int Count, int Stride, nint Data) Grid()
+        {
+            if (_grid is { } cached) return cached;
+            var grid = Terrain + L.GridOffset;
+            var count = Int(grid + L.GridCountOffset); var stride = Int(grid + L.GridStrideOffset);
+            var data = Game.Pointer(grid + L.GridDataOffset);
+            if (stride != Vertices[1] || count != (long)Vertices[0] * Vertices[1] || data == 0)
+                throw new InvalidDataException("Terrain height-grid bounds mismatch.");
+            _grid = (count, stride, data);
+            return _grid.Value;
+        }
+
+        internal bool InsideMap(double x, double z) => x >= 0 && z >= 0 && x <= WorldWidth && z <= WorldDepth;
+
+        /// <summary>Native trGetTerrainHeight-style quantized node lookup (truncating tile coordinates).</summary>
+        internal (float Height, int TileX, int TileZ) Height(double x, double z)
+        {
+            if (!InsideMap(x, z)) throw new ArgumentException("Terrain sample outside map.");
+            var ix = (int)(x * InverseScale); var iz = (int)(z * InverseScale); // Native getter truncates nonnegative tile coordinates.
+            var (_, stride, data) = Grid();
+            if (ix >= Vertices[0] || iz >= Vertices[1]) throw new InvalidDataException("Terrain height-grid bounds mismatch.");
+            var height = Float(data + checked((ix * stride + iz) * FloatSize));
+            if (!float.IsFinite(height)) throw new InvalidDataException("Invalid terrain height.");
+            return (height, ix, iz);
+        }
+
+        /// <summary>Reads contiguous Z-fast node heights for one X node row.</summary>
+        internal float[] HeightRow(int ix, int iz0, int count)
+        {
+            var (_, stride, data) = Grid();
+            if (ix < 0 || iz0 < 0 || count < 1 || ix >= Vertices[0] || iz0 + count > Vertices[1])
+                throw new ArgumentException("Terrain node row outside height grid.");
+            var bytes = Game.Read(data + checked((ix * stride + iz0) * FloatSize), count * FloatSize);
+            var values = Enumerable.Range(0, count).Select(i => BitConverter.ToSingle(bytes, i * FloatSize)).ToArray();
+            if (values.Any(v => !float.IsFinite(v))) throw new InvalidDataException("Invalid terrain height.");
+            return values;
+        }
+
+        internal Projected Project(Vector3 world) => ProjectPoint(world, Pose, Projection, Viewport);
+        internal Vector3 RayAt(float x, float y) => Ray(x, y, Pose, Projection, Viewport);
+
+        /// <summary>Ray hit on quantized terrain node heights by fixed-point refinement; not collision/occlusion.</summary>
+        internal Vector3? GroundHit(Vector3 direction)
+        {
+            if (direction.Y > -Epsilon) return null;
+            float plane = 0;
+            Vector3 hit = default;
+            for (var i = 0; i < 4; i++) // Host refinement passes; converges on gentle quantized terrain.
+            {
+                var distance = (plane - Pose.Position.Y) / direction.Y;
+                if (distance < 0) return null;
+                hit = Pose.Position + direction * distance;
+                plane = Height(Math.Clamp(hit.X, 0, WorldWidth), Math.Clamp(hit.Z, 0, WorldDepth)).Height;
+            }
+            return hit;
+        }
+
+        /// <summary>Camera forward-ray ground hit: world point at viewport center.</summary>
+        internal Vector3? Target() => GroundHit(Pose.Forward);
+
+        /// <summary>Refuses if map/camera/projection changed since the snapshot.</summary>
+        internal void Verify()
+        {
+            var g = Game;
+            if (g.Editor() != EditorPtr || g.Pointer(g.Base + checked((int)g.Layout.ContextRva)) != Context
+                || g.Pointer(Context + L.WorldOffset) != World || g.Pointer(Root + L.CameraOffset) != Camera
+                || g.Pointer(g.Base + checked((int)L.RendererGlobalRva)) != Renderer
+                || g.Pointer(World + L.TerrainOffset) != Terrain
+                || Float(Camera + L.FovOffset) != Fov
+                || L.ViewportOffsets.Where((offset, i) => Int(Renderer + offset) != ViewValues[i]).Any()
+                || L.TileOffsets.Where((offset, i) => Int(Terrain + offset) != Tiles[i]).Any()
+                || L.VertexOffsets.Where((offset, i) => Int(Terrain + offset) != Vertices[i]).Any()
+                || !g.Read(Renderer + L.ProjectionOffset, MatrixBytes.Length).AsSpan().SequenceEqual(MatrixBytes)
+                || L.PoseOffsets.Where((offset, i) => !g.Read(Camera + offset, VectorBytes[i].Length).AsSpan().SequenceEqual(VectorBytes[i])).Any())
+                throw new InvalidDataException("Map/camera changed during query; no result returned.");
+        }
+    }
+
+    internal sealed record Projected(float X, float Y, float Depth, bool InFront, bool VisibleInViewport);
+
+    /// <summary>Reads and validates map dimensions, active camera, projection and viewport.</summary>
+    internal static ViewState ReadView(Game game)
     {
         var l = game.Layout.Map ?? throw new InvalidDataException("Map layout unavailable; passive patch review required.");
         if (l.TileOffsets.Length != 2 || l.VertexOffsets.Length != 2 || l.PoseOffsets.Length != 4 || l.ViewportOffsets.Length != 4)
@@ -158,64 +277,69 @@ internal static class EditorView
         var m = Enumerable.Range(0, 16).Select(i => BitConverter.ToSingle(matrixBytes, i * FloatSize)).ToArray();
         if (m.Any(v => !float.IsFinite(v))) throw new InvalidDataException("Invalid render projection.");
         var projection = new Matrix4x4(m[0],m[1],m[2],m[3],m[4],m[5],m[6],m[7],m[8],m[9],m[10],m[11],m[12],m[13],m[14],m[15]);
+        return new ViewState
+        {
+            Game = game, L = l, EditorPtr = editor, Context = context, World = world, Terrain = terrain, Root = root,
+            Camera = camera, Renderer = renderer, Tiles = tiles, Vertices = vertices, ViewValues = viewValues,
+            Scale = scale, InverseScale = inverseScale, Fov = fov, VectorBytes = vectorBytes, MatrixBytes = matrixBytes,
+            M = m, Pose = pose, Projection = projection, Viewport = viewport,
+        };
+    }
+
+    /// <summary>Reads dimensions, camera, projection and optional terrain/coordinate samples.</summary>
+    /// <param name="game">Validated read-only process connection.</param>
+    /// <param name="args">Optional terrainAt [X,Z], world [X,Y,Z], screen [clientX,clientY], planeY.</param>
+    /// <returns>Measured map/view data, projected coordinates, inverse ray and explicit plane intersection.</returns>
+    public static object MapInfo(Game game, JsonElement args)
+    {
+        var v = ReadView(game);
         object? terrainSample = null, projected = null, screenRay = null, planeIntersection = null;
         if (args.TryGetProperty("terrainAt", out var at))
         {
             var x = at[0].GetDouble(); var z = at[1].GetDouble();
-            if (x < 0 || z < 0 || x > tiles[0] * scale || z > tiles[1] * scale) throw new ArgumentException("Terrain sample outside map.");
-            var ix = (int)(x * inverseScale); var iz = (int)(z * inverseScale); // Native trGetTerrainHeight truncates nonnegative tile coordinates.
-            var grid = terrain + l.GridOffset;
-            var count = Int(grid + l.GridCountOffset); var stride = Int(grid + l.GridStrideOffset);
-            var data = game.Pointer(grid + l.GridDataOffset);
-            if (ix >= vertices[0] || iz >= vertices[1] || stride != vertices[1] || count != (long)vertices[0] * vertices[1] || data == 0)
-                throw new InvalidDataException("Terrain height-grid bounds mismatch.");
-            var height = Float(data + checked((ix * stride + iz) * FloatSize));
-            if (!float.IsFinite(height)) throw new InvalidDataException("Invalid terrain height.");
+            var (height, ix, iz) = v.Height(x, z);
             terrainSample = new { x, z, height, tileX = ix, tileZ = iz, sampling = "Native trGetTerrainHeight quantized node lookup, not bilinear or collision surface." };
         }
         if (args.TryGetProperty("world", out var point))
-            projected = Project(new Vector3(point[0].GetSingle(),point[1].GetSingle(),point[2].GetSingle()), pose, projection, viewport);
+            projected = Project(new Vector3(point[0].GetSingle(),point[1].GetSingle(),point[2].GetSingle()), v.Pose, v.Projection, v.Viewport);
         if (args.TryGetProperty("screen", out var screen))
         {
-            var direction = Ray(screen[0].GetSingle(), screen[1].GetSingle(), pose, projection, viewport);
-            screenRay = new { origin = XYZ(pose.Position), direction = XYZ(direction) };
+            var direction = Ray(screen[0].GetSingle(), screen[1].GetSingle(), v.Pose, v.Projection, v.Viewport);
+            screenRay = new { origin = XYZ(v.Pose.Position), direction = XYZ(direction) };
             if (args.TryGetProperty("planeY", out var y))
-                planeIntersection = IntersectPlane(pose.Position, direction, y.GetSingle());
+                planeIntersection = IntersectPlane(v.Pose.Position, direction, y.GetSingle());
         }
-        if (game.Editor() != editor || game.Pointer(game.Base + checked((int)game.Layout.ContextRva)) != context
-            || game.Pointer(context + l.WorldOffset) != world || game.Pointer(root + l.CameraOffset) != camera
-            || game.Pointer(game.Base + checked((int)l.RendererGlobalRva)) != renderer
-            || game.Pointer(world + l.TerrainOffset) != terrain
-            || Float(camera + l.FovOffset) != fov
-            || l.ViewportOffsets.Where((offset, i) => Int(renderer + offset) != viewValues[i]).Any()
-            || l.TileOffsets.Where((offset, i) => Int(terrain + offset) != tiles[i]).Any()
-            || l.VertexOffsets.Where((offset, i) => Int(terrain + offset) != vertices[i]).Any()
-            || !game.Read(renderer + l.ProjectionOffset, matrixBytes.Length).AsSpan().SequenceEqual(matrixBytes)
-            || l.PoseOffsets.Where((offset, i) => !game.Read(camera + offset, vectorBytes[i].Length).AsSpan().SequenceEqual(vectorBytes[i])).Any())
-            throw new InvalidDataException("Map/camera changed during query; no result returned.");
+        v.Verify();
+        var pose = v.Pose;
         return new
         {
             pid = game.Pid, buildHash = game.Layout.ExeSha256, atomic = false,
-            dimensions = new { tilesX = tiles[0], tilesZ = tiles[1], worldWidth = tiles[0] * scale, worldDepth = tiles[1] * scale, tileWorldSize = scale },
-            camera = new { position = XYZ(pose.Position), forward = XYZ(pose.Forward), up = XYZ(pose.Up), right = XYZ(pose.Right), fieldOfViewRadians = fov },
-            viewport, projection = m, terrainSample, projected, screenRay, planeIntersection,
+            dimensions = new { tilesX = v.Tiles[0], tilesZ = v.Tiles[1], worldWidth = v.WorldWidth, worldDepth = v.WorldDepth, tileWorldSize = v.Scale },
+            camera = new { position = XYZ(pose.Position), forward = XYZ(pose.Forward), up = XYZ(pose.Up), right = XYZ(pose.Right), fieldOfViewRadians = v.Fov },
+            viewport = v.Viewport, projection = v.M, terrainSample, projected, screenRay, planeIntersection,
             limitation = "Measured live active-camera basis, renderer projection and full-resolution client viewport. Projection visibility is frustum-only, not occlusion/UI clickability. Screen inverse returns a ray; world point requires caller's explicit planeY, never guessed terrain intersection. Terrain height matches quantized native getter, not rendered triangle collision. Editor only; changing/unreviewed layouts refuse.",
         };
     }
 
-    static object XYZ(Vector3 v) => new { x = v.X, y = v.Y, z = v.Z };
-    static object Project(Vector3 world, Pose pose, Matrix4x4 matrix, Viewport viewport)
+    internal static Projected ProjectPoint(Vector3 world, Pose pose, Matrix4x4 matrix, Viewport viewport)
     {
         var delta = world - pose.Position;
         var clip = Vector4.Transform(new Vector4(Vector3.Dot(delta,pose.Right),Vector3.Dot(delta,pose.Up),Vector3.Dot(delta,pose.Forward),1),matrix); // Homogeneous point W=1.
         if (Math.Abs(clip.W) < Epsilon) throw new InvalidDataException("World point on camera projection singularity.");
         var ndc = new Vector3(clip.X,clip.Y,clip.Z) / clip.W;
         // Direct3D normalized clip X/Y [-1,1], Z [0,1]; screen Y increases downward.
-        return new { x = viewport.X + (ndc.X + 1) * viewport.Width / 2, y = viewport.Y + (1 - ndc.Y) * viewport.Height / 2,
-            depth = ndc.Z, inFront = clip.W > 0, visibleInViewport = clip.W > 0 && Math.Abs(ndc.X) <= 1 && Math.Abs(ndc.Y) <= 1 && ndc.Z is >= 0 and <= 1 };
+        return new(viewport.X + (ndc.X + 1) * viewport.Width / 2, viewport.Y + (1 - ndc.Y) * viewport.Height / 2, ndc.Z,
+            clip.W > 0, clip.W > 0 && Math.Abs(ndc.X) <= 1 && Math.Abs(ndc.Y) <= 1 && ndc.Z is >= 0 and <= 1);
     }
 
-    static Vector3 Ray(float x, float y, Pose pose, Matrix4x4 projection, Viewport viewport)
+    internal static object XYZ(Vector3 v) => new { x = v.X, y = v.Y, z = v.Z };
+    static object Project(Vector3 world, Pose pose, Matrix4x4 matrix, Viewport viewport)
+    {
+        var p = ProjectPoint(world, pose, matrix, viewport);
+        return new { x = p.X, y = p.Y, depth = p.Depth, inFront = p.InFront, visibleInViewport = p.VisibleInViewport };
+    }
+
+    internal static Vector3 Ray(float x, float y, Pose pose, Matrix4x4 projection, Viewport viewport)
     {
         if (!Matrix4x4.Invert(projection, out var inverse)) throw new InvalidDataException("Noninvertible projection.");
         // Direct3D far clip Z=1; normalized X/Y map full-resolution client rectangle.
@@ -226,7 +350,7 @@ internal static class EditorView
         return Vector3.Normalize(pose.Right * camera.X + pose.Up * camera.Y + pose.Forward * camera.Z);
     }
 
-    static object IntersectPlane(Vector3 origin, Vector3 direction, float planeY)
+    internal static object IntersectPlane(Vector3 origin, Vector3 direction, float planeY)
     {
         if (Math.Abs(direction.Y) < Epsilon) throw new ArgumentException("Screen ray parallel to requested plane.");
         var distance = (planeY - origin.Y) / direction.Y;

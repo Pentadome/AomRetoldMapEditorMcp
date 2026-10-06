@@ -100,6 +100,7 @@ if (selfTest)
     EditorFiles.SelfTest();
     ScenarioChecks.SelfTest();
     Formations.SelfTest();
+    SceneGeometry.SelfTest();
     using var native = new Bridge(bridge);
     native.SelfTest();
     if (localOnly)

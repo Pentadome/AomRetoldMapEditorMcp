@@ -99,11 +99,11 @@ Example tag only: use a new, unpublished semver version for each release. Packag
 
 ## Tool surface
 
-Default **core exposes 49 tools**: 40 core helpers plus nine essential native commands. **Full exposes 899 tools**:
+Default **core exposes 60 tools**: 51 core helpers plus nine essential native commands. **Full exposes 910 tools**:
 
 - **434 `editor_*` command tools**: typed scalar/vector arguments from native help. Editor/UI/gadget functions, core editor operations, and additional functions referenced by shipped editor controls/hotkeys. Selected multiplayer/online prefixes excluded.
 - **418 `action_*` tools**: 116 XML command elements, 41 command attributes, 261 `editor.con` hotkey/context expressions. Original compound expressions preserved; `confirmDestructive: true` required.
-- **47 helper tools**: 40 core helpers (tool search/selection, state/catalogs/input/placement/batch, capabilities, export recovery, trigger list/edit/parity, players, dependency audit, diplomacy, screenshot crop/OCR, player settings and AI staging), plus seven **full-only** [session workflow helpers](research/SESSION-WORKFLOWS.md): saved notes, checkpoint diffs, managed AI installation, startup orders, XS probes, supplied evidence reports and fail-closed playtest sessions.
+- **58 helper tools**: 51 core helpers (tool search/selection, state/catalogs/input/placement/batch, capabilities, export recovery, trigger list/edit/parity, players, dependency audit, diplomacy, screenshot crop/OCR, player settings and AI staging, plus eleven [world-space scene helpers](research/SCENE-TOOLS.md): camera look-at, view/UI state, world placement, layouts, snapshots/diffs, scene summary, guarded deletion, footprint and terrain checks), plus seven **full-only** [session workflow helpers](research/SESSION-WORKFLOWS.md): saved notes, checkpoint diffs, managed AI installation, startup orders, XS probes, supplied evidence reports and fail-closed playtest sessions.
 
 Core native commands: `editor_undo`, `editor_redo`, `editor_uiClearSelection`, `editor_uiSelectType`, `editor_uiLookAtAndSelectUnit`, `editor_uiSetCameraStartLoc`, `editor_saveScenario`, `editor_uiLoadTriggers`, `editor_uiSaveTriggers`. All `action_*` aliases and other native commands require full mode. Core helpers retain their guarded internal native workflows in both sets. New session workflow helpers require full mode. One independently reviewed Play/Quit profile is available: English alternative UI, 2560×1440, Player1/Standard (`uilayouts/playtest-alt-en-2560x1440.json`). Public start/inspect/token-bound Quit passed an authorized isolated run. Other UI states fail closed; runtime memory telemetry remains unavailable. Generated XS/transcript assertions are not compiler or authenticated runtime proof.
 

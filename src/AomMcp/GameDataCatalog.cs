@@ -54,13 +54,15 @@ internal sealed class GameDataCatalog
     {
         var archive = new FileInfo(Archive(exe));
         var image = new FileInfo(exe);
-        // Size/UTC modification time detect ordinary updates, not adversarial changes preserving file stamps.
+        // Executable identity is the SHA-256 the host computed from the live file at startup; launcher/Steam
+        // validation can touch its timestamp without changing bytes, so exe write time is not compared.
+        // Archive size/UTC modification time detect ordinary data updates, not adversarial stamp-preserving changes.
         if (_data.GetProperty("exeSha256").GetString() != hash
             || !image.Exists || image.Length != _data.GetProperty("exeLength").GetInt64()
-            || image.LastWriteTimeUtc != _data.GetProperty("exeWriteTimeUtc").GetDateTime()
             || !archive.Exists || archive.Length != _data.GetProperty("archiveLength").GetInt64()
             || archive.LastWriteTimeUtc != _data.GetProperty("archiveWriteTimeUtc").GetDateTime())
-            throw new InvalidDataException("Game catalog metadata stale. Run --generate generated and restart MCP.");
+            throw new WorkflowFailure("METADATA_STALE", "metadata", "Game catalog metadata stale (executable hash/length or Data.bar size/time changed).", false, false,
+                "Run --generate generated and restart MCP. Metadata read only; no game connection or native command occurred.");
     }
 
     string Culture(string name)
@@ -74,6 +76,55 @@ internal sealed class GameDataCatalog
             throw new ArgumentException("Unknown pantheon. Available: "
                 + string.Join(", ", groups.EnumerateObject().Select(p => p.Name)));
         return match.Name;
+    }
+
+    Dictionary<string, (string Name, float? X, float? Z)>? _footprints;
+
+    /// <summary>Exact prototype names plus source obstruction radii; refuses stale metadata.</summary>
+    internal Dictionary<string, (string Name, float? X, float? Z)> Footprints(string exe, string hash)
+    {
+        CheckFresh(exe, hash);
+        if (_footprints is not null) return _footprints;
+        float? Radius(XElement unit, string tag) =>
+            float.TryParse(unit.Element(tag)?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var r) && float.IsFinite(r) && r >= 0 ? r : null;
+        var result = new Dictionary<string, (string, float?, float?)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var e in _data.GetProperty("catalogs").GetProperty("prototypes").EnumerateArray())
+        {
+            var name = e.GetProperty("name").GetString()!;
+            if (result.ContainsKey(name)) continue;
+            var xml = e.TryGetProperty("definition", out var d) && d.ValueKind == JsonValueKind.String ? XElement.Parse(d.GetString()!) : null;
+            result[name] = (name, xml is null ? null : Radius(xml, "obstructionradiusx"), xml is null ? null : Radius(xml, "obstructionradiusz"));
+        }
+        return _footprints = result;
+    }
+
+    /// <summary>Ranks close exact-name candidates by containment then edit distance; metadata only.</summary>
+    internal static string[] Suggest(string requested, IEnumerable<string> names, int max = 5)
+    {
+        var wanted = requested.Trim();
+        if (wanted.Length == 0) return [];
+        static int Distance(string a, string b)
+        {
+            a = a.ToLowerInvariant(); b = b.ToLowerInvariant();
+            var previous = Enumerable.Range(0, b.Length + 1).ToArray();
+            for (var i = 1; i <= a.Length; i++)
+            {
+                var current = new int[b.Length + 1]; current[0] = i;
+                for (var j = 1; j <= b.Length; j++)
+                    current[j] = Math.Min(Math.Min(current[j - 1] + 1, previous[j] + 1), previous[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1));
+                previous = current;
+            }
+            return previous[b.Length];
+        }
+        var limit = Math.Max(3, wanted.Length / 3); // Host fuzzy policy: about one edit per three characters.
+        return names.Select(n => (Name: n,
+                Rank: n.Equals(wanted, StringComparison.OrdinalIgnoreCase) ? 0
+                    : n.StartsWith(wanted, StringComparison.OrdinalIgnoreCase) ? 1
+                    : n.Contains(wanted, StringComparison.OrdinalIgnoreCase) || wanted.Contains(n, StringComparison.OrdinalIgnoreCase) && n.Length >= 4 ? 2 : 3,
+                Distance: Distance(n, wanted)))
+            .Where(c => c.Rank < 3 || c.Distance <= limit)
+            .OrderBy(c => c.Rank).ThenBy(c => c.Distance).ThenBy(c => c.Name.Length).ThenBy(c => c.Name, StringComparer.Ordinal)
+            .Take(max).Select(c => c.Name).ToArray();
     }
 
     /// <summary>Returns a culture's potential unit/building union, refusing stale metadata.</summary>

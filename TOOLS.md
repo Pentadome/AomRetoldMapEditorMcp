@@ -1,6 +1,6 @@
 # Complete Age of Mythology Retold editor MCP tool reference
 
-**Current full: 899 tools = 47 helpers + 434 native commands + 418 shipped editor actions. Default core unchanged: 49 = 40 core helpers + nine essential native commands.**
+**Current full: 910 tools = 58 helpers + 434 native commands + 418 shipped editor actions. Default core: 60 = 51 core helpers + nine essential native commands.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md).
 
 Authoritative source: production `aom-retold-editor` `0.1.0` `tools/list` with `--toolset full`, protocol `2025-11-25`. Executable SHA-256: `dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff`.
 
