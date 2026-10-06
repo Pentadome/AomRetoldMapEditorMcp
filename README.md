@@ -8,6 +8,9 @@ Windows x64, out-of-process .NET stdio MCP host + small native window-thread bri
 
 > [!WARNING]
 > Beta software! If a mcp tool fails or crashes the game, then please ask your Ai agent to create an Issue in this repo.
+>
+> If your agent struggles to do something and overly relies on creating screenshots and moving the mouse, then ask what tools the agent is missing from the mcp server and consider creating a new issue/pr.
+> Thank you!
 
 ## Install through npm (Recommended)
 
