@@ -106,6 +106,13 @@ internal static class SceneGeometry
 
     /// <summary>Finds non-overlapping square windows whose node-height range is within maxDelta.</summary>
     /// <param name="heights">Node heights [ix - ix0][iz - iz0].</param>
+    /// <param name="ix0">First X node index of the height block.</param>
+    /// <param name="iz0">First Z node index of the height block.</param>
+    /// <param name="scale">World units per node.</param>
+    /// <param name="windowNodes">Square window side in nodes.</param>
+    /// <param name="maxDelta">Maximum allowed max-min height inside a window.</param>
+    /// <param name="maxResults">Maximum non-overlapping sites returned.</param>
+    /// <returns>Window centers in world units, flattest and most central first.</returns>
     internal static FlatSpot[] FlatSpots(float[][] heights, int ix0, int iz0, double scale, int windowNodes, double maxDelta, int maxResults)
     {
         var nx = heights.Length; var nz = nx == 0 ? 0 : heights[0].Length;
