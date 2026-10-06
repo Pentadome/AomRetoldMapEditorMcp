@@ -1,0 +1,19 @@
+{
+  "synthetic": true,
+  "worldHeader": 444,
+  "prototypeHeader": 0,
+  "registryFlag": 1,
+  "enLength": 80,
+  "p2Length": 15,
+  "opaqueFieldCount": 10,
+  "prototypes": ["CinematicBlockSpawnPoint", "VillagerAztec", "Farm", "TreePalm"],
+  "entities": [
+    {"id": 100, "player": 6, "protoIndex": 0, "p1Length": 86, "position": [10, 4, 20], "note": null},
+    {"id": 101, "player": 6, "protoIndex": 0, "p1Length": 86, "position": [12, 4, 20], "note": "Tower"},
+    {"id": 102, "player": 6, "protoIndex": 0, "p1Length": 86, "position": [14, 4, 20], "note": "塔 — Δέντρο 🌴"},
+    {"id": 103, "player": 1, "protoIndex": 1, "p1Length": 178, "position": [20, 4, 20], "note": ""},
+    {"id": 104, "player": 1, "protoIndex": 2, "p1Length": 220, "position": [21, 4, 20], "note": null},
+    {"id": 105, "player": 0, "protoIndex": 3, "p1Length": 128, "position": [22, 4, 20], "note": null}
+  ],
+  "refusalCases": ["worldHeader=445", "registryFlag=2", "enLength=81", "p1Length=87", "p2Length=16", "opaqueFieldCount=11", "invalidUtf16", "duplicateId", "mismatchedEnId", "truncatedRecord", "unresolvedPrototypeFilter"]
+}

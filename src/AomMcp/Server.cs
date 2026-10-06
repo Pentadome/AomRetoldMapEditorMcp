@@ -13,7 +13,7 @@ namespace AomMcp;
 /// <param name="uiDirectory">Optional decoded editor XML directory.</param>
 /// <param name="pid">Explicit game process ID, or null for single-process discovery.</param>
 /// <param name="fullTools">Expose all generated tools instead of compact core set.</param>
-internal sealed class Server(
+internal sealed partial class Server(
     string exe,
     string layoutPath,
     string bridgePath,
@@ -140,7 +140,7 @@ internal sealed class Server(
     Tool[] Tools => _fullTools ? FullTools : CoreTools;
     Tool[] CoreTools => field ??= Extras().Concat(_catalog.Tools(CoreNativeTools))
         .Select(t => JsonSerializer.SerializeToElement(t, Json).Deserialize<Tool>(Json)!).ToArray();
-    Tool[] FullTools => field ??= Extras().Concat(_catalog.Tools())
+    Tool[] FullTools => field ??= Extras().Concat(WorkflowExtras()).Concat(_catalog.Tools())
         .Select(t => JsonSerializer.SerializeToElement(t, Json).Deserialize<Tool>(Json)!).ToArray();
 
     ListToolsResult List(ListToolsRequestParams? p)
@@ -228,7 +228,7 @@ internal sealed class Server(
         catch (Exception e)
         {
             var noInput = e.Message.Contains("no input sent", StringComparison.OrdinalIgnoreCase);
-            var safeInspection = passedPreflight && (noInput || name is "editor_search_tools" or "editor_trigger_list" or "editor_players" or "editor_player_dependency_audit"
+            var safeInspection = passedPreflight && (noInput || WorkflowSafeInspection(name, args) || name is "editor_search_tools" or "editor_trigger_list" or "editor_players" or "editor_player_dependency_audit"
                 || (name is "editor_set_diplomacy" or "editor_player_settings") && args.GetProperty("operation").GetString() != "apply"
                 || (name is "editor_trigger_edit" or "editor_stage_ai")
                     && (!args.TryGetProperty("preview", out var preview) || preview.GetBoolean()));
@@ -372,7 +372,7 @@ internal sealed class Server(
             ValidateValue(item, schema.GetProperty("items"));
     }
 
-    static bool ConnectionFree(string name, JsonElement args) => name is "editor_toolset" or "editor_search_tools" or "editor_catalog" or "editor_capabilities" or "editor_export_recovery" or "editor_trigger_list" or "editor_trigger_player_parity" or "editor_trigger_edit" or "editor_players" or "editor_player_dependency_audit" or "editor_stage_ai" or "editor_pantheon" or "editor_dependencies"
+    static bool ConnectionFree(string name, JsonElement args) => WorkflowNames.Contains(name) || name is "editor_toolset" or "editor_search_tools" or "editor_catalog" or "editor_capabilities" or "editor_export_recovery" or "editor_trigger_list" or "editor_trigger_player_parity" or "editor_trigger_edit" or "editor_players" or "editor_player_dependency_audit" or "editor_stage_ai" or "editor_pantheon" or "editor_dependencies"
         || GameDataCatalog.ToolKinds.ContainsKey(name)
         || (name is "editor_set_diplomacy" or "editor_player_settings" && (args.GetProperty("operation").GetString() is "preview" or "verify"))
         || (name == "editor_triggers" && args.GetProperty("operation").GetString() is "inspect" or "validate" or "patch")
@@ -400,6 +400,7 @@ internal sealed class Server(
         if (name == "editor_save_checkpoint") EditorFiles.PreflightCheckpoint(args);
         if (name == "editor_export_recovery") EditorFiles.PreflightRecovery(args);
         if (name == "editor_trigger_edit") TriggerEdits.Preflight(args);
+        PreflightWorkflow(name, args);
         if (name == "editor_set_diplomacy" && args.GetProperty("operation").GetString() == "apply")
             PlayerWorkflow.PreflightApply(args, exe);
         if (name == "editor_place_formation")
@@ -414,6 +415,7 @@ internal sealed class Server(
 
     object Invoke(string name, JsonElement args, Game? batchGame = null)
     {
+        if (WorkflowNames.Contains(name)) return InvokeWorkflow(name, args);
         if (name == "editor_search_tools") return SearchTools(args);
         if (name == "editor_toolset")
         {
@@ -439,6 +441,12 @@ internal sealed class Server(
                 scenarioEditing = "Never edit .mythscn directly. Use game editor, game-writer checkpoints and normal Load Scenario UI; native loadScenario disabled after crash.",
                 aiScripts = "Computer-player .xs personality must be under INSTALLPATH\\game\\ai (or its subdirectory). Active-profile Games\\Age of Mythology Retold\\<id>\\ai did NOT work. Triggers belong in active-profile trigger directory; use filename stems for uiLoadTriggers/uiSaveTriggers.",
                 exportRecovery = "On unknown export outcome, use editor_export_recovery inspect on reported staging path. Recover only to a new file with expectedSha256; no second native dispatch.",
+                workflowTools = new { requiredToolset = "full", names = WorkflowNames.Order().ToArray(), savedIdentity = "Checkpoint IDs only; never assume live/runtime identity.",
+                    scenarioDiff = "Partial semantic decoding plus ordered raw section hashes; all assertions before paging, no universal unchanged claim.",
+                    aiInstallation = "Receipt-owned aom_mcp namespace only; preview first, source/old/receipt hashes, exclusive staging/backups/receipts. No binding/compile/runtime proof.",
+                    startupOrders = "Explicit saved pools, reviewed task effects, preserve jobs, bounded deterministic minimum-distance XZ assignments; new TR only, no live apply.",
+                    playtest = PlaytestWorkflow.Capabilities(), telemetry = RuntimeTelemetry.Capabilities(),
+                    runtimeEvidence = "Hash/time/run/player-bound supplied debug transcripts only; capture transport/compiler proof unavailable." },
             };
         }
         if (name == "editor_export_recovery") return EditorFiles.Recover(args);
@@ -776,7 +784,7 @@ internal sealed class Server(
         yield return new
         {
             name = "editor_toolset",
-            description = "Get or switch current core/full tool set mid-session; omit mode to inspect. Default core exposes all helpers plus essential history/selection/camera/file commands; full exposes all generated native/action tools. No game connection. Always available in both sets. Changes notify tools/list_changed; client must refresh tools/list. Standalone only, not allowed in batches. Surface selection is not a permissions sandbox; all editor guards/confirmations remain.",
+            description = "Get or switch current core/full tool set mid-session; omit mode to inspect. Default core exposes core helpers plus essential history/selection/camera/file commands; full additionally exposes workflow helpers and all generated native/action tools. No game connection. Always available in both sets. Changes notify tools/list_changed; client must refresh tools/list. Standalone only, not allowed in batches. Surface selection is not a permissions sandbox; all editor guards/confirmations remain.",
             inputSchema = new
             {
                 type = "object",
@@ -861,7 +869,7 @@ internal sealed class Server(
                 ["limit"] = new { type = "integer", minimum = 1, maximum = 200 },
             }, ["path", "templatePlayer", "targetPlayer"], true);
         yield return Spec("editor_trigger_edit",
-            "Preview-first patch/clone of reviewed TR v12 records in exported .trg. Single operation or edits array (1..64 distinct source triggers) applied in memory with one new output and grouped diff. expectedSha256/source triggerId/expectedName mandatory; clone needs unique newId/newName. Optional active/loop, removeEffects/removeConditions indices (at least one element of each kind remains), labels (printable ASCII, changes element Kind/display label), duplicates (byte-exact copies of original conditions/effects appended in order; max 32), replacements for reviewed single-value numeric Player/PlayerID/FromPlayerID/ToPlayerID/EventID/TechID/Count/Dist/Status/Value/Duration and string ProtoUnit/UnitType/Command/QVName/Op params with expected old value. Indexes use ORIGINAL numbering; duplicates are numbered after originals per kind (e.g. first effect duplicate = original effect count), so a replacement can retarget a copy before removals renumber the result. preview=true default, no file or game change. preview=false requires new outputPath + confirmWrite=true; no scenario file edits. Refuses unknown references/group membership and validates original records remain byte-identical.",
+            "Preview-first patch/clone of reviewed TR v12 records in exported .trg. Single operation or edits array (1..64 distinct source triggers) applied in memory with one new output and grouped diff. expectedSha256/source triggerId/expectedName mandatory; clone needs unique newId/newName. Optional active/loop, removeEffects/removeConditions indices (at least one element of each kind remains), labels (printable ASCII, changes element Kind/display label), duplicates (byte-exact copies of original conditions/effects appended in order; max 32), replacements for reviewed single-value numeric Player/PlayerID/FromPlayerID/ToPlayerID/EventID/TechID/Count/Dist/Status/Value/Duration and string ProtoUnit/UnitType/Command/QVName/Op params with expected old value. Indexes use ORIGINAL numbering; duplicates are numbered after originals per kind (e.g. first effect duplicate = original effect count), so a replacement can retarget a copy before removals renumber the result. objectReplacements use complete expected/new objects tuples {unitId,player,proto}, selected by original kind/elementIndex or copyHandle. copyEffects (max 32) use handle/sourceTriggerId/expectedSourceName/effectIndex/beforeEffectIndex; source always immutable original export, insertion before original destination index (original count means end), equal positions preserve request order. Copies retain commands/expression extras/flags. preview=true default, no file or game change. preview=false requires new outputPath + confirmWrite=true; no scenario file edits. Refuses unknown references/group membership and validates original records remain byte-identical.",
             new Dictionary<string, object>
             {
                 ["operation"] = new { type = "string", @enum = TriggerEditOperations },
@@ -875,6 +883,7 @@ internal sealed class Server(
                         ["newId"] = new { type = "integer", minimum = 0 },
                         ["newName"] = new { type = "string" },
                         ["active"] = new { type = "boolean" }, ["loop"] = new { type = "boolean" },
+                        ["objectReplacements"] = TriggerObjects.ReplacementSchema(), ["copyEffects"] = TriggerObjects.CopySchema(),
                         ["removeEffects"] = new { type = "array", items = new { type = "integer", minimum = 0 }, maxItems = 200 },
                         ["removeConditions"] = new { type = "array", items = new { type = "integer", minimum = 0 }, maxItems = 200 },
                         ["labels"] = new { type = "array", maxItems = 200, items = new { type = "object", properties = new Dictionary<string, object>
@@ -905,6 +914,7 @@ internal sealed class Server(
                 ["newName"] = new { type = "string" },
                 ["active"] = new { type = "boolean" },
                 ["loop"] = new { type = "boolean" },
+                ["objectReplacements"] = TriggerObjects.ReplacementSchema(), ["copyEffects"] = TriggerObjects.CopySchema(),
                 ["removeEffects"] = new { type = "array", items = new { type = "integer", minimum = 0 }, maxItems = 200 },
                 ["removeConditions"] = new { type = "array", items = new { type = "integer", minimum = 0 }, maxItems = 200 },
                 ["labels"] = new { type = "array", maxItems = 200, items = new { type = "object", properties = new Dictionary<string, object>

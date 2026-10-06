@@ -13,12 +13,15 @@ import subprocess
 import tempfile
 import time
 import zlib
+from workflow_fixtures import trigger_fixture, checkpoint_fixture
+from datetime import datetime, timezone, timedelta
 
 root = pathlib.Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
 parser.add_argument('--live', action='store_true')
+parser.add_argument('--app', type=pathlib.Path, default=root / 'src/AomMcp/bin/Release/net10.0-windows/AomMcp.dll')
 options = parser.parse_args()
-app = root / 'src/AomMcp/bin/Release/net10.0-windows/AomMcp.dll'
+app = options.app.resolve()
 subprocess.run(['dotnet', str(app), '--self-test'], check=True, cwd=root)
 # Local metadata/preflight tests use impossible PID (Int32.MaxValue), proving no Game connection.
 host_args = ['dotnet', str(app), '--toolset', 'full'] + ([] if options.live else ['--pid', '2147483647'])
@@ -26,6 +29,8 @@ p = subprocess.Popen(host_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                      stderr=subprocess.PIPE, text=True, cwd=root, creationflags=subprocess.CREATE_NO_WINDOW)
 sequence = 0
 notifications = []
+workflow_names = {'editor_unit_notes', 'editor_scenario_diff', 'editor_install_ai', 'editor_startup_orders',
+                  'editor_runtime_probe', 'editor_runtime_report', 'editor_playtest'}
 
 def send(method, params=None):
     global sequence
@@ -67,6 +72,93 @@ def request(method, params=None, error_code=None):
 
 def tool(name, args=None):
     return request('tools/call', {'name': name, 'arguments': args or {}})
+
+def assert_workflow_tools():
+    def success(name, args):
+        response = tool(name, args)
+        assert not response['isError'], response
+        return response['structuredContent']
+
+    def refusal(name, args):
+        response = tool(name, args)
+        assert response['isError'] and 'Process with an Id' not in str(response), response
+        return response
+
+    with tempfile.TemporaryDirectory(prefix='aom-workflow-protocol-') as tmp:
+        folder = pathlib.Path(tmp)
+        before = folder / 'before.mythscn'
+        after = folder / 'after.mythscn'
+        before.write_bytes(checkpoint_fixture())
+        after.write_bytes(checkpoint_fixture(note='changed note'))
+        sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+        notes_args = {'scenarioPath': str(before), 'expectedSha256': sha(before), 'player': 6,
+                      'noteContains': '塔', 'unitIds': [100], 'limit': 1}
+        notes = success('editor_unit_notes', notes_args)
+        assert notes['total'] == 1 and notes['units'][0]['note'] == '塔 — Δέντρο 🌴', notes
+        assert success('editor_unit_notes', {**notes_args, 'offset': 999})['units'] == []
+        refusal('editor_unit_notes', {**notes_args, 'expectedSha256': '0' * 64})
+        unsupported = folder / 'unsupported.mythscn'
+        unsupported.write_bytes(checkpoint_fixture(world_header=999))
+        refusal('editor_unit_notes', {'scenarioPath': str(unsupported), 'expectedSha256': sha(unsupported)})
+        comparison = {'beforePath': str(before), 'expectedBeforeSha256': sha(before),
+                      'afterPath': str(after), 'expectedAfterSha256': sha(after), 'offset': 999, 'limit': 1,
+                      'assertions': [{'scope': 'entities', 'policy': 'preserve', 'fields': ['note']}]}
+        diff = success('editor_scenario_diff', comparison)
+        assert not diff['universalUnchangedVerified'] and not diff['decodingComplete'], diff
+        assert 'fail' in str(diff['assertions']), diff
+        xs = folder / 'source.xs'
+        xs.write_text('void main() {}\n', encoding='utf-8')
+        ai = success('editor_install_ai', {'sourcePath': str(xs), 'expectedSha256': sha(xs), 'destination': folder.name + '.xs'})
+        assert ai['preview'] and not ai['runtimeVerified'] and not ai['compilationVerified'], ai
+        refusal('editor_install_ai', {'sourcePath': str(xs), 'expectedSha256': sha(xs), 'destination': '../stock.xs'})
+        scene = folder / 'workers.mythscn'
+        scene.write_bytes(checkpoint_fixture(units=[(100, 1, 'VillagerAztec', 10, 0, 20, None),
+            (101, 1, 'VillagerAztec', 12, 0, 22, None), (200, 1, 'Farm', 11, 0, 21, None), (201, 1, 'Farm', 13, 0, 23, None)]))
+        tr = folder / 'startup.trg'
+        tr.write_bytes(trigger_fixture(selection=0, trailer=0))
+        startup = {'operation': 'plan', 'path': str(tr), 'expectedSha256': sha(tr), 'scenarioPath': str(scene),
+                   'expectedScenarioSha256': sha(scene), 'triggerId': 704, 'expectedName': 'Startup',
+                   'workers': [{'unitId': i, 'player': 1, 'proto': 'VillagerAztec'} for i in [100, 101]],
+                   'targets': [{'unitId': i, 'player': 1, 'proto': 'Farm'} for i in [200, 201]],
+                   'player': 1, 'targetPlayer': 1, 'workerProtos': ['VillagerAztec'], 'targetProtos': ['Farm'],
+                   'job': 'farm', 'maxDistance': 100, 'templateEffectIndex': 0}
+        plan = success('editor_startup_orders', startup)
+        assert len(plan['preserved']) == 1 and plan['assignments'][0]['workerId'] == 101 and plan['assignments'][0]['targetId'] == 201, plan
+        output = folder / 'planned.trg'
+        written = success('editor_startup_orders', {**startup, 'operation': 'write', 'outputPath': str(output), 'confirmWrite': True})
+        assert written['sha256'] == sha(output)
+        refusal('editor_startup_orders', {**startup, 'operation': 'write', 'outputPath': str(output), 'confirmWrite': True})
+        probe_args = {'runId': 'protocol_fixture', 'player': 6, 'runtimeIdentityReviewed': True, 'includePlans': True,
+                      'selectors': [{'key': 'workers', 'kind': 'worker', 'runtimeProtoId': 12, 'runtimeStateId': 2, 'maxMatches': 44, 'savedIdAnnotation': 31332}]}
+        probe = success('editor_runtime_probe', probe_args)
+        assert not probe['runtimeVerified'] and 'xsSetContextPlayer' not in probe['code'], probe
+        assert 'kbUnitGetActionType(31332)' not in probe['code']
+        probe_path = folder / 'probe.xs'
+        probe = success('editor_runtime_probe', {**probe_args, 'preview': False, 'outputPath': str(probe_path), 'confirmWrite': True})
+        assert probe['sha256'] == sha(probe_path)
+        refusal('editor_runtime_probe', {**probe_args, 'preview': False, 'outputPath': str(probe_path), 'confirmWrite': True})
+        transcript = folder / 'evidence.txt'
+        prefix = 'AOMMCP1|protocol_fixture|5|6|'
+        transcript.write_text(prefix + 'BEGIN\n' + prefix + 'UNIT|workers|700|12|2|9|900|10|20\n'
+                              + prefix + 'PRESENCE|workers|1\n' + prefix + 'PLAN_COUNT|0\n' + prefix + 'END\n', encoding='utf-8')
+        now = datetime.now(timezone.utc)
+        evidence = {'evidencePath': str(transcript), 'expectedSha256': sha(transcript), 'runId': 'protocol_fixture', 'player': 6,
+                    'runStartedAtUtc': (now - timedelta(seconds=5)).isoformat(), 'capturedAtUtc': now.isoformat(), 'minGameTime': 5, 'maxGameTime': 5,
+                    'offset': 999, 'limit': 1, 'assertions': [{'check': 'workerTarget', 'key': 'workers', 'runtimeUnitId': 700, 'expectedTargetKbId': 900}, {'check': 'compilation'}]}
+        report = success('editor_runtime_report', evidence)
+        assert report['assertions'][0]['status'] == 'pass' and report['assertions'][1]['status'] == 'unsupported' and report['units'] == [], report
+        assert not report['engineTransportVerified'] and not report['compilationVerified'], report
+        refusal('editor_runtime_report', {**evidence, 'runId': 'wrong_run'})
+        refusal('editor_runtime_report', {**evidence, 'capturedAtUtc': (now - timedelta(hours=1)).isoformat()})
+        play_caps = success('editor_playtest', {'operation': 'preview'})
+        assert play_caps['available'] and play_caps['profileCount'] == 1 and not play_caps['nativeStartTest'] and not play_caps['nativeLoad'], play_caps
+        profile_path = app.parent / play_caps['profile']
+        profile_preview = success('editor_playtest', {'operation': 'preview', 'profilePath': str(profile_path), 'expectedProfileSha256': sha(profile_path)})
+        assert profile_preview['reviewed'] and not profile_preview['inputSent'] and not profile_preview['runtimeTelemetry']['available'], profile_preview
+        refusal('editor_playtest', {'operation': 'quit', 'token': 'foreign_host', 'confirmQuit': True})
+        caps = success('editor_capabilities', {})['workflowTools']
+        assert set(caps['names']) == workflow_names and caps['playtest']['available'] and caps['playtest']['profileCount'] == 1 and not caps['telemetry']['available'], caps
+
 
 def assert_tool_search(full_specs, expected_core, mode):
     schema = full_specs['editor_search_tools']
@@ -431,6 +523,35 @@ try:
         assert tool('editor_trigger_list', {'path': str(prepared), 'triggerId': trigger_id})['structuredContent']['trigger']['name'] == 'Defense_Controller_preview'
         assert tool('editor_trigger_edit', {**edit_args, 'preview': False,
             'outputPath': str(prepared), 'confirmWrite': True})['isError']  # No overwrite.
+        # Independent synthetic TR verifies schemas, offline dispatch, immutable copies, and actual new-file readback.
+        object_source = pathlib.Path(temporary) / 'objects.trg'
+        object_source.write_bytes(trigger_fixture())
+        object_sha = hashlib.sha256(object_source.read_bytes()).hexdigest()
+        tuple_old = {'unitId': 100, 'player': 1, 'proto': 'VillagerAztec'}
+        object_edit = {'operation': 'patch', 'triggerId': 704, 'expectedName': 'Startup',
+            'copyEffects': [{'handle': 'east', 'sourceTriggerId': 704, 'expectedSourceName': 'Startup',
+                             'effectIndex': 0, 'beforeEffectIndex': 0}],
+            'objectReplacements': [{'copyHandle': 'east', 'parameter': 'SrcObject', 'expected': [tuple_old],
+                                    'objects': [{**tuple_old, 'unitId': 333}]}]}
+        object_args = {'path': str(object_source), 'expectedSha256': object_sha, **object_edit}
+        object_preview = tool('editor_trigger_edit', object_args)
+        assert not object_preview['isError'] and object_preview['structuredContent']['effectCount'] == 2, object_preview
+        object_output = pathlib.Path(temporary) / 'objects-copy.trg'
+        assert not object_output.exists()
+        object_write = tool('editor_trigger_edit', {**object_args, 'preview': False,
+            'outputPath': str(object_output), 'confirmWrite': True})
+        assert not object_write['isError'] and object_write['structuredContent']['sha256'] == hashlib.sha256(object_output.read_bytes()).hexdigest(), object_write
+        object_detail = tool('editor_trigger_list', {'path': str(object_output), 'triggerId': 704})['structuredContent']['trigger']
+        assert object_detail['effects'][0]['args'][0]['objects'][0]['unitId'] == 333
+        assert object_detail['effects'][1]['args'][0]['objects'][0]['unitId'] == 100
+        assert object_detail['effects'][0]['args'][0]['selectionFlag'] == 1 and object_detail['effects'][0]['args'][0]['trailer'] == 127
+        assert object_detail['effects'][0]['extras'] == object_detail['effects'][1]['extras']
+        wrong_owner = {**object_edit, 'objectReplacements': [{**object_edit['objectReplacements'][0],
+            'expected': [{**tuple_old, 'player': 2}]}]}
+        assert tool('editor_trigger_edit', {**object_args, **wrong_owner})['isError']
+        assert tool('editor_trigger_edit', {**object_args, 'expectedSha256': '0' * 64})['isError']
+        assert tool('editor_trigger_edit', {**object_args, 'preview': False, 'outputPath': str(object_output), 'confirmWrite': True})['isError']
+        assert hashlib.sha256(object_source.read_bytes()).hexdigest() == object_sha
         xs_source = pathlib.Path(temporary) / 'fixture-source.xs'
         xs_source.write_text('// draft; not a loaded personality\n', encoding='utf-8')
         xs_staged = pathlib.Path(temporary) / 'fixture-staged.xs'
@@ -699,11 +820,14 @@ try:
     assert full_catalog['toolset'] == 'full' and full_catalog['exposedToolCount'] == len(names)
     native_names = {'editor_' + command['name'] for command in full_catalog['commands']}
     helper_names = {name for name in names if name not in native_names and not name.startswith('action_')}
-    # Host core policy: every helper plus this explicit selection/history/camera/file subset.
+    # Core stays unchanged; new workflow helpers are full-only.
+    assert workflow_names <= helper_names
+    assert_workflow_tools()
     core_native = {'editor_undo', 'editor_redo', 'editor_uiClearSelection', 'editor_uiSelectType',
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
-    expected_core = helper_names | core_native
+    expected_core = (helper_names - workflow_names) | core_native
+    assert len(expected_core) == 49 and len(names) == 899
     full_specs = {t['name']: t for t in tools}
     assert 'editor_search_tools' in expected_core
     assert_search_isolation(full_specs, expected_core, 'full')
@@ -733,7 +857,7 @@ try:
             assert tool('editor_catalog', {'filter': 'uiPlaceAtPointer'})['structuredContent']['commands'] == []
             preview = tool('editor_place_formation', formation)
             assert not preview['isError'] and preview['structuredContent']['attempted'] == 0, preview
-            for hidden in ('editor_uiPlaceAtPointer', next(n for n in names if n.startswith('action_'))):
+            for hidden in (*sorted(workflow_names), 'editor_uiPlaceAtPointer', next(n for n in names if n.startswith('action_'))):
                 for refused in (tool(hidden), tool('editor_batch', {'steps': [
                         {'name': 'editor_search_tools', 'arguments': {'query': hidden}},
                         {'name': 'editor_status'}, {'name': hidden}]})):

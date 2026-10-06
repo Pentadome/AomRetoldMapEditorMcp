@@ -46,6 +46,8 @@ public sealed record Layout
     public SelectionReadLayout? Selection { get; init; }
     /// <summary>Gets optional terrain/camera/render fields; absent candidates refuse map queries.</summary>
     public MapReadLayout? Map { get; init; }
+    /// <summary>Gets optional independently corroborated runtime telemetry; unregistered candidates refuse loading.</summary>
+    public RuntimeReadLayout? Runtime { get; init; }
     /// <summary>Gets the dispatcher signature bytes decoded from <see cref="PrefixHex"/>.</summary>
     // Spaces are human-readable byte separators in layout JSON, not part of the runtime signature.
     public byte[] Prefix => Convert.FromHexString(PrefixHex.Replace(" ", ""));
@@ -87,6 +89,8 @@ public sealed record Layout
             throw new InvalidDataException("Incomplete layout.");
         if (layout.Units is { } units)
             LiveUnits.ValidateLayout(units);
+        if (layout.Runtime is { } runtime)
+            RuntimeTelemetry.ValidateLayout(runtime, hash);
         return layout;
     }
 }

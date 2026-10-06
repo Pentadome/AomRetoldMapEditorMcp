@@ -11,9 +11,12 @@ internal static class CampaignTriggers
     const int MaxTriggers = 10_000, MaxChars = 250_000;
     internal const int MaxItems = 20_000;
     static readonly UnicodeEncoding Utf16 = new(false, false, true);
+    internal sealed record ObjectRef(uint UnitId, uint Player, string Proto);
+    internal sealed record Extra(string Expression, byte Flag, string[] Strings);
     internal sealed record Arg(string Key, string Label, uint ValueType, string[] Values,
-        int Start, int ValueStart, int ValueEnd, int End);
-    internal sealed record Element(string Name, string Kind, Arg[] Args, string Command, int Start, int End, int LabelOffset, int LabelBytes);
+        int Start, int ValueStart, int ValueEnd, int End, ObjectRef[]? Objects = null, byte? SelectionFlag = null, byte Trailer = 0, byte? ValueFlag = null, uint Magic = 1);
+    internal sealed record Element(string Name, string Kind, Arg[] Args, string Command, int Start, int End, int LabelOffset, int LabelBytes,
+        Extra[]? Extras = null, byte[]? Trailer = null);
     internal sealed record Trigger(uint Id, uint Group, uint Priority, string Name, string Note,
         byte[] Flags, int Start, int End, int IdOffset, int FlagsOffset, int NameOffset, int NameChars,
         int EffectsCountOffset, Element[] Conditions, Element[] Effects);
@@ -151,15 +154,17 @@ internal static class CampaignTriggers
             for (var j = 0; j < argc; j++)
             {
                 var argStart = r.Offset;
-                _ = r.U32(); var key = r.Narrow(); var label = r.Narrow(); var type = r.U32();
+                var magic = r.U32(); var key = r.Narrow(); var label = r.Narrow(); var type = r.U32();
                 var valueStart = r.Offset;
                 string[] values;
+                ObjectRef[]? objects = null; byte? selectionFlag = null, valueFlag = null;
                 switch (type)
                 {
                     case 4:
                         values = WideList(r);
-                        for (var k = r.Count(512, "proto list"); k > 0; k--) { _ = r.U32(); _ = r.U32(); _ = r.Wide(); }
-                        _ = r.Byte(); break;
+                        objects = new ObjectRef[r.Count(512, "proto list")];
+                        for (var k = 0; k < objects.Length; k++) objects[k] = new(r.U32(), r.U32(), r.Wide());
+                        selectionFlag = r.Byte(); break;
                     case 7: values = WideList(r); break;
                     case 22:
                         var n = r.Count(512, "string-id count"); _ = r.U32();
@@ -173,21 +178,24 @@ internal static class CampaignTriggers
                     default:
                         if (type > 82) throw new InvalidDataException("Unsupported TR argument value type " + type + ".");
                         _ = r.U32(); values = [r.Wide()];
-                        if (type is 2 or 5 or 8 or 56) _ = r.Byte();
+                        if (type is 2 or 5 or 8 or 56) valueFlag = r.Byte();
                         break;
                 }
                 var valueEnd = r.Offset;
-                _ = r.Byte(); // TR v12 argument trailer, preserved.
-                args[j] = new(key, label, type, values, argStart, valueStart, valueEnd, r.Offset);
+                var trailer = r.Byte(); // TR v12 argument trailer, preserved.
+                args[j] = new(key, label, type, values, argStart, valueStart, valueEnd, r.Offset, objects, selectionFlag, trailer, valueFlag, magic);
             }
             var cmd = r.Narrow();
-            for (var extras = r.Count(512, "extra expression count"); extras > 0; extras--)
+            var extras = new Extra[r.Count(512, "extra expression count")];
+            for (var j = 0; j < extras.Length; j++)
             {
-                _ = r.Narrow(); _ = r.Byte();
-                for (var k = r.Count(512, "extra string count"); k > 0; k--) _ = r.Narrow();
+                var expression = r.Narrow(); var flag = r.Byte();
+                var strings = new string[r.Count(512, "extra string count")];
+                for (var k = 0; k < strings.Length; k++) strings[k] = r.Narrow();
+                extras[j] = new(expression, flag, strings);
             }
-            _ = r.Take(2);
-            elements[i] = new(name, kind, args, cmd, start, r.Offset, labelOffset, labelBytes);
+            var elementTrailer = r.Take(2).ToArray();
+            elements[i] = new(name, kind, args, cmd, start, r.Offset, labelOffset, labelBytes, extras, elementTrailer);
         }
         return elements;
     }
@@ -241,6 +249,12 @@ internal static class CampaignTriggers
 
     internal static void SelfTest()
     {
+        var typed = Parse(WorkflowFixtures.Trigger(2)).Triggers.Single().Effects.Single();
+        if (typed.Args[0].Objects is not { Length: 2 } || typed.Args[0].Objects![1] != new ObjectRef(101, 1, "VillagerAztec")
+            || typed.Args[0].SelectionFlag != 0 || typed.Args[0].Trailer != 0
+            || typed.Extras is not { Length: 3 } || typed.Extras[1].Strings.Single() != "SrcObject"
+            || typed.Extras[2].Expression != "trUnitDoWorkOnUnit(%DstObject%, %EventID%);")
+            throw new InvalidOperationException("Typed TR metadata/expression fixture failed.");
         var controller = TriggerCodec.ReadFile(Path.Combine(AppContext.BaseDirectory, "trigger-controller-template.trg"));
         var bodyOnly = controller.AsSpan(0, controller.Length - 4).ToArray(); // Reviewed sentinel fixture.
         byte[] WithCameras(string exportName, string cameraName)
@@ -348,7 +362,11 @@ internal static class CampaignTriggers
     };
     static object DescribeElement(Element e) => new
     {
-        e.Name, e.Kind, args = e.Args.Select(a => new { a.Key, a.Label, a.ValueType,
-            values = a.Values.Take(20).Select(Clip).ToArray(), totalValues = a.Values.Length }).ToArray(),
+        e.Name, e.Kind, command = Clip(e.Command), args = e.Args.Select(a => new { a.Key, a.Label, a.ValueType,
+            values = a.Values.Take(20).Select(Clip).ToArray(), totalValues = a.Values.Length,
+            objects = a.Objects?.Take(200).Select(o => new { unitId = o.UnitId, player = o.Player, proto = o.Proto }).ToArray(),
+            totalObjects = a.Objects?.Length, a.SelectionFlag, a.Trailer, a.ValueFlag, a.Magic }).ToArray(),
+        extras = e.Extras?.Take(20).Select(x => new { expression = Clip(x.Expression), x.Flag, strings = x.Strings.Take(20).Select(Clip).ToArray() }).ToArray(),
+        totalExtras = e.Extras?.Length, e.Trailer,
     };
 }

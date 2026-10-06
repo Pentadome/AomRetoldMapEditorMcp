@@ -1,6 +1,4 @@
 using System.Buffers.Binary;
-using System.IO.Compression;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -33,58 +31,16 @@ internal static class ScenarioReader
         catch (DecoderFallbackException e) { throw new InvalidDataException("Invalid scenario UTF-16.", e); }
     }
 
-    static byte[] Section(ReadOnlySpan<byte> bytes, int start, string name)
+    internal static Snapshot Read(string path) => Read(CheckpointDocument.Read(path));
+
+    internal static Snapshot Read(CheckpointDocument document)
     {
-        var offset = start;
-        var found = false;
-        byte[]? result = null;
-        for (var n = 0; offset + 6 <= bytes.Length && n < 50_000; n++)
-        {
-            var tag = Encoding.ASCII.GetString(bytes.Slice(offset, 2));
-            if (tag[0] is < ' ' or > '~' || tag[1] is < ' ' or > '~') break;
-            var size = U32(bytes, offset + 2);
-            if (size > ExportFormats.MaxDecodedBytes || size > bytes.Length - offset - 6)
-                throw new InvalidDataException("Scenario section outside bounds: " + tag);
-            if (tag == name)
-            {
-                if (found) throw new InvalidDataException("Duplicate scenario section: " + name);
-                found = true;
-                result = bytes.Slice(offset + 6, size).ToArray();
-            }
-            offset += 6 + size;
-        }
-        return result ?? throw new InvalidDataException("Scenario section missing: " + name);
+        var players = ReadPlayers(document.World.One("PL").ToArray());
+        return new(document.Path, document.Sha256, players, document.Root.One("TR").ToArray(),
+            document.Format, document.SuffixBytes);
     }
 
-    internal static Snapshot Read(string path)
-    {
-        path = EditorFiles.LocalPath(path);
-        if (!path.EndsWith(".mythscn", StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException("Read-only players requires .mythscn checkpoint.");
-        var size = new FileInfo(path).Length;
-        if (size <= 0 || size > ExportFormats.MaxStoredBytes) throw new InvalidDataException("Checkpoint outside stored-file bound.");
-        var bytes = File.ReadAllBytes(path);
-        var check = ExportFormats.Scenario(bytes);
-        if (!check.Valid) throw new InvalidDataException(check.Reason);
-        var expected = U32(bytes, 4);
-        byte[] decoded;
-        using (var input = new MemoryStream(bytes, 8, bytes.Length - 8 - check.SuffixBytes, false))
-        using (var z = new ZLibStream(input, CompressionMode.Decompress))
-        using (var memory = new MemoryStream(Math.Min(expected, 24_000_000)))
-        {
-            z.CopyTo(memory);
-            decoded = memory.ToArray();
-        }
-        if (decoded.Length != expected || decoded.Length < 10 || decoded[0] != 'B' || decoded[1] != 'G')
-            throw new InvalidDataException("Checkpoint decoded BG/length mismatch.");
-        var tr = Section(decoded, 10, "TR");
-        var world = Section(decoded, 10, "J1");
-        var players = ReadPlayers(Section(world, 4, "PL"));
-        return new(path, Convert.ToHexStringLower(SHA256.HashData(bytes)), players, tr,
-            check.Format, check.SuffixBytes);
-    }
-
-    static Player[] ReadPlayers(byte[] data)
+    internal static Player[] ReadPlayers(byte[] data, bool requireReviewedVersion = false)
     {
         if (data.Length < 8) throw new InvalidDataException("PL section truncated.");
         var count = U32(data, 4);
@@ -98,7 +54,8 @@ internal static class ScenarioReader
             var bpSize = U32(data, off + 3); off += 7;
             if (bpSize > data.Length - off) throw new InvalidDataException("PL player size outside bound.");
             var bp = data.AsSpan(off, bpSize); off += bpSize;
-            _ = U32(bp, 0); // Player block version; field layout reviewed for game writer's v319.
+            var version = U32(bp, 0); // Player block version; field layout reviewed for game writer's v319.
+            if (requireReviewedVersion && version != 319) throw new InvalidDataException("Unsupported player block version for semantic diff.");
             var sub = 4;
             uint playerId = uint.MaxValue;
             string? name = null, ai = null;

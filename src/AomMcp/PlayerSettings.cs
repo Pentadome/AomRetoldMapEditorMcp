@@ -11,7 +11,33 @@ internal static class PlayerSettings
     static readonly string[] Fields = ["name", "control", "aiPath", "civ", "color", "visibility", "food", "wood", "gold", "favor", "pop", "popLimit", "handicap", "startAge", "maxAge", "classicalGod", "heroicGod", "mythicGod"];
     static readonly string[] AgeNames = ["Archaic Age", "Classical Age", "Heroic Age", "Mythic Age"];
     static readonly string[] Keys = ["operation", "scenarioPath", "expectedSha256", "changes", "verificationPath", "backupScenarioPath", "backupTriggerPath", "verificationDirectory", "scenarioProfileDirectory", "triggerProfileDirectory", "confirmDestructive", "confirmIsolatedScene"];
-    static readonly Regex AiPath = new(@"^[a-zA-Z0-9_]+(\\[a-zA-Z0-9_]+)+?(\.xs)?$", RegexOptions.Compiled);
+    static readonly Regex AiPath = new(@"^[a-zA-Z0-9_]+(\\[a-zA-Z0-9_]+)+?(\.xs)?\z", RegexOptions.Compiled);
+    static readonly Regex BareAiName = new(@"^[a-zA-Z0-9_]+(\.xs)?\z", RegexOptions.Compiled);
+    static bool ValidAiChange(string expected, string desired) => AiPath.IsMatch(desired)
+        && (AiPath.IsMatch(expected) || BareAiName.IsMatch(expected));
+    // Reviewed game-written AI selection omits the optional .xs extension.
+    // This equivalence is limited to an explicitly requested AI destination;
+    // source expectations and preservation of unrequested fields stay exact.
+    static bool MatchesRequestedAi(string actual, string desired) => actual == desired
+        || desired.EndsWith(".xs", StringComparison.Ordinal) && actual == desired[..^3];
+    internal static void SelfTest()
+    {
+        if (!MatchesRequestedAi(@"aom_mcp\fixture", @"aom_mcp\fixture.xs")
+            || !MatchesRequestedAi(@"aom_mcp\fixture.xs", @"aom_mcp\fixture.xs")
+            || MatchesRequestedAi(@"other\fixture", @"aom_mcp\fixture.xs")
+            || MatchesRequestedAi(@"aom_mcp\different", @"aom_mcp\fixture.xs")
+            || MatchesRequestedAi(@"aom_mcp\fixture.txt", @"aom_mcp\fixture.xs")
+            || MatchesRequestedAi(@"aom_mcp\fixture.xs", @"aom_mcp\fixture"))
+            throw new InvalidOperationException("Reviewed AI extension omission comparison failed.");
+        if (!ValidAiChange("chairon", @"aom_mcp\fixture.xs") || !ValidAiChange("chairon.xs", @"aom_mcp\fixture.xs")
+            || !ValidAiChange(@"aom_mcp\old.xs", @"aom_mcp\fixture.xs"))
+            throw new InvalidOperationException("Valid legacy/default AI path refused.");
+        foreach (var unsafePath in new[] { "", "../chairon", @"..\chairon", @"C:\chairon.xs", @"\\host\chairon.xs", "chairon\n", "chairon.txt" })
+            if (ValidAiChange(unsafePath, @"aom_mcp\fixture.xs")) throw new InvalidOperationException("Unsafe legacy AI path accepted.");
+        if (ValidAiChange("chairon", "stock.xs") || ValidAiChange("chairon", @"aom_mcp\..\stock.xs")
+            || ValidAiChange("chairon", "aom_mcp\\fixture.xs\n"))
+            throw new InvalidOperationException("Destination AI path restrictions weakened.");
+    }
     static readonly int[] Panel = [0, 22, 420, 74];
     static readonly int[] BrowserTitle = [1080, 240, 420, 100];
     static readonly int[] BrowserRows = [360, 415, 430, 485];
@@ -77,7 +103,7 @@ internal static class PlayerSettings
             if (Value(source.Players[player], field) != expected)
                 throw new WorkflowFailure("STALE_PLAYER", "preflight", $"P{player}.{field} differs from expected checkpoint value.", false, false,
                     "Inspect game-written source checkpoint; no input sent.");
-            if (field == "aiPath" && (!AiPath.IsMatch(desired) || !AiPath.IsMatch(expected)))
+            if (field == "aiPath" && !ValidAiChange(expected, desired))
                 throw new ArgumentException("AI path must be relative game\\ai path (installed .xs file required)." );
             if (observedOnly && field is not ("classicalGod" or "heroicGod" or "mythicGod"))
                 throw new ArgumentException("observedOnly limited to age-dependent minor god IDs.");
@@ -273,7 +299,10 @@ internal static class PlayerSettings
             {
                 var request = changes.FirstOrDefault(c => c.Player == before.Id && c.Field == field);
                 var wanted = request is null ? Value(before, field) : request.Desired;
-                if (Value(after, field) != wanted) errors.Add($"P{before.Id}.{field}: expected {wanted}, observed {Value(after, field)}");
+                var observed = Value(after, field);
+                var matches = request is not null && field == "aiPath"
+                    ? MatchesRequestedAi(observed, wanted) : observed == wanted;
+                if (!matches) errors.Add($"P{before.Id}.{field}: expected {wanted}, observed {observed}");
             }
             if (!before.Diplomacy.AsSpan().SequenceEqual(after.Diplomacy)) errors.Add($"P{before.Id}.diplomacy");
         }

@@ -85,6 +85,17 @@ if (selfTest)
     EditorView.SelfTest();
     TriggerCodec.SelfTest();
     CampaignTriggers.SelfTest();
+    CheckpointDocument.SelfTest();
+    TriggerObjects.SelfTest();
+    CheckpointUnits.SelfTest();
+    ScenarioDiff.SelfTest();
+    AiInstaller.SelfTest();
+    PlayerSettings.SelfTest();
+    StartupOrders.SelfTest();
+    RuntimeProbes.SelfTest();
+    RuntimeReport.SelfTest();
+    RuntimeTelemetry.SelfTest();
+    PlaytestWorkflow.SelfTest();
     ExportFormats.SelfTest();
     EditorFiles.SelfTest();
     ScenarioChecks.SelfTest();

@@ -10,10 +10,11 @@ internal sealed class WorkflowFailure : Exception
     internal string? StagingPath { get; }
     internal string? DestinationPath { get; }
     internal string NextAction { get; }
+    internal string[] RetainedPaths { get; }
 
     internal WorkflowFailure(string code, string phase, string message, bool nativeDispatched,
         bool outcomeUnknown, string nextAction, string? stagingPath = null, string? destinationPath = null,
-        Exception? inner = null) : base(message, inner)
+        Exception? inner = null, string[]? retainedPaths = null) : base(message, inner)
     {
         Code = code;
         Phase = phase;
@@ -22,6 +23,7 @@ internal sealed class WorkflowFailure : Exception
         StagingPath = stagingPath;
         DestinationPath = destinationPath;
         NextAction = nextAction;
+        RetainedPaths = retainedPaths ?? [];
     }
 
     internal object Details => new
@@ -31,7 +33,8 @@ internal sealed class WorkflowFailure : Exception
         message = Message,
         nativeDispatched = NativeDispatched,
         outcomeUnknown = OutcomeUnknown,
-        retrySafe = !NativeDispatched,
+        retrySafe = !NativeDispatched && !OutcomeUnknown,
+        retainedPaths = RetainedPaths,
         stagingPath = StagingPath,
         destinationPath = DestinationPath,
         nextAction = NextAction,

@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "exeSha256": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+  "build": "100.19.17020.0",
+  "interface": "alternative",
+  "language": "en",
+  "width": 2560,
+  "height": 1440,
+  "startPlayer": 1,
+  "difficulty": "Standard",
+  "path": ["editor Play popover", "Play", "loaded gameplay", "gear", "Paused Quit", "Quit YES", "editor"],
+  "sourceHashes": {
+    "PausePopup.xaml": "146b2501f942c7b35c60f2265894a6d9dbd3bb4c15af3952d1d43abccceec5ad",
+    "ui_xs_debugger.xml": "ce1819ac983638df93a4b80f55d8a98f522d0afaf1ec7febc66bac94ad19d890"
+  },
+  "screenshots": {
+    "editor": "338f47ee4f6455444edb921cb8abc9fa3294a44e9a0d020445b9ba55a3709f03",
+    "popover": "59c3c385e0faf78270d492c6d6f5187df1b7e1e7058bf9a0e5b648e0746dcdac",
+    "playing": "3fffaad491bb8fd3103d79f4afc59a2ef770d71261ea86c8ce1a8e2ee3c17237",
+    "paused": "908ddc937e53ac0daaeba2b3c7e7b107423b14c14709d05df357b6a1852d92c5",
+    "confirm": "6633310fce23324de5450d74e44032b5b218672edcb198e87d93f62cfc4b8f6f"
+  },
+  "beforeCheckpointSha256": "0cca0cbbb6bcfe3b727ee936edcf40fd67ebe9fe6c2e899a6d40b605a79db333",
+  "afterCheckpointSha256": "a2382b06df21ae68267f2da336d6bbcfa7050f433aabe90e0aa4f912ab045ad1",
+  "triggerBackupSha256": "4cbd6c31f70716280d50ea37b67bc6b016696ecbd7f9d3c25cd52425e54a09b1",
+  "observedEditorModeBeforeAfter": 1,
+  "observedPlayingMode": 0,
+  "identityStable": true,
+  "rawEditorPixelsIndependentlyCorroborated": true,
+  "reviewedSemanticChanges": 0,
+  "rawChanges": 8,
+  "decodingComplete": false,
+  "compilationVerified": false,
+  "engineTranscriptAuthenticated": false,
+  "runtimeFieldsCorroborated": false,
+  "scope": "Sanitized observation manifest only; retained screenshots/backups/private token logs remain local. No process IDs, tokens, game records or proprietary XML included. Loading, external overlays, defeat, other UI modes/languages/resolutions and gameplay correctness are outside profile proof."
+}

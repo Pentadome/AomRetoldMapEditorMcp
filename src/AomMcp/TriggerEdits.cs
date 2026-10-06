@@ -24,10 +24,12 @@ internal static class TriggerEdits
             if (list.ValueKind != JsonValueKind.Array || list.GetArrayLength() is < 1 or > 64)
                 throw new ArgumentException("edits must contain 1..64 operations.");
             var seen = new HashSet<int>();
-            var newIds = new HashSet<int>();
+            var newIds = new HashSet<int>(); var objectTuples = 0;
             foreach (var entry in list.EnumerateArray())
             {
                 ValidateEdit(entry);
+                if (entry.TryGetProperty("objectReplacements", out var objectEdits)) objectTuples += objectEdits.EnumerateArray().Sum(r => r.GetProperty("objects").GetArrayLength());
+                if (objectTuples > TriggerObjects.MaxObjects) throw new ArgumentException("At most 200 replacement object tuples per batch.");
                 if (!seen.Add(entry.GetProperty("triggerId").GetInt32()))
                     throw new ArgumentException("Each source trigger may be edited only once per batch.");
                 if (entry.GetProperty("operation").GetString() == "clone" && !newIds.Add(entry.GetProperty("newId").GetInt32()))
@@ -38,8 +40,8 @@ internal static class TriggerEdits
         else
         {
             Catalog.ValidateObject(args, Preview(args)
-                ? ["operation", "path", "triggerId", "expectedSha256", "expectedName", "newId", "newName", "active", "loop", "replacements", "removeEffects", "removeConditions", "labels", "duplicates", "preview"]
-                : ["operation", "path", "triggerId", "expectedSha256", "expectedName", "newId", "newName", "active", "loop", "replacements", "removeEffects", "removeConditions", "labels", "duplicates", "preview", "outputPath", "confirmWrite"]);
+                ? ["operation", "path", "triggerId", "expectedSha256", "expectedName", "newId", "newName", "active", "loop", "replacements", "removeEffects", "removeConditions", "labels", "duplicates", "objectReplacements", "copyEffects", "preview"]
+                : ["operation", "path", "triggerId", "expectedSha256", "expectedName", "newId", "newName", "active", "loop", "replacements", "removeEffects", "removeConditions", "labels", "duplicates", "objectReplacements", "copyEffects", "preview", "outputPath", "confirmWrite"]);
             ValidateEdit(args);
         }
         _ = TriggerCodec.ReadFile(args.GetProperty("path").GetString()!);
@@ -56,7 +58,8 @@ internal static class TriggerEdits
     static void ValidateEdit(JsonElement entry)
     {
         Catalog.ValidateObject(entry, ["operation", "triggerId", "expectedName", "newId", "newName", "active", "loop",
-            "replacements", "removeEffects", "removeConditions", "labels", "duplicates", "path", "expectedSha256", "preview", "outputPath", "confirmWrite"]);
+            "replacements", "removeEffects", "removeConditions", "labels", "duplicates", "objectReplacements", "copyEffects", "path", "expectedSha256", "preview", "outputPath", "confirmWrite"]);
+        TriggerObjects.ValidateSelectors(entry);
         var op = entry.GetProperty("operation").GetString();
         if (op is not "patch" and not "clone") throw new ArgumentException("Trigger edit operation: patch/clone.");
         if (entry.GetProperty("triggerId").GetInt32() < 0) throw new ArgumentException("triggerId must be nonnegative.");
@@ -292,7 +295,7 @@ internal static class TriggerEdits
         return ApplyChanges(raw, edits);
     }
 
-    static (byte[] Output, object Detail, uint SourceId, uint TargetId) ApplyOne(CampaignTriggers.Document input, JsonElement args)
+    static (byte[] Output, object Detail, uint SourceId, uint TargetId) ApplyLegacy(CampaignTriggers.Document input, JsonElement args)
     {
         var sourceId = (uint)args.GetProperty("triggerId").GetInt32();
         var trigger = input.Triggers.SingleOrDefault(t => t.Id == sourceId)
@@ -441,6 +444,15 @@ internal static class TriggerEdits
         }, sourceId, newId);
     }
 
+    internal static (byte[] Output, object Detail, uint SourceId, uint TargetId) Transform(CampaignTriggers.Document input, JsonElement args,
+        CampaignTriggers.Document? immutableSources = null)
+    {
+        ValidateEdit(args);
+        var legacy = ApplyLegacy(input, args);
+        var advanced = TriggerObjects.Apply(input, legacy.Output, args, immutableSources ?? input, legacy.Detail, legacy.TargetId);
+        return (advanced.Output, advanced.Detail, legacy.SourceId, legacy.TargetId);
+    }
+
     static string[] PrototypeWarnings(JsonElement[] operations)
     {
         var names = operations.SelectMany(op => op.TryGetProperty("replacements", out var replacements)
@@ -476,7 +488,7 @@ internal static class TriggerEdits
         var affected = new HashSet<uint>();
         foreach (var operation in operations)
         {
-            var step = ApplyOne(current, operation);
+            var step = Transform(current, operation, input);
             affected.Add(step.SourceId);
             details.Add(step.Detail);
             current = CampaignTriggers.Parse(step.Output);
