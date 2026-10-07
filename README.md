@@ -29,7 +29,7 @@ Windows x64 + Node.js 20+ only. [npm package](https://www.npmjs.com/package/aom-
 
 No separate setup or CryBar needed for native editor tools. Default game path is Steam's `C:\Program Files (x86)\Steam\steamapps\common\Age of Mythology Retold\AoMRT_s.exe`; append `"--exe", "<game exe path>"` to args for another location. Game build must be supported. CryBar is optional for generating game-data catalogs/dependencies and decoded XML actions; missing metadata lookups refuse with generation guidance. [npm/README.md](npm/README.md) covers optional setup, version pinning, Windows shims and registry publishing. Existing safety guards remain; no automatic CryBar/game downloads or security-policy changes.
 
-## Download and set up
+## Download and set up (Alternative)
 
 Download `AomRetoldMapEditorMcp-win-x64.zip` and its `.sha256` file from [GitHub Releases](https://github.com/Pentadome/AomRetoldMapEditorMcp/releases). Extract ZIP into a writable folder. Package includes .NET runtime, native bridge, reviewed layouts and pinned trigger template; no SDK or MSVC installation needed. Server **runs only on Windows x64**, even though release is built on Linux.
 
@@ -63,7 +63,7 @@ Add to client's standard MCP configuration (adjust path):
     "aom-editor": {
       "command": "dotnet",
       "args": [
-        "C:\\Users\\wrket\\repos\\aom\\src\\AomMcp\\bin\\Release\\net10.0-windows\\AomMcp.dll"
+        "DOWNLOAD_LOCATION\\AomMcp.dll"
       ]
     }
   }
