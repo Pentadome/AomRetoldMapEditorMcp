@@ -21,7 +21,7 @@
     "runtime/layouts/*.json",
     "runtime/uilayouts/*.json",
     "runtime/fixtures/ocr-*.bgra",
-    "runtime/fixtures/playtest-ui-evidence.json",
+    "runtime/fixtures/playtest-ui-evidence*.json",
     "runtime/trigger-controller-template.trg",
     "runtime/setup.ps1",
     "runtime/TOOLS.md",

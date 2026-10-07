@@ -155,13 +155,17 @@ def assert_workflow_tools():
         refusal('editor_runtime_report', {**evidence, 'runId': 'wrong_run'})
         refusal('editor_runtime_report', {**evidence, 'capturedAtUtc': (now - timedelta(hours=1)).isoformat()})
         play_caps = success('editor_playtest', {'operation': 'preview'})
-        assert play_caps['available'] and play_caps['profileCount'] == 1 and not play_caps['nativeStartTest'] and not play_caps['nativeLoad'], play_caps
+        assert play_caps['available'] and play_caps['profileCount'] == 4 and len(play_caps['profiles']) == 4 and not play_caps['nativeStartTest'] and not play_caps['nativeLoad'], play_caps
         profile_path = app.parent / play_caps['profile']
         profile_preview = success('editor_playtest', {'operation': 'preview', 'profilePath': str(profile_path), 'expectedProfileSha256': sha(profile_path)})
         assert profile_preview['reviewed'] and not profile_preview['inputSent'] and not profile_preview['runtimeTelemetry']['available'], profile_preview
+        for registered in play_caps['profiles']:
+            other = app.parent / registered['profile']
+            assert sha(other) == registered['expectedProfileSha256'], registered
+            assert success('editor_playtest', {'operation': 'preview', 'profilePath': str(other), 'expectedProfileSha256': registered['expectedProfileSha256']})['reviewed'], registered
         refusal('editor_playtest', {'operation': 'quit', 'token': 'foreign_host', 'confirmQuit': True})
         caps = success('editor_capabilities', {})['workflowTools']
-        assert set(caps['names']) == workflow_names and caps['playtest']['available'] and caps['playtest']['profileCount'] == 1 and not caps['telemetry']['available'], caps
+        assert set(caps['names']) == workflow_names and caps['playtest']['available'] and caps['playtest']['profileCount'] == 4 and not caps['telemetry']['available'], caps
 
 
 def assert_tool_search(full_specs, expected_core, mode):

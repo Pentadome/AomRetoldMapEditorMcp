@@ -4,6 +4,115 @@
   "width": 2560,
   "height": 1440,
   "notes": "Measured on English normal (non-alternative) editor UI, 2560x1440, 256x256 map. Rects are full-res client px [x,y,w,h]; gates are 1280x720 half-res screenshot samples (ScreenProbe frame), stable across 5 captures (no panel, elevation panel, paint panel, object palette, palette after editMode None). Bottom tool panel (left, 'Paint Terrain'/'Elevation'/'Place Object') opens for most edit modes; the list panel (right, terrain/object list with filter dropdown) opens for paint/forest/object placement modes. Minimap frame outer diamond 2092..2540 x 971..1421; inner map diamond center (2316,1196) half-diagonal ~201. Minimap frame is identical to the alternative UI (same gate pixels match); the UI kind is told apart by the normal-UI top menu-bar detect gate (alternative UI has no menu bar).",
+  "ocrNotes": "Measured 2026-10-07 on English normal UI 2560x1440: Scenario > Player Data dialog with 12 players, its Age Settings popup (fixed position for every row) and the AI 'Set' Load Menu file browser. Player rows: field boxes y=293..331 (row 1) to 768..805 (row 12); rects relative to row center, x from box edges at row 1. 'pop' = Starting Pop column. No 'color' preset: normal UI shows only a swatch. Gates are 1280x720 half-res samples stable across captures; agePopup gate points differ from the closed-popup dialog.",
+  "rowCenterFirst": 312,
+  "rowStep": 43.14,
+  "playerFields": {
+    "civ": [199, -21, 166, 42],
+    "name": [429, -21, 236, 42],
+    "food": [686, -21, 92, 42],
+    "wood": [799, -21, 91, 42],
+    "gold": [911, -21, 92, 42],
+    "favor": [1024, -21, 91, 42],
+    "pop": [1136, -21, 127, 42],
+    "popLimit": [1284, -21, 101, 42],
+    "handicap": [1406, -21, 102, 42],
+    "control": [1699, -21, 159, 42],
+    "visibility": [1916, -21, 97, 42],
+    "aiPath": [2071, -21, 229, 42]
+  },
+  "staticFields": {
+    "agePopup.title": [1620, 350, 380, 38],
+    "agePopup.startAge": [1774, 402, 206, 40],
+    "agePopup.maxAge": [1774, 449, 206, 40],
+    "agePopup.classicalGod": [1774, 548, 206, 40],
+    "agePopup.heroicGod": [1774, 595, 206, 40],
+    "agePopup.mythicGod": [1774, 642, 206, 40],
+    "fileBrowser.title": [1013, 270, 533, 80],
+    "fileBrowser.search": [400, 1022, 530, 48],
+    "fileBrowser.row": [400, 424, 530, 48],
+    "fileBrowser.loadInGame": [1760, 1018, 420, 52]
+  },
+  "ocrGateTolerance": 14,
+  "ocrGates": {
+    "playerData": {
+      "gate": [
+        {"x": 5, "y": 70, "r": 28, "g": 28, "b": 28},
+        {"x": 400, "y": 74, "r": 27, "g": 27, "b": 27},
+        {"x": 900, "y": 74, "r": 28, "g": 28, "b": 28},
+        {"x": 1245, "y": 70, "r": 23, "g": 23, "b": 23},
+        {"x": 1240, "y": 70, "r": 199, "g": 109, "b": 42},
+        {"x": 20, "y": 100, "r": 110, "g": 110, "b": 110},
+        {"x": 1248, "y": 300, "r": 110, "g": 110, "b": 110},
+        {"x": 640, "y": 430, "r": 110, "g": 110, "b": 110},
+        {"x": 6, "y": 153, "r": 110, "g": 110, "b": 110},
+        {"x": 313, "y": 111, "r": 43, "g": 43, "b": 43},
+        {"x": 640, "y": 436, "r": 159, "g": 159, "b": 159},
+        {"x": 300, "y": 436, "r": 159, "g": 159, "b": 159},
+        {"x": 320, "y": 163, "r": 75, "g": 75, "b": 75},
+        {"x": 600, "y": 163, "r": 75, "g": 75, "b": 75}
+      ],
+      "minimumMatches": 12
+    },
+    "agePopup": {
+      "gate": [
+        {"x": 790, "y": 180, "r": 27, "g": 27, "b": 27},
+        {"x": 850, "y": 184, "r": 26, "g": 26, "b": 26},
+        {"x": 960, "y": 186, "r": 28, "g": 28, "b": 28},
+        {"x": 1000, "y": 190, "r": 26, "g": 26, "b": 26},
+        {"x": 1018, "y": 186, "r": 28, "g": 28, "b": 28},
+        {"x": 1013, "y": 182, "r": 222, "g": 119, "b": 42},
+        {"x": 790, "y": 250, "r": 110, "g": 110, "b": 110},
+        {"x": 1020, "y": 250, "r": 110, "g": 110, "b": 110},
+        {"x": 900, "y": 342, "r": 110, "g": 110, "b": 110},
+        {"x": 1000, "y": 270, "r": 110, "g": 110, "b": 110},
+        {"x": 790, "y": 340, "r": 110, "g": 110, "b": 110}
+      ],
+      "minimumMatches": 10
+    },
+    "fileBrowser": {
+      "gate": [
+        {"x": 172, "y": 125, "r": 145, "g": 122, "b": 69},
+        {"x": 1108, "y": 125, "r": 196, "g": 177, "b": 105},
+        {"x": 172, "y": 595, "r": 185, "g": 161, "b": 99},
+        {"x": 1108, "y": 595, "r": 255, "g": 226, "b": 141},
+        {"x": 640, "y": 140, "r": 46, "g": 47, "b": 46},
+        {"x": 600, "y": 150, "r": 11, "g": 16, "b": 22},
+        {"x": 640, "y": 190, "r": 27, "g": 30, "b": 32},
+        {"x": 640, "y": 300, "r": 25, "g": 28, "b": 31},
+        {"x": 400, "y": 400, "r": 28, "g": 31, "b": 32},
+        {"x": 200, "y": 523, "r": 0, "g": 0, "b": 0},
+        {"x": 1000, "y": 523, "r": 0, "g": 0, "b": 0},
+        {"x": 640, "y": 560, "r": 39, "g": 37, "b": 29}
+      ],
+      "minimumMatches": 10
+    },
+    "diplomacy": {
+      "gate": [
+        {"x": 180, "y": 58, "r": 28, "g": 28, "b": 28},
+        {"x": 300, "y": 58, "r": 28, "g": 28, "b": 28},
+        {"x": 900, "y": 58, "r": 28, "g": 28, "b": 28},
+        {"x": 1064, "y": 55, "r": 232, "g": 124, "b": 38},
+        {"x": 300, "y": 300, "r": 110, "g": 110, "b": 110},
+        {"x": 700, "y": 300, "r": 110, "g": 110, "b": 110},
+        {"x": 1000, "y": 400, "r": 110, "g": 110, "b": 110},
+        {"x": 400, "y": 472, "r": 67, "g": 67, "b": 67},
+        {"x": 640, "y": 472, "r": 67, "g": 67, "b": 67},
+        {"x": 200, "y": 495, "r": 0, "g": 255, "b": 0},
+        {"x": 200, "y": 520, "r": 255, "g": 0, "b": 0},
+        {"x": 200, "y": 546, "r": 238, "g": 238, "b": 238},
+        {"x": 180, "y": 555, "r": 110, "g": 110, "b": 110},
+        {"x": 1068, "y": 555, "r": 110, "g": 110, "b": 110},
+        {"x": 972, "y": 529, "r": 103, "g": 103, "b": 103}
+      ],
+      "minimumMatches": 14
+    }
+  },
+  "fieldGates": {
+    "players": ["playerData"],
+    "agePopup": ["playerData", "agePopup"],
+    "fileBrowser": ["fileBrowser"]
+  },
   "editorScene": {
     "uiKind": "normal",
     "detect": {
@@ -83,7 +192,10 @@
     "safeMargin": 24,
     "palette": {
       "notes": "Terrain/mix list in the bottom list panel (normal UI): 2 columns, 2 visible rows, one wheel notch scrolls one row (2 items). Textures are sorted by display name (case-insensitive); mixes follow file order. Click the label to select.",
-      "labelColumns": [[860, 1180, 320, 180], [1370, 1180, 320, 180]],
+      "labelColumns": [
+        [860, 1180, 320, 180],
+        [1370, 1180, 320, 180]
+      ],
       "selectedLabel": [40, 1108, 560, 36],
       "scrollAnchor": [1300, 1270],
       "columns": 2

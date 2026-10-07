@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "exeSha256": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+  "build": "100.19.17020.0",
+  "interface": "normal",
+  "language": "en",
+  "width": 1920,
+  "height": 1080,
+  "startPlayer": 1,
+  "difficulty": "Standard",
+  "path": [
+    "editor Play button",
+    "loaded gameplay",
+    "gear",
+    "Paused Quit",
+    "Quit YES",
+    "editor"
+  ],
+  "screenshots": {
+    "confirm": "d11e22db971b4a609834150d332e1e01df012b928d5863b41c05ccc8a5e03bab",
+    "editor": "5eb6f4d097819c31e4383c1fa22ca3ec3bfc4094d0b6486177160a5daa3fee92",
+    "paused": "6ac7ce6d2900b5f9cad0a2097efcef44da54baa2541431608b71678dac86d123",
+    "playing": "0e2ab6f317ce8b40beeb46989dfaf75a87bd248b07677cb515ffc5d9c6e2efa7"
+  },
+  "observedEditorModeBeforeAfter": 1,
+  "observedPlayingMode": 0,
+  "identityStable": true,
+  "gatesExactAcrossCaptures": true,
+  "hoverSensitivePixelsExcluded": true,
+  "compilationVerified": false,
+  "engineTranscriptAuthenticated": false,
+  "runtimeFieldsCorroborated": false,
+  "scope": "Sanitized observation manifest only; retained full-resolution screenshots remain local. Manual research Play/Quit path with exact full-resolution pixel gates; public editor_playtest start/inspect/quit run recorded in research/WORKFLOW-LIVE-OBSERVATIONS.md. Loading, external overlays, defeat, other UI modes/languages/resolutions and gameplay correctness are outside profile proof."
+}

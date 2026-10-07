@@ -3,13 +3,18 @@ using System.IO.Compression;
 
 namespace AomMcp;
 
-/// <summary>Pixel gate for explicitly observed 2560×1440 alternative-editor diplomacy panel only.</summary>
+/// <summary>Half-resolution (1280×720) pixel gates for reviewed editor dialogs at reviewed client sizes (2560×1440, 1920×1080).</summary>
 internal static class ScreenProbe
 {
     static readonly byte[] PngHeader = [137, 80, 78, 71, 13, 10, 26, 10];
     internal readonly record struct Rgb(byte R, byte G, byte B);
-    internal sealed class Frame(byte[] rgb, int width, int height)
+    /// <summary>One 1280×720 screenshot frame; ClientWidth/Height record the full-resolution client it was scaled from.</summary>
+    internal sealed class Frame(byte[] rgb, int width, int height, int clientWidth = 2560, int clientHeight = 1440)
     {
+        internal int ClientWidth => clientWidth;
+        internal int ClientHeight => clientHeight;
+        /// <summary>Frame pixel to full-resolution client pixel.</summary>
+        internal int ToClient(int frameCoordinate) => (int)Math.Round(frameCoordinate * (double)clientWidth / width, MidpointRounding.AwayFromZero);
         internal Rgb At(int x, int y)
         {
             if (x < 0 || y < 0 || x >= width || y >= height) throw new InvalidDataException("Screen probe outside frame.");
@@ -22,14 +27,14 @@ internal static class ScreenProbe
     {
         Win.Check(Win.GetClientRect(game.Window, out var rect), "GetClientRect");
         if (game.Layout.ExeSha256 != "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff"
-            || rect.Right != 2560 || rect.Bottom != 1440)
-            throw new WorkflowFailure("UI_LAYOUT_UNREVIEWED", "ui-preflight", "Diplomacy geometry only observed for pinned 2560×1440 alternative editor build.", false, false,
-                "Use manual UI and verify game-written checkpoint; no guessed clicks.");
+            || !UiLayouts.IsReviewed(rect.Right, rect.Bottom))
+            throw new WorkflowFailure("UI_LAYOUT_UNREVIEWED", "ui-preflight", $"Dialog pixel gates only reviewed for {UiLayouts.ReviewedText} clients on the pinned build; client is {rect.Right}x{rect.Bottom}.", false, false,
+                "Switch the game to a reviewed resolution, or use manual UI and verify a game-written checkpoint; no input sent.");
         var png = Ui.Screenshot(game, 1280);
-        return DecodePng(png);
+        return DecodePng(png, rect.Right, rect.Bottom);
     }
 
-    internal static Frame DecodePng(byte[] png)
+    internal static Frame DecodePng(byte[] png, int clientWidth = 2560, int clientHeight = 1440)
     {
         if (!png.AsSpan(0, Math.Min(8, png.Length)).SequenceEqual(PngHeader))
             throw new InvalidDataException("Unexpected PNG screenshot signature.");
@@ -65,7 +70,7 @@ internal static class ScreenProbe
             if (scan[start] != 0) throw new InvalidDataException("Screenshot PNG filter unreviewed.");
             scan.AsSpan(start + 1, width * 3).CopyTo(rgb.AsSpan(y * width * 3));
         }
-        return new(rgb, width, height);
+        return new(rgb, width, height, clientWidth, clientHeight);
     }
 
     internal static (int X, int Y) Cell(int player, int target)
@@ -74,26 +79,50 @@ internal static class ScreenProbe
         return (283 + 50 * target, 108 + (int)Math.Round(27.5 * player, MidpointRounding.AwayFromZero));
     }
 
-    internal static void RequirePlayersPanel(Frame frame)
+    // Exact half-res pixels of the alternative-UI Players Settings panel / its Diplomacy view, per reviewed client width.
+    static readonly Dictionary<int, (int X, int Y, Rgb C)[]> AltPlayersPanel = new()
     {
-        if (frame.At(20, 35) != new Rgb(231, 214, 161)
-            || frame.At(640, 60) != new Rgb(36, 39, 42)
-            || frame.At(1064, 55) != new Rgb(33, 34, 38)
-            || frame.At(300, 300) != new Rgb(18, 20, 21)
-            || frame.At(1240, 690) != new Rgb(57, 53, 49))
-            throw new WorkflowFailure("UI_LAYOUT_UNREVIEWED", "ui-observe", "Players Settings pixels differ from reviewed alternative UI.", false, false,
-                "STOP. Normal UI unsupported; inspect layout. No input sent.");
+        [2560] = [(20, 35, new(231, 214, 161)), (640, 60, new(36, 39, 42)), (1064, 55, new(33, 34, 38)), (300, 300, new(18, 20, 21)), (1240, 690, new(57, 53, 49))],
+        [1920] = [(20, 35, new(246, 227, 171)), (640, 60, new(36, 39, 43)), (1064, 55, new(32, 34, 37)), (300, 300, new(20, 23, 24)), (1240, 690, new(56, 52, 49))],
+    };
+    static readonly Dictionary<int, (int X, int Y, Rgb C)[]> AltDiplomacy = new()
+    {
+        [2560] = [(20, 35, new(231, 214, 161)), (640, 60, new(6, 6, 6)), (1064, 55, new(156, 156, 156)), (300, 300, new(15, 16, 18))],
+        [1920] = [(20, 35, new(246, 227, 171)), (560, 60, new(28, 28, 28)), (1064, 55, new(148, 148, 148)), (300, 300, new(15, 16, 18)), (600, 472, new(44, 45, 46))],
+    };
+
+    static bool Exact(Frame frame, Dictionary<int, (int X, int Y, Rgb C)[]> gates) =>
+        gates.TryGetValue(frame.ClientWidth, out var points) && points.All(p => frame.At(p.X, p.Y) == p.C);
+
+    /// <summary>Half-res cell center to full-resolution client click (×2 at 2560×1440, ×1.5 at 1920×1080).</summary>
+    internal static (int X, int Y) CellClient(Game game, int x, int y)
+    {
+        var (width, _) = Ui.ClientSize(game);
+        var scale = width / 1280.0;
+        return ((int)Math.Round(x * scale, MidpointRounding.AwayFromZero), (int)Math.Round(y * scale, MidpointRounding.AwayFromZero));
     }
 
-    internal static void RequireDialog(Frame frame)
+    /// <summary>Exact-pixel gate for the reviewed alternative-UI Players Settings panel (fails closed for unreviewed client widths).</summary>
+    internal static bool PlayersPanelVisible(Frame frame) => Exact(frame, AltPlayersPanel);
+
+    internal static void RequirePlayersPanel(Frame frame)
     {
-        if (frame.At(20, 35) != new Rgb(231, 214, 161)
-            || frame.At(640, 60) != new Rgb(6, 6, 6)
-            || frame.At(1064, 55) != new Rgb(156, 156, 156)
-            || frame.At(300, 300) != new Rgb(15, 16, 18))
-            throw new WorkflowFailure("UI_PANEL_MISMATCH", "ui-observe", "Observed panel pixels differ from reviewed Players Settings + Diplomacy dialog.", false, false,
-                "Open Players Settings (upper-right Players Settings icon), then Diplomacy; inspect screenshot. No input sent.");
+        if (!PlayersPanelVisible(frame))
+            throw new WorkflowFailure("UI_LAYOUT_UNREVIEWED", "ui-observe", "Players Settings pixels differ from reviewed alternative UI.", false, false,
+                "STOP. Inspect layout (normal UI: open Scenario > Player Data). No input sent.");
     }
+
+    /// <summary>Alternative Players Settings + Diplomacy pixels, or the reviewed normal-UI Scenario > Diplomacy dialog.
+    /// Both share the same stance-cell grid and colors (measured 2560×1440).</summary>
+    internal static string DiplomacyUi(Frame frame)
+    {
+        if (Exact(frame, AltDiplomacy)) return "alternative";
+        if (UiRead.NormalGate(frame, "diplomacy", out var detail)) return "normal";
+        throw new WorkflowFailure("UI_PANEL_MISMATCH", "ui-observe", "Observed pixels match neither reviewed Diplomacy dialog (alternative gate failed; normal " + detail + ").", false, false,
+            "Alternative UI: open Players Settings, then Diplomacy. Normal UI: open Scenario > Diplomacy. Inspect screenshot. No input sent.");
+    }
+
+    internal static void RequireDialog(Frame frame) => _ = DiplomacyUi(frame);
 
     internal static void SelfTest()
     {

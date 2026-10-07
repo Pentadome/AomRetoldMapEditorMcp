@@ -66,11 +66,11 @@ internal static class PlayerWorkflow
         }
         return new { preview = true, changes, sourceSha256 = snapshot.Sha256,
             clicks = changes.Sum(c => { var state = c.Old; var n = 0; while (state != c.Desired) { state = NextStance(state); n++; } return n; }),
-            limitation = "Alternative UI 2560×1440 only, pre-opened diplomacy dialog. Pixel gate before/after each click, one final checkpoint; no automatic retry." };
+            limitation = "2560×1440/1920×1080 alternative (Players Settings > Diplomacy) or normal (Scenario > Diplomacy) UI, pre-opened dialog. Pixel gate before/after each click, one final checkpoint; no automatic retry." };
     }
 
     static bool SameFields(ScenarioReader.Player a, ScenarioReader.Player b) =>
-        a.Id == b.Id && a.Name == b.Name && a.AiPath == b.AiPath && a.Control == b.Control
+        a.Id == b.Id && a.Name == b.Name && a.DisplayName == b.DisplayName && a.AiPath == b.AiPath && a.Control == b.Control
         && a.CivId == b.CivId && a.ColorId == b.ColorId && a.StartAge == b.StartAge && a.MaxAge == b.MaxAge
         && a.ClassicalGodId == b.ClassicalGodId && a.HeroicGodId == b.HeroicGodId && a.MythicGodId == b.MythicGodId
         && a.Pop == b.Pop && a.PopLimit == b.PopLimit && a.Food == b.Food && a.Wood == b.Wood
@@ -153,7 +153,7 @@ internal static class PlayerWorkflow
         return new { preview = true, current = new { player = from, target = to, stance = expected, reverseStance = other.Diplomacy[from], aiPath = player.AiPath },
             requested = new { stance = desired, direction = mutual ? "mutual" : "oneWay", reverseStance = mutual ? (int?)newReverse : null, aiPath = ai },
             sourceSha256 = snapshot.Sha256, aiResolution, liveAutomationAvailable = !changeAi,
-            limitation = "Only pinned 2560×1440 ALTERNATIVE UI diplomacy grid observed live. Apply requires pre-opened Players Settings + Diplomacy panel, isolated scene confirmation, game-writer checkpoint+trigger backups and screenshot pixel gates at every click; other UI layouts fail closed. AI Name text replacement FAILED live P5 verification; manual input + verify only.",
+            limitation = "Pinned diplomacy grid (2560×1440 and 1920×1080; same half-frame cells) observed live in alternative (Players Settings > Diplomacy) and normal (Scenario > Diplomacy; same cell grid/colors) UI. Apply requires the pre-opened dialog, isolated scene confirmation, game-writer checkpoint+trigger backups and screenshot pixel gates at every click; other UI layouts fail closed. AI Name text replacement FAILED live P5 verification; manual input + verify only.",
             aiLocation = "Computer-player .xs: INSTALLPATH\\game\\ai. Active-profile ai folder did NOT work; trigger scripts: active-profile trigger directory." };
     }
 
@@ -229,6 +229,7 @@ internal static class PlayerWorkflow
         var scenarioProfile = args.GetProperty("scenarioProfileDirectory").GetString()!;
         var triggerProfile = args.GetProperty("triggerProfileDirectory").GetString()!;
         game.Focus();
+        var uiKind = ScreenProbe.DiplomacyUi(ScreenProbe.Capture(game));
         ScreenProbe.RequireCell(ScreenProbe.Capture(game), from, to, directions[0].Old);
         var backupSaved = EditorFiles.Checkpoint(game,
             JsonSerializer.SerializeToElement(new { path = backupScenario, profileDirectory = scenarioProfile, confirmWrite = true }), native);
@@ -259,7 +260,8 @@ internal static class PlayerWorkflow
                     var next = NextStance(state);
                     var (x, y) = ScreenProbe.Cell(owner, target);
                     clicked = true; // Input outcome becomes uncertain from this point onward.
-                    Ui.Click(game, x * 2, y * 2, "left");
+                    var (cx, cy) = ScreenProbe.CellClient(game, x, y);
+                    Ui.Click(game, cx, cy, "left");
                     Thread.Sleep(180);
                     ScreenProbe.RequireCell(ScreenProbe.Capture(game), owner, target, next);
                     latest = EditorFiles.ApprovedNewPath(Path.Combine(verifyDir,
@@ -272,7 +274,7 @@ internal static class PlayerWorkflow
                     state = next;
                 }
             }
-            return new { verified = true, backupScenarioPath = backupScenario, backupTriggerPath = backupTrigger,
+            return new { verified = true, uiKind, backupScenarioPath = backupScenario, backupTriggerPath = backupTrigger,
                 checkpoints, finalCheckpointPath = latest, requestedDirections = directions.Count,
                 limitation = "Verified game-written directional P6 fields after each click; no .mythscn edit. AI path/XS runtime, other scene state and scenario reload NOT proven. Backups retained." };
         }
@@ -295,6 +297,7 @@ internal static class PlayerWorkflow
         var scenarioProfile = args.GetProperty("scenarioProfileDirectory").GetString()!;
         var triggerProfile = args.GetProperty("triggerProfileDirectory").GetString()!;
         game.Focus();
+        var uiKind = ScreenProbe.DiplomacyUi(ScreenProbe.Capture(game));
         ScreenProbe.RequireCell(ScreenProbe.Capture(game), changes[0].From, changes[0].To, changes[0].Old);
         _ = EditorFiles.Checkpoint(game,
             JsonSerializer.SerializeToElement(new { path = backupScenario, profileDirectory = scenarioProfile, confirmWrite = true }), native);
@@ -321,7 +324,8 @@ internal static class PlayerWorkflow
                     var next = NextStance(state);
                     var (x, y) = ScreenProbe.Cell(change.From, change.To);
                     clicked = true;
-                    Ui.Click(game, x * 2, y * 2, "left");
+                    var (cx, cy) = ScreenProbe.CellClient(game, x, y);
+                    Ui.Click(game, cx, cy, "left");
                     Thread.Sleep(180);
                     ScreenProbe.RequireCell(ScreenProbe.Capture(game), change.From, change.To, next);
                     done.Add(new { change.From, change.To, before = state, after = next });
@@ -334,7 +338,7 @@ internal static class PlayerWorkflow
             _ = EditorFiles.Checkpoint(game,
                 JsonSerializer.SerializeToElement(new { path = latest, profileDirectory = scenarioProfile, confirmWrite = true }), native);
             Compare(source, ScenarioReader.Read(latest), expected, backupScenario, latest);
-            return new { verified = true, backupScenarioPath = backupScenario, backupTriggerPath = backupTrigger,
+            return new { verified = true, uiKind, backupScenarioPath = backupScenario, backupTriggerPath = backupTrigger,
                 finalCheckpointPath = latest, completedClicks = done, requestedDirections = changes.Length,
                 limitation = "Pixel-gated and final checkpoint verified; no scenario file edit, XS/runtime/reload proof or retry. Backups retained." };
         }

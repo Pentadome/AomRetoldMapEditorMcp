@@ -1,150 +1,150 @@
 {
   "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
   "ui": "alternative",
-  "width": 2560,
-  "height": 1440,
-  "rowCenterFirst": 402,
-  "rowStep": 80.5,
+  "width": 1920,
+  "height": 1080,
+  "rowCenterFirst": 302,
+  "rowStep": 60.375,
   "playerFields": {
     "name": [
-      42,
-      -25,
-      220,
-      52
+      32,
+      -19,
+      165,
+      39
     ],
     "control": [
-      274,
-      -25,
-      184,
-      52
+      206,
+      -19,
+      138,
+      39
     ],
     "aiPath": [
-      485,
-      -25,
-      224,
-      52
+      364,
+      -19,
+      168,
+      39
     ],
     "civ": [
-      880,
-      -25,
-      202,
-      52
+      660,
+      -19,
+      152,
+      39
     ],
     "color": [
-      1090,
-      -25,
-      146,
-      52
+      818,
+      -19,
+      110,
+      39
     ],
     "visibility": [
-      1262,
-      -25,
-      222,
-      52
+      947,
+      -19,
+      167,
+      39
     ],
     "food": [
-      1628,
-      -25,
-      108,
-      52
+      1221,
+      -19,
+      81,
+      39
     ],
     "wood": [
-      1750,
-      -25,
-      110,
-      52
+      1313,
+      -19,
+      83,
+      39
     ],
     "gold": [
-      1868,
-      -25,
-      110,
-      52
+      1401,
+      -19,
+      83,
+      39
     ],
     "favor": [
-      1990,
-      -25,
-      108,
-      52
+      1493,
+      -19,
+      81,
+      39
     ],
     "pop": [
-      2102,
-      -25,
-      112,
-      52
+      1577,
+      -19,
+      84,
+      39
     ],
     "popLimit": [
-      2220,
-      -25,
-      108,
-      52
+      1665,
+      -19,
+      81,
+      39
     ],
     "handicap": [
-      2332,
-      -25,
-      112,
-      52
+      1749,
+      -19,
+      84,
+      39
     ]
   },
   "staticFields": {
     "agePopup.title": [
-      1560,
-      342,
-      480,
-      58
+      1170,
+      257,
+      360,
+      44
     ],
     "agePopup.startAge": [
-      1750,
-      396,
-      268,
-      56
+      1313,
+      297,
+      201,
+      42
     ],
     "agePopup.maxAge": [
-      1750,
-      448,
-      268,
-      56
+      1313,
+      336,
+      201,
+      42
     ],
     "agePopup.classicalGod": [
-      1750,
-      546,
-      268,
-      48
+      1313,
+      410,
+      201,
+      36
     ],
     "agePopup.heroicGod": [
-      1750,
-      596,
-      268,
-      48
+      1313,
+      447,
+      201,
+      36
     ],
     "agePopup.mythicGod": [
-      1750,
-      646,
-      268,
-      48
+      1313,
+      485,
+      201,
+      36
     ],
     "fileBrowser.search": [
-      800,
-      1020,
-      475,
-      52
+      600,
+      765,
+      356,
+      39
     ],
     "fileBrowser.row": [
-      414,
-      424,
-      720,
-      56
+      311,
+      318,
+      540,
+      42
     ],
     "fileBrowser.loadInGame": [
-      1680,
-      1018,
-      250,
-      52
+      1260,
+      764,
+      188,
+      39
     ],
     "fileBrowser.title": [
-      760,
-      280,
-      800,
-      65
+      570,
+      210,
+      600,
+      49
     ]
   },
   "notes": "Only observed alternative editor UI. Rects are full-res client pixels; gated against build/UI/size before preset use. Verify OCR and checkpoint; some positions approximate until live tests. Normal UI must use a separate measured layout.",
@@ -152,100 +152,100 @@
     "notes": "Measured 2026-10-06 on blank 128x128 alternative-UI editor. Rects full-res client px [x,y,w,h]; gates are 1280x720 half-res screenshot samples (ScreenProbe frame). Minimap orientation: screen up = world +X+Z, screen right = world +X-Z; closed-loop camera reads correct residual error. Minimap gate uses diamond-frame pixels stable across 4 captures (corner buttons excluded: hover highlight changes).",
     "minimap": {
       "center": [
-        2318,
-        1196
+        1739,
+        897
       ],
-      "halfDiagonal": 205,
+      "halfDiagonal": 154,
       "gate": [
         {
           "x": 1049,
           "y": 596,
-          "r": 214,
-          "g": 175,
-          "b": 92
+          "r": 174,
+          "g": 142,
+          "b": 85
         },
         {
           "x": 1145,
           "y": 504,
-          "r": 254,
-          "g": 210,
-          "b": 117
+          "r": 252,
+          "g": 212,
+          "b": 119
         },
         {
           "x": 1173,
           "y": 504,
-          "r": 255,
-          "g": 241,
-          "b": 145
+          "r": 249,
+          "g": 233,
+          "b": 142
         },
         {
           "x": 1265,
           "y": 594,
-          "r": 219,
-          "g": 182,
-          "b": 92
+          "r": 207,
+          "g": 173,
+          "b": 94
         },
         {
           "x": 1251,
           "y": 616,
           "r": 109,
-          "g": 90,
+          "g": 89,
           "b": 52
         },
         {
           "x": 1175,
           "y": 692,
-          "r": 111,
-          "g": 74,
-          "b": 34
+          "r": 107,
+          "g": 72,
+          "b": 32
         },
         {
           "x": 1157,
           "y": 702,
-          "r": 116,
-          "g": 71,
-          "b": 44
+          "r": 122,
+          "g": 76,
+          "b": 46
         },
         {
           "x": 1063,
           "y": 664,
-          "r": 144,
-          "g": 108,
-          "b": 51
+          "r": 141,
+          "g": 106,
+          "b": 48
         }
       ],
       "minimumMatches": 7
     },
     "occluders": {
       "topButtons": [
-        2304,
+        1728,
         0,
-        256,
-        70
+        192,
+        53
       ],
       "activePlayer": [
-        2050,
-        110,
-        380,
-        96
+        1538,
+        83,
+        285,
+        72
       ],
       "minimap": [
-        2086,
-        964,
-        474,
-        476
+        1565,
+        723,
+        356,
+        357
       ],
       "toolbar": [
-        680,
-        1300,
-        1200,
-        140
+        510,
+        975,
+        900,
+        105
       ],
       "fpsCounter": [
         0,
         0,
-        40,
-        20
+        30,
+        15
       ]
     },
     "conditionalOccluders": {
@@ -253,8 +253,8 @@
         "rect": [
           0,
           0,
-          684,
-          990
+          513,
+          743
         ],
         "gate": [
           {
@@ -267,9 +267,9 @@
           {
             "x": 200,
             "y": 30,
-            "r": 28,
-            "g": 28,
-            "b": 28
+            "r": 26,
+            "g": 26,
+            "b": 26
           },
           {
             "x": 330,
@@ -290,18 +290,18 @@
       },
       "objectToolBar": {
         "rect": [
-          680,
-          1226,
-          1200,
-          84
+          510,
+          920,
+          900,
+          63
         ],
         "gate": [
           {
             "x": 350,
             "y": 624,
-            "r": 155,
-            "g": 134,
-            "b": 96
+            "r": 196,
+            "g": 170,
+            "b": 120
           },
           {
             "x": 392,
@@ -311,46 +311,46 @@
             "b": 255
           },
           {
-            "x": 527,
-            "y": 636,
-            "r": 154,
-            "g": 155,
-            "b": 155
+            "x": 548,
+            "y": 640,
+            "r": 20,
+            "g": 23,
+            "b": 23
           },
           {
             "x": 646,
             "y": 634,
-            "r": 108,
-            "g": 96,
-            "b": 60
+            "r": 112,
+            "g": 97,
+            "b": 61
           },
           {
             "x": 724,
             "y": 631,
-            "r": 211,
-            "g": 181,
-            "b": 105
+            "r": 187,
+            "g": 160,
+            "b": 94
           },
           {
             "x": 757,
             "y": 641,
-            "r": 225,
-            "g": 192,
-            "b": 110
+            "r": 168,
+            "g": 145,
+            "b": 85
           },
           {
             "x": 851,
             "y": 639,
-            "r": 105,
-            "g": 83,
-            "b": 62
+            "r": 97,
+            "g": 79,
+            "b": 59
           },
           {
             "x": 870,
             "y": 636,
-            "r": 89,
-            "g": 63,
-            "b": 40
+            "r": 73,
+            "g": 51,
+            "b": 32
           }
         ],
         "minimumMatches": 6
@@ -359,8 +359,8 @@
         "rect": [
           0,
           0,
-          433,
-          1440
+          325,
+          1080
         ],
         "gate": [
           {
@@ -403,100 +403,99 @@
       },
       "toolPanel": {
         "rect": [
-          688,
-          1236,
-          1180,
-          108
+          516,
+          927,
+          885,
+          81
         ],
         "gate": [
           {
             "x": 400,
             "y": 619,
-            "r": 163,
-            "g": 142,
-            "b": 101
+            "r": 195,
+            "g": 169,
+            "b": 120
           },
           {
             "x": 600,
             "y": 619,
-            "r": 181,
-            "g": 158,
-            "b": 113
+            "r": 217,
+            "g": 187,
+            "b": 135
           },
           {
             "x": 800,
             "y": 619,
-            "r": 180,
-            "g": 158,
-            "b": 113
+            "r": 215,
+            "g": 186,
+            "b": 133
           },
           {
             "x": 920,
             "y": 619,
-            "r": 180,
-            "g": 158,
-            "b": 113
+            "r": 216,
+            "g": 187,
+            "b": 133
           },
           {
             "x": 933,
-            "y": 635,
+            "y": 640,
             "r": 255,
-            "g": 245,
-            "b": 174
+            "g": 226,
+            "b": 165
           },
           {
             "x": 345,
-            "y": 643,
-            "r": 121,
-            "g": 105,
-            "b": 75
+            "y": 640,
+            "r": 202,
+            "g": 174,
+            "b": 124
           }
         ],
         "minimumMatches": 5
       }
     },
     "gateTolerance": 14,
-    "safeMargin": 24,
+    "safeMargin": 18,
     "palette": {
-      "notes": "Terrain/mix list on the left (alternative UI): 1 column, 13 visible rows, one wheel notch scrolls one row (1 item). Textures sorted by display name (case-insensitive). Click the label to select. Geometry scaled from 1920x1080; OCR label rects split into three (readback bound 500 px high); toolPanel gate re-sampled; texture/mix/water selection live-verified at 2560x1440.",
+      "notes": "Terrain/mix list on the left (alternative UI): 1 column, 13 visible rows, one wheel notch scrolls one row (1 item). Textures sorted by display name (case-insensitive). Click the label to select.",
       "labelColumns": [
         [
-          80,
-          101,
-          291,
-          336
+          60,
+          76,
+          218,
+          441
         ],
         [
-          80,
-          437,
-          291,
-          336
-        ],
-        [
-          80,
-          773,
-          291,
-          420
+          60,
+          517,
+          218,
+          378
         ]
       ],
       "listRect": [
-        80,
-        101,
-        291,
-        1092
+        60,
+        76,
+        218,
+        819
       ],
       "visibleRows": 13,
       "columns": 1,
       "selectedLabel": [
-        109,
-        1273,
-        300,
-        44
+        82,
+        955,
+        225,
+        33
       ],
       "scrollAnchor": [
-        220,
-        640
+        165,
+        480
       ]
     }
+  },
+  "scaledFrom": {
+    "file": "alt-2560x1440.json",
+    "factor": 0.75,
+    "note": "Full-res client geometry scaled x0.75 from the reviewed 2560x1440 layout (game UI scales proportionally); gate positions are half-res 1280x720 frame samples and their colors were re-sampled live at 1920x1080."
   }
 }

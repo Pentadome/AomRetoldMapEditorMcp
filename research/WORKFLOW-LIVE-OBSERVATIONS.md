@@ -70,3 +70,16 @@ Bounded profile log/temp/config/users inspection found no independently confirme
 Actual farmer/woodcutter/defense work targets, controlled reconstruction, generated startup/causeway application and reload persistence were not exercised in this run. Original-scene preservation and observed Play/Defeat/Quit do not satisfy those tests. The seven helpers' offline infrastructure is implemented; comprehensive live verification is incomplete, not silently marked done.
 
 Latest checks after registration: standard and staged Release builds (0 warnings/errors), local self-tests, full/core protocol (`full=899`, `core=49`, `live=False`), `git diff --check`, stub-only release workflow and isolated self-contained ZIP/npm/checksum/install/npx/launcher smoke passed. Initial new-profile npm smoke found the sanitized evidence omitted by the package whitelist; failed staging/logs remain under `.tmp/agent/workflow-package-1d2d03b1850d4e8d9f9b747b4a0a55ef/` and the live root. The repaired explicit evidence-only whitelist and profile/evidence equality checks passed in fresh `.tmp/agent/workflow-package-b5bf4aefa7784092996c2f19a5b4d7f5/` staging. Earlier package artifacts remain retained. No real publish occurred. The v4 host was deployed only through explicit inspected agent-only maintenance and remains alive; the game was never restarted.
+
+## Multi-profile playtest verification (normal/alternative × 2560×1440/1920×1080)
+
+Three new reviewed profiles were researched manually with exact full-resolution gates stable across captures and while hovering the Play control (hover-sensitive Play pixels excluded), then registered and run through public `editor_playtest` start → inspect → host-token Quit (timeoutMs=15000) on one MCP connection per run. Each run retained a distinct original checkpoint, a fresh disposable checkpoint and a TR export (`.tmp/nui/<tag>-*`, not cleaned). Scene: blank map plus two TownCenters (P1, P2). Start reported playing; inspect matched; Quit returned to the editor with the reported `uiKind` unchanged. The alternative 2560×1440 profile was re-run as a regression check.
+
+| Run | Profile | Original | Disposable | TR |
+| --- | --- | --- | --- | --- |
+| ptn2560a | normal 2560×1440 (Play `(2526,58)`) | 6a06bcf2… | 135eab14… | 3ddb48ed… |
+| pta2560b | alternative 2560×1440 (re-run) | 38a64375… | c2b044c6… | 3ddb48ed… |
+| pta1920a | alternative 1920×1080 (Play `(1755,23)` → popover `(1654,236)`) | 5b919d19… | d21b86ef… | 3ddb48ed… |
+| ptn1920a | normal 1920×1080 (Play `(1894,44)`) | 9966f71e… | 8a8ae231… | 3ddb48ed… |
+
+Quit path is identical across UIs at a given size: gear → Paused Quit → YES (2560: `(2528,28)`/`(1280,1008)`/`(1074,782)`; 1920: `(1896,21)`/`(960,756)`/`(805,586)`). The alt-2560 start gate fails closed on the normal UI. Compilation, runtime telemetry and gameplay correctness remain unverified.

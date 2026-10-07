@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "exeSha256": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+  "build": "100.19.17020.0",
+  "interface": "alternative",
+  "language": "en",
+  "width": 1920,
+  "height": 1080,
+  "startPlayer": 1,
+  "difficulty": "Standard",
+  "path": [
+    "editor Play popover",
+    "Play",
+    "loaded gameplay",
+    "gear",
+    "Paused Quit",
+    "Quit YES",
+    "editor"
+  ],
+  "screenshots": {
+    "confirm": "6eb481a185d9ba997e2041fbc34518a9ceb435db956236ed95054c8d51f78c3d",
+    "editor": "17e7589f01270200df35c735438918e72bf95ab0baacf2facce37dfc0c81ca00",
+    "paused": "715acbe8f5124d6b5ef00299f6f1ccb8a93a5450dac61616b0cb825d199b48d9",
+    "playing": "10f11ab940d5de525e8032b1e3d75ff087713770fa16a89a47fbff0686c196dc",
+    "popover": "36fff91ec8eb1e0e7ca91e56cbeee243efc003b8ceb20b9240afc6d556ca4b43"
+  },
+  "observedEditorModeBeforeAfter": 1,
+  "observedPlayingMode": 0,
+  "identityStable": true,
+  "gatesExactAcrossCaptures": true,
+  "hoverSensitivePixelsExcluded": true,
+  "compilationVerified": false,
+  "engineTranscriptAuthenticated": false,
+  "runtimeFieldsCorroborated": false,
+  "scope": "Sanitized observation manifest only; retained full-resolution screenshots remain local. Manual research Play/Quit path with exact full-resolution pixel gates; public editor_playtest start/inspect/quit run recorded in research/WORKFLOW-LIVE-OBSERVATIONS.md. Loading, external overlays, defeat, other UI modes/languages/resolutions and gameplay correctness are outside profile proof."
+}

@@ -23,16 +23,24 @@ internal sealed class PlaytestWorkflow
         internal DateTimeOffset StartedAtUtc { get; } = DateTimeOffset.UtcNow;
         internal string State { get; set; } = "prepared";
     }
-    // Independently observed ordinary Play/Paused-Quit/YES path; caller assertions cannot register profiles.
+    // Independently observed ordinary Play/Paused-Quit/YES paths; caller assertions cannot register profiles.
+    internal sealed record Registered(string File, string Sha256, string Evidence);
     internal const string ReviewedProfileHash = "df2311ab670edf906425f3864eec9d2493699ed0a74e923834d5dec291ae5c46";
-    static readonly string[] ReviewedProfileHashes = [ReviewedProfileHash];
+    internal static readonly Registered[] ReviewedProfiles = [
+        new("playtest-alt-en-2560x1440.json", ReviewedProfileHash, "playtest-ui-evidence.json"),
+        new("playtest-normal-en-2560x1440.json", "1606e96220f8e5ca4a5457e72e9d3139f24fa5ca5e1df190d22f8ead307665e8", "playtest-ui-evidence-normal-en-2560x1440.json"),
+        new("playtest-alt-en-1920x1080.json", "fba93a2b409ecbc3342f80c9c983940a46da36445881fcd623ce161ad39e86c8", "playtest-ui-evidence-alt-en-1920x1080.json"),
+        new("playtest-normal-en-1920x1080.json", "ea27f70ca44884e656f30b83b7f1d6d4b7ecdd4d25fc1bbda253a49c411a9c65", "playtest-ui-evidence-normal-en-1920x1080.json"),
+    ];
+    static readonly string[] ReviewedProfileHashes = ReviewedProfiles.Select(r => r.Sha256).ToArray();
     static readonly JsonSerializerOptions ProfileJson = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
     readonly HashSet<string> _runIds = new(StringComparer.Ordinal);
     Session? _session;
     internal static bool Available => ReviewedProfileHashes.Length != 0;
     internal static object Capabilities() => new { available = Available, profileCount = ReviewedProfileHashes.Length, nativeStartTest = false, nativeLoad = false,
-        profile = "uilayouts/playtest-alt-en-2560x1440.json", expectedProfileSha256 = ReviewedProfileHash,
-        reason = "One reviewed English alternative-UI 2560x1440 Player1/Standard normal Play/Paused-Quit/YES path. Exact pixels fail closed on other/loading/defeat/overlay states. No compiler/runtime/gameplay proof; existing editor guards unchanged." };
+        profile = "uilayouts/" + ReviewedProfiles[0].File, expectedProfileSha256 = ReviewedProfileHash,
+        profiles = ReviewedProfiles.Select(r => new { profile = "uilayouts/" + r.File, expectedProfileSha256 = r.Sha256 }).ToArray(),
+        reason = "Reviewed English Player1/Standard ordinary Play/Paused-Quit/YES paths, one profile per editor UI (normal/alternative) and client size; pick the profile matching editor_ui_state uiKind/client. Exact pixels fail closed on other/loading/defeat/overlay states. No compiler/runtime/gameplay proof; existing editor guards unchanged." };
     internal static void Preflight(JsonElement args)
     {
         var operation = args.GetProperty("operation").GetString();
@@ -52,7 +60,7 @@ internal sealed class PlaytestWorkflow
             foreach (var key in new[] { "originalCheckpointPath", "disposableCheckpointPath", "triggerBackupPath" }) _ = EditorFiles.LocalPath(args.GetProperty(key).GetString()!);
             _ = args.GetProperty("profilePath"); _ = args.GetProperty("expectedProfileSha256");
         }
-        if (operation is "inspect" or "quit" && !RuntimeProbes.Token(args.GetProperty("token").GetString())) throw new ArgumentException("Host session token required.");
+        if (operation is "inspect" or "quit" && (!args.TryGetProperty("token", out var token) || token.ValueKind != JsonValueKind.String || !RuntimeProbes.Token(token.GetString()))) throw new ArgumentException("Host session token required.");
         if (operation == "quit") EditorFiles.Confirm(args, "confirmQuit");
     }
     static void Hash(string value) { if (value.Length != 64 || !value.All(Uri.IsHexDigit)) throw new ArgumentException("Pinned SHA-256 required."); }
@@ -224,16 +232,19 @@ internal sealed class PlaytestWorkflow
         var identity = new Identity(1, 2, 3, 4, 5, new('a', 64), 2560, 1440); CheckIdentity(identity, identity);
         foreach (var wrong in new[] { identity with { Pid = 2 }, identity with { Thread = 3 }, identity with { StartedTicks = 6 }, identity with { Width = 1280 }, identity with { ExeSha256 = new('b', 64) } })
         { try { CheckIdentity(identity, wrong); throw new InvalidOperationException("Changed playtest identity accepted."); } catch (InvalidDataException) { } }
-        if (!Available || ReviewedProfileHashes.Length != 1) throw new InvalidOperationException("Reviewed UI profile registration changed.");
+        if (!Available || ReviewedProfileHashes.Distinct().Count() != ReviewedProfiles.Length) throw new InvalidOperationException("Reviewed UI profile registration changed.");
         var attempts = 0; var pauses = 0; long elapsed = 0;
         WaitForGate(() => { if (++attempts < 3) throw new InvalidDataException("queued"); }, 1000, () => elapsed, () => { pauses++; elapsed += 100; });
         if (attempts != 3 || pauses != 2) throw new InvalidOperationException("Queued UI gate did not use read-only polling.");
         try { WaitForGate(() => throw new InvalidDataException("unexpected"), 100, () => elapsed, () => throw new InvalidOperationException("Expired gate polled again")); throw new InvalidOperationException("Expired gate accepted."); } catch (InvalidDataException) { }
-        var reviewedPath = Path.Combine(AppContext.BaseDirectory, "uilayouts", "playtest-alt-en-2560x1440.json");
-        var reviewed = ReadProfile(JsonSerializer.SerializeToElement(new { profilePath = reviewedPath, expectedProfileSha256 = ReviewedProfileHash }));
-        if (!reviewed.Reviewed || reviewed.Profile.Start.Length != 2 || reviewed.Profile.Quit.Length != 3) throw new InvalidOperationException("Reviewed packaged profile missing/stale.");
-        var evidencePath = Path.Combine(AppContext.BaseDirectory, "fixtures", "playtest-ui-evidence.json");
-        CheckpointDocument.RequireHash(Layout.Hash(evidencePath), reviewed.Profile.EvidenceSha256);
+        foreach (var registered in ReviewedProfiles)
+        {
+            var reviewedPath = Path.Combine(AppContext.BaseDirectory, "uilayouts", registered.File);
+            var reviewed = ReadProfile(JsonSerializer.SerializeToElement(new { profilePath = reviewedPath, expectedProfileSha256 = registered.Sha256 }));
+            if (!reviewed.Reviewed || reviewed.Profile.Start.Length is < 1 or > 2 || reviewed.Profile.Quit.Length != 3) throw new InvalidOperationException("Reviewed packaged profile missing/stale: " + registered.File);
+            var evidencePath = Path.Combine(AppContext.BaseDirectory, "fixtures", registered.Evidence);
+            CheckpointDocument.RequireHash(Layout.Hash(evidencePath), reviewed.Profile.EvidenceSha256);
+        }
         Pixel[] pixels = [new(1, 1, 1, 2, 3), new(2, 2, 1, 2, 3), new(3, 3, 1, 2, 3)];
         var profile = new Profile("fixture", new('a', 64), 2560, 1440, "fixture-only", "en", new('b', 64), [new(5, 5, true, pixels)], [new(5, 5, false, pixels)], pixels, pixels); ValidateProfile(profile);
         var session = new Session("owned", "fixture", profile, identity, []); workflow._session = session;

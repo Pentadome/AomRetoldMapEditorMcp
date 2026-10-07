@@ -20,10 +20,10 @@ internal sealed class SceneUi
     internal int Tolerance { get; private set; }
     internal int SafeMargin { get; private set; }
 
-    // Reviewed layout files; normal first: its menu-bar detect gate discriminates (minimap frames are identical in both UIs).
-    static readonly string[] LayoutFiles = ["normal-en-2560x1440.json", "alt-2560x1440.json"];
+    // Reviewed layout files per client size; normal first: its menu-bar detect gate discriminates (minimap frames are identical in both UIs).
+    static string[] LayoutFiles(int width, int height) => [UiLayouts.Normal(width, height), UiLayouts.Alt(width, height)];
 
-    static string LayoutPath(string file) => Path.Combine(AppContext.BaseDirectory, "uilayouts", file);
+    static string LayoutPath(string file) => UiLayouts.Path(file);
 
     /// <summary>Loads one reviewed layout without pixel detection; null with reason when build/size mismatch.</summary>
     static SceneUi? Load(Game game, string file, out string reason)
@@ -59,7 +59,13 @@ internal sealed class SceneUi
     {
         var reasons = new List<string>();
         var candidates = new List<SceneUi>();
-        foreach (var file in LayoutFiles)
+        var (width, height) = Ui.ClientSize(game);
+        if (!UiLayouts.IsReviewed(width, height))
+        {
+            reason = $"Editor scene UI geometry only reviewed for {UiLayouts.ReviewedText} clients on pinned build; client is {width}x{height}.";
+            return null;
+        }
+        foreach (var file in LayoutFiles(width, height))
         {
             var ui = Load(game, file, out var why);
             if (ui is null) reasons.Add(why); else candidates.Add(ui);
@@ -73,7 +79,11 @@ internal sealed class SceneUi
     }
 
     /// <summary>Captures one half-resolution frame (focuses game) for pixel gates.</summary>
-    internal static ScreenProbe.Frame Capture(Game game) => ScreenProbe.DecodePng(Ui.Screenshot(game, 1280));
+    internal static ScreenProbe.Frame Capture(Game game)
+    {
+        var (width, height) = Ui.ClientSize(game);
+        return ScreenProbe.DecodePng(Ui.Screenshot(game, 1280), width, height);
+    }
 
     bool Gate(ScreenProbe.Frame frame, JsonElement gated) =>
         SceneGeometry.GateMatches(frame, gated.GetProperty("gate"), Tolerance) >= gated.GetProperty("minimumMatches").GetInt32();

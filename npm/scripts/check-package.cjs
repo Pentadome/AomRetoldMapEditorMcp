@@ -21,10 +21,15 @@ try {
     'Reviewed layouts required.');
   assert(existsSync(join(runtime, 'uilayouts', 'alt-2560x1440.json')),
     'Reviewed alternative-UI layout required.');
-  assert(existsSync(join(runtime, 'uilayouts', 'playtest-alt-en-2560x1440.json')),
-    'Reviewed Play/Quit profile required.');
-  assert(existsSync(join(runtime, 'fixtures', 'playtest-ui-evidence.json')),
-    'Pinned sanitized Play/Quit evidence required.');
+  for (const [profile, evidence] of [
+    ['playtest-alt-en-2560x1440.json', 'playtest-ui-evidence.json'],
+    ['playtest-normal-en-2560x1440.json', 'playtest-ui-evidence-normal-en-2560x1440.json'],
+    ['playtest-alt-en-1920x1080.json', 'playtest-ui-evidence-alt-en-1920x1080.json'],
+    ['playtest-normal-en-1920x1080.json', 'playtest-ui-evidence-normal-en-1920x1080.json'],
+  ]) {
+    assert(existsSync(join(runtime, 'uilayouts', profile)), `Reviewed Play/Quit profile required: ${profile}.`);
+    assert(existsSync(join(runtime, 'fixtures', evidence)), `Pinned sanitized Play/Quit evidence required: ${evidence}.`);
+  }
   for (const name of ['ocr-control.bgra', 'ocr-pop.bgra', 'ocr-food.bgra', 'ocr-age.bgra']) {
     assert(existsSync(join(runtime, 'fixtures', name)), `Missing OCR fixture ${name}.`);
   }

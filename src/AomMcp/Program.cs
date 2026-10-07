@@ -80,6 +80,7 @@ if (selfTest)
     Catalog.SelfTest();
     Ui.SelfTest();
     ScreenProbe.SelfTest();
+    UiLayouts.SelfTest();
     UiRead.SelfTest();
     LiveUnits.SelfTest();
     LiveWorld.SelfTest();

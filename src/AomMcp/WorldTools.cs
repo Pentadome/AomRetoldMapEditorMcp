@@ -427,20 +427,23 @@ internal sealed partial class Server
         return SelectFromPalette(game, type, ordered, mix: false);
     }
 
-    /// <summary>Normal-UI bottom list palette: scroll by estimated index, OCR labels, click, verify (memory for textures, OCR label for mixes).</summary>
+    /// <summary>Reviewed list palette (normal bottom 2-column list; alternative left 1-column list): scroll by estimated index, OCR labels, click, verify (memory for textures, OCR label for mixes).</summary>
     static string SelectFromPalette(Game game, string type, string[] ordered, bool mix)
     {
         var frame = SceneUi.Capture(game);
         var ui = SceneUi.TryLoad(game, frame, out var reason);
         if (ui?.Palette is not { } palette)
-            throw new WorkflowFailure("PALETTE_UNREVIEWED", "select", "Palette selection only reviewed for the normal 2560x1440 UI" + (ui is null ? ": " + reason : $" (detected {ui.Kind})."),
+            throw new WorkflowFailure("PALETTE_UNREVIEWED", "select", "No reviewed palette list geometry" + (ui is null ? ": " + reason : $" for {ui.Kind} UI ({ui.File})."),
                 true, false, kind(mix) + " not on visible map to sample. Select it manually in the palette, then retry (already-selected types are accepted).");
         static string kind(bool m) => m ? "Mix" : "Texture";
         static int[] R(JsonElement e) => e.EnumerateArray().Select(v => v.GetInt32()).ToArray();
         var columns = palette.GetProperty("labelColumns").EnumerateArray().Select(R).ToArray();
         var anchor = R(palette.GetProperty("scrollAnchor"));
         var index = Array.FindIndex(ordered, n => n == type);
-        var perRow = columns.Length;
+        // Items per list row (normal: 2 columns; alternative: 1). listRect/visibleRows locate a recognised label's visible row.
+        var perRow = palette.TryGetProperty("columns", out var pr) ? pr.GetInt32() : columns.Length;
+        var listRect = palette.TryGetProperty("listRect", out var lr) ? R(lr) : columns[0];
+        var visibleRows = palette.TryGetProperty("visibleRows", out var vr) ? vr.GetInt32() : 2;
         game.Move(anchor[0], anchor[1]);
         Thread.Sleep(80);
         for (var i = 0; i < ordered.Length / perRow / 20 + 2; i++) { Ui.Wheel(game, 20); Thread.Sleep(30); } // Scroll to top.
@@ -470,15 +473,16 @@ internal sealed partial class Server
                 if (Norm(label) == Norm(type)) return $"palette row {row} (OCR-verified label)";
                 throw new WorkflowFailure("PAINT_TYPE_NOT_SELECTED", "select", $"Selected-mix label reads '{label}', not '{type}'.", true, false, "Nothing painted; inspect palette.");
             }
-            // Correct the scroll position from a recognised label's known index (row = upper/lower half of the column).
-            var midY = columns[0][1] + columns[0][3] / 2;
+            // Correct the scroll position from a recognised label's known index and its visible row in listRect.
+            var rowHeight = listRect[3] / (double)visibleRows;
             var known = lines.Select(l => (l, i: Array.FindIndex(ordered, n => Norm(n) == Norm(l.Text)))).Where(t => t.i >= 0).ToArray();
             if (known.Length == 0) break;
-            var firstRow = known[0].i / perRow - (known[0].l.Y > midY ? 1 : 0);
+            var visibleRow = Math.Clamp((int)((known[0].l.Y - listRect[1]) / rowHeight), 0, visibleRows - 1);
+            var firstRow = known[0].i / perRow - visibleRow;
             row = Math.Max(0, firstRow);
             var targetRow = index / perRow;
-            // Target should have been visible (OCR miss): put it on the other visible row and read again.
-            ScrollTo(targetRow >= row && targetRow <= row + 1 ? Math.Max(0, targetRow - (targetRow == row ? 1 : 0)) : targetRow);
+            // Target should have been visible (OCR miss): shift it to another visible row and read again.
+            ScrollTo(targetRow >= row && targetRow < row + visibleRows ? Math.Max(0, targetRow - (targetRow == row ? 1 : 0)) : targetRow);
         }
         throw new WorkflowFailure("PAINT_TYPE_NOT_FOUND_IN_PALETTE", "select", $"'{type}' not found in the palette list by OCR (filter dropdown not 'All', OCR misread or different sort).",
             true, false, "Palette scrolled only; nothing painted. Select the type manually, then retry.");

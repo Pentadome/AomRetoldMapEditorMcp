@@ -10,7 +10,7 @@ internal static class ScenarioReader
     static readonly UnicodeEncoding Utf16 = new(false, false, true);
     internal sealed record Player(uint Id, string Name, string AiPath, int[] Diplomacy,
         int Control, int CivId, int ColorId, int StartAge, int MaxAge, int ClassicalGodId, int HeroicGodId, int MythicGodId, int Pop, int PopLimit,
-        float Food, float Wood, float Gold, float Favor, int Visibility, float Handicap, byte[][] Sections);
+        float Food, float Wood, float Gold, float Favor, int Visibility, float Handicap, byte[][] Sections, string DisplayName = "");
     internal sealed record Snapshot(string Path, string Sha256, Player[] Players, byte[]? TriggerSection,
         string Format, int SuffixBytes);
 
@@ -58,7 +58,7 @@ internal static class ScenarioReader
             if (requireReviewedVersion && version != 319) throw new InvalidDataException("Unsupported player block version for semantic diff.");
             var sub = 4;
             uint playerId = uint.MaxValue;
-            string? name = null, ai = null;
+            string? name = null, ai = null, displayName = null;
             int[]? diplomacy = null;
             var sections = new byte[6][];
             int control = -1, civ = -1, color = -1, age = -1, maxAge = -1, classicalGod = -1, heroicGod = -1, mythicGod = -1, pop = -1, popLimit = -1;
@@ -75,7 +75,9 @@ internal static class ScenarioReader
                 if (n == 1)
                 {
                     playerId = (uint)U32(body, 0);
-                    var at = 5; _ = Wide(body, ref at); name = Wide(body, ref at);
+                    // First string is the editable player name (normal-UI Player Data typing "Bob" replaced "Player 2" here; the
+                    // second string stayed empty). Name keeps its legacy (second-string) meaning for existing comparisons.
+                    var at = 5; displayName = Wide(body, ref at); name = Wide(body, ref at);
                     _ = Wide(body, ref at); // String ID; observed independent of displayed name.
                     if (at >= body.Length) throw new InvalidDataException("PL control byte missing.");
                     control = body[at++];
@@ -133,7 +135,7 @@ internal static class ScenarioReader
             if (playerId != i || name is null || ai is null || diplomacy is null)
                 throw new InvalidDataException("PL player ID/fields mismatch; no guessed mapping.");
             players[i] = new(playerId, name, ai, diplomacy, control, civ, color, age, maxAge, classicalGod, heroicGod, mythicGod,
-                pop, popLimit, food, wood, gold, favor, visibility, handicap, sections);
+                pop, popLimit, food, wood, gold, favor, visibility, handicap, sections, displayName ?? "");
         }
         return players;
     }
@@ -152,7 +154,7 @@ internal static class ScenarioReader
         }).ToArray() : null;
         return new { snapshot.Path, snapshot.Sha256, snapshot.Format, snapshot.SuffixBytes,
             players = snapshot.Players.Where(p => player == -1 || p.Id == player)
-                .Select(p => new { p.Id, p.Name, p.AiPath,
+                .Select(p => new { p.Id, p.Name, p.DisplayName, p.AiPath,
                     control = p.Control switch { 0 => "Human", 1 => "Computer", 3 => "Unavailable", _ => "unknown" },
                     p.CivId, p.ColorId, p.StartAge, p.MaxAge,
                     minorGodIds = new { p.ClassicalGodId, p.HeroicGodId, p.MythicGodId },
