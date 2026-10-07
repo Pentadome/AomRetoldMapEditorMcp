@@ -937,11 +937,71 @@ internal sealed partial class Server
         };
     }
 
-    // Tiny 3x5 digit font for overview labels (host drawing, not a game asset).
+    // Tiny 3x5 font for overview labels (host drawing, not a game asset): digits 0-9 then '/'.
     static readonly string[] Digits = ["111101101101111", "010110010010111", "111001111100111", "111001111001111", "101101111001001",
-        "111100111001111", "111100111101111", "111001001001001", "111101111101111", "111101111001111"];
+        "111100111001111", "111100111101111", "111001001001001", "111101111101111", "111101111001111", "001001010100100"];
 
-    static ImageResult Overview(Game game, JsonElement args)
+    // Host label colors (RGB): regular objects yellow cross + white ID; helpers cyan cross + cyan ID; '/' separator grey.
+    static readonly (byte R, byte G, byte B) RegularCross = (255, 255, 0), RegularText = (255, 255, 255),
+        HelperColor = (0, 230, 255), SeparatorColor = (170, 170, 170);
+
+    /// <summary>World XZ radius (units) for a helper to join its nearest regular object's label. Live auras drift 0.04..0.62 from their hero.</summary>
+    const double HelperAttachRadius = 1.5;
+
+    /// <summary>World XZ radius (units) within which objects of the same kind are treated as co-located and share one label.</summary>
+    const double CoLocatedRadius = 0.25;
+
+    /// <summary>Groups label indices: regular objects co-located within CoLocatedRadius share a group; each helper joins the
+    /// nearest regular group anchor within HelperAttachRadius, else groups with co-located helpers. Regular members first.</summary>
+    static List<List<int>> StackLabels(List<(double X, double Z, bool Helper)> items)
+    {
+        static double Distance((double X, double Z, bool) a, (double X, double Z, bool) b) => Math.Sqrt(Math.Pow(a.X - b.X, 2) + Math.Pow(a.Z - b.Z, 2));
+        var groups = new List<List<int>>();
+        for (var i = 0; i < items.Count; i++)
+            if (!items[i].Helper)
+            {
+                var group = groups.FirstOrDefault(g => Distance(items[g[0]], items[i]) <= CoLocatedRadius);
+                if (group is null) groups.Add([i]); else group.Add(i);
+            }
+        var regularGroups = groups.Count;
+        for (var i = 0; i < items.Count; i++)
+            if (items[i].Helper)
+            {
+                var nearest = groups.Take(regularGroups).Select(g => (Group: g, Distance: Distance(items[g[0]], items[i])))
+                    .Where(c => c.Distance <= HelperAttachRadius).OrderBy(c => c.Distance).Select(c => c.Group).FirstOrDefault()
+                    ?? groups.Skip(regularGroups).FirstOrDefault(g => Distance(items[g[0]], items[i]) <= CoLocatedRadius);
+                if (nearest is null) groups.Add([i]); else nearest.Add(i);
+            }
+        return groups;
+    }
+
+    /// <summary>Helper heuristic: shipped proto flagged NotSelectable+NotPlayerPlaceable (effects, projectiles, flags,
+    /// containers) or a live proto name absent from shipped proto.xml (runtime-generated, e.g. MythUnitDamageAura*).
+    /// Unresolved (null) names are never classified as helpers.</summary>
+    static string? HelperReason(string? proto, Dictionary<string, string[]>? flags) =>
+        proto is null || flags is null ? null
+        : !flags.TryGetValue(proto, out var f) ? "notInProtoCatalog"
+        : f.Contains("NotSelectable") && f.Contains("NotPlayerPlaceable") ? "flags" : null;
+
+    /// <summary>Offline checks for overview helper classification and glyph table (no game calls).</summary>
+    internal static void OverviewSelfTest()
+    {
+        var flags = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Atalanta"] = ["CommonCommands"], ["Flowers"] = ["NotSelectable"], ["CentaurAreaDamage"] = ["NotSelectable", "NotPlayerPlaceable"],
+        };
+        if (HelperReason("Atalanta", flags) is not null || HelperReason("flowers", flags) is not null
+            || HelperReason("CentaurAreaDamage", flags) != "flags" || HelperReason("MythUnitDamageAuraGuardians", flags) != "notInProtoCatalog"
+            || HelperReason(null, flags) is not null || HelperReason("MythUnitDamageAuraGuardians", null) is not null
+            || Digits.Length != 11 || Digits.Any(g => g.Length != 15))
+            throw new InvalidOperationException("Overview helper classification/glyph self-test failed.");
+        // Hero(0)+drifted aura(1, 0.62 away), second hero(2) 8 units away + its aura(3), stray helper(4), co-located regulars(5,6).
+        var stacks = StackLabels([(0, 0, false), (0.62, 0, true), (8, 0, false), (8, 0.05, true), (30, 30, true), (50, 50, false), (50.1, 50, false)]);
+        if (stacks.Count != 4 || !stacks[0].SequenceEqual([0, 1]) || !stacks[1].SequenceEqual([2, 3]) || !stacks[2].SequenceEqual([5, 6]) || !stacks[3].SequenceEqual([4]))
+            throw new InvalidOperationException("Overview label stacking self-test failed.");
+    }
+
+    ImageResult Overview(Game game, JsonElement args)
     {
         var view = EditorView.ReadView(game);
         var units = LiveUnits.Read(game);
@@ -949,41 +1009,89 @@ internal sealed partial class Server
         var protoFilter = String(args, "proto", "");
         var maxLabels = Int(args, "maxLabels", 80);
         var scale = Int(args, "labelScale", 2);
-        var capture = Ui.CapturePixels(game, Int(args, "maxWidth", 1280));
+        var includeHelpers = args.TryGetProperty("includeHelpers", out var ih) && ih.GetBoolean();
+        Dictionary<string, string[]>? flags = null;
+        string classification;
+        try
+        {
+            flags = (_gameData ??= new GameDataCatalog()).Flags(exe, _layout.ExeSha256);
+            classification = "helper = shipped proto flagged NotSelectable+NotPlayerPlaceable, or proto absent from shipped proto.xml (runtime-generated); heuristic, not engine attachment data";
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            classification = "unavailable (no objects hidden or colored as helpers): " + e.Message;
+        }
+        // Shrink first (single GDI halftone pass), then draw markers/labels at final size so they stay crisp.
+        var resolutionScale = args.TryGetProperty("resolutionScale", out var rs) ? rs.GetDouble() : 1;
+        var capture = Ui.CapturePixels(game, Int(args, "maxWidth", 1280), resolutionScale);
         var (cw, ch) = Ui.ClientSize(game);
         double f = capture.Width / (double)cw;
-        var labels = new List<object>();
-        void Set(int x, int y, byte r, byte g, byte b)
+        void Set(int x, int y, (byte R, byte G, byte B) c)
         {
             if (x < 0 || y < 0 || x >= capture.Width || y >= capture.Height) return;
-            var o = (y * capture.Width + x) * 4; capture.Bgra[o] = b; capture.Bgra[o + 1] = g; capture.Bgra[o + 2] = r;
+            var o = (y * capture.Width + x) * 4; capture.Bgra[o] = c.B; capture.Bgra[o + 1] = c.G; capture.Bgra[o + 2] = c.R;
         }
+        var shown = new List<(LiveUnits.Unit U, double X, double Y, string? Helper)>();
+        var hidden = new List<(int UnitId, string? Proto, string Reason)>();
         foreach (var u in units.Where(u => (player is null || u.Player == player) && (protoFilter.Length == 0 || (u.Proto ?? "").Contains(protoFilter, StringComparison.OrdinalIgnoreCase)))
                      .OrderBy(u => u.UnitId))
         {
-            if (labels.Count >= maxLabels) break;
+            if (shown.Count >= maxLabels) break;
             var p = view.Project(new Vector3(u.Position.X, u.Position.Y, u.Position.Z));
             if (!p.VisibleInViewport) continue;
-            int x = (int)(p.X * f), y = (int)(p.Y * f);
-            var text = u.UnitId.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            int w = text.Length * 4 * scale + scale, h = 7 * scale;
-            for (var dx = -3; dx <= 3; dx++) { Set(x + dx, y, 255, 255, 0); Set(x, y + dx, 255, 255, 0); }
-            for (var yy = 0; yy < h; yy++) for (var xx = 0; xx < w; xx++) Set(x + 4 + xx, y - h - 2 + yy, 0, 0, 0);
-            for (var i = 0; i < text.Length; i++)
+            var helper = HelperReason(u.Proto, flags);
+            if (helper is not null && !includeHelpers) { hidden.Add((u.UnitId, u.Proto, helper)); continue; }
+            shown.Add((u, p.X, p.Y, helper));
+        }
+        var groups = StackLabels(shown.Select(s => ((double)s.U.Position.X, (double)s.U.Position.Z, s.Helper is not null)).ToList());
+        foreach (var group in groups)
+        {
+            var anchor = shown[group[0]];
+            int x = (int)(anchor.X * f), y = (int)(anchor.Y * f);
+            // Segments: each ID in its own color, '/' (glyph 10) between stacked IDs.
+            var glyphs = new List<(int Glyph, (byte, byte, byte) Color)>();
+            foreach (var index in group)
             {
-                var glyph = Digits[text[i] - '0'];
+                if (glyphs.Count > 0) glyphs.Add((10, SeparatorColor));
+                var color = shown[index].Helper is null ? RegularText : HelperColor;
+                glyphs.AddRange(shown[index].U.UnitId.ToString(System.Globalization.CultureInfo.InvariantCulture).Select(digit => (digit - '0', color)));
+            }
+            var cross = group.Any(i => shown[i].Helper is null) ? RegularCross : HelperColor;
+            int w = glyphs.Count * 4 * scale + scale, h = 7 * scale;
+            for (var dx = -3; dx <= 3; dx++) { Set(x + dx, y, cross); Set(x, y + dx, cross); }
+            for (var yy = 0; yy < h; yy++) for (var xx = 0; xx < w; xx++) Set(x + 4 + xx, y - h - 2 + yy, (0, 0, 0));
+            for (var i = 0; i < glyphs.Count; i++)
+            {
+                var glyph = Digits[glyphs[i].Glyph];
                 for (var gy = 0; gy < 5; gy++) for (var gx = 0; gx < 3; gx++)
                     if (glyph[gy * 3 + gx] == '1')
                         for (var sy = 0; sy < scale; sy++) for (var sx = 0; sx < scale; sx++)
-                            Set(x + 4 + scale + i * 4 * scale + gx * scale + sx, y - h - 2 + scale + gy * scale + sy, 255, 255, 255);
+                            Set(x + 4 + scale + i * 4 * scale + gx * scale + sx, y - h - 2 + scale + gy * scale + sy, glyphs[i].Color);
             }
-            labels.Add(new { u.UnitId, u.Proto, u.Player, pixel = new[] { (int)Math.Round(p.X), (int)Math.Round(p.Y) }, u.Position, u.HeadingDegrees });
         }
+        var labels = groups.SelectMany(g => g.Select(i =>
+        {
+            var (u, px, py, helper) = shown[i];
+            var others = g.Where(j => j != i).Select(j => shown[j].U.UnitId).ToArray();
+            return new
+            {
+                u.UnitId, u.Proto, u.Player, pixel = new[] { (int)Math.Round(px), (int)Math.Round(py) }, u.Position, u.HeadingDegrees,
+                helper = helper is not null, helperReason = helper, stackedWith = others.Length == 0 ? null : others,
+            };
+        })).OrderBy(l => l.UnitId).ToList();
         view.Verify();
         return new ImageResult(Ui.Png(capture.Width, capture.Height, capture.Bgra), new
         {
-            labeled = labels.Count, imageScale = f, labels,
-            limitation = "Screenshot with host-drawn markers (yellow cross at projected unit origin) and white unit-ID labels; pixel coordinates in labels are full-resolution client pixels. Projection is frustum-only (occluded units still labeled).",
+            labeled = labels.Count, labelGroups = groups.Count, imageScale = f, labels,
+            hiddenHelpers = new
+            {
+                count = hidden.Count,
+                byProto = hidden.GroupBy(h => h.Proto ?? "?").OrderBy(g => g.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Count()),
+                unitIds = hidden.Select(h => h.UnitId).Take(300).ToArray(),
+            },
+            helperClassification = classification,
+            colors = "regular: yellow cross + white ID; helper (includeHelpers=true): cyan cross + cyan ID; stacked label 'id/id' (each ID in its own color): helpers join nearest regular object within 1.5 world units, same-kind objects within 0.25 world units share a label.",
+            limitation = "Screenshot with host-drawn markers (cross at projected unit origin) and unit-ID labels; pixel coordinates in labels are full-resolution client pixels. Projection is frustum-only (occluded units still labeled). Helper hiding is a catalog heuristic; hidden objects still exist.",
         });
     }
 
@@ -1132,7 +1240,7 @@ internal sealed partial class Server
             "Read/change the editor tool mode. No args: current edit mode (from memory), active UI kind (normal/alternative via pixel gates + profile hint), open bottom panels, current texture/water/forest/cliff paint selections. exit=true leaves any tool (loops editMode None until mode 0; closes palettes). mode=<name> enters a tool and verifies.",
             new Dictionary<string, object> { ["mode"] = new { type = "string", @enum = LiveWorld.Modes.Select(m => m.Name).ToArray() }, ["exit"] = new { type = "boolean" } }, []);
         yield return Spec("editor_paint_world",
-            "Paint along WORLD points (1..64 [x,z], one point = dab, stroke follows the polyline): kind texture|mix|water|forest|cliff with exact type name (editor_terrain_catalog; case/space-insensitive accepted). Exits current tool, enters the paint tool, selects the type (native setter verified from memory; textures by sampling a visible tile or normal-UI palette OCR; mixes via palette OCR), moves camera if needed, drags with the current brush, exits tool (keepMode=false), then verifies tiles/water/heights/objects changed. confirmDestructive=true required (overwrites terrain; forest tool may remove objects).",
+            "Paint along WORLD points (1..64 [x,z], one point = dab, stroke follows the polyline): kind texture|mix|water|forest|cliff with exact type name (editor_terrain_catalog; case/space-insensitive accepted). Exits current tool, enters the paint tool, selects the type (native setter verified from memory; textures by sampling a visible tile or list-palette OCR; mixes via palette OCR; derived-size palette geometry is scaled, not live-tested), moves camera if needed, drags with the current brush, exits tool (keepMode=false), then verifies tiles/water/heights/objects changed. confirmDestructive=true required (overwrites terrain; forest tool may remove objects).",
             new Dictionary<string, object>
             {
                 ["kind"] = new { type = "string", @enum = PaintKinds }, ["type"] = new { type = "string" },
@@ -1169,11 +1277,13 @@ internal sealed partial class Server
             "Center the camera on a world rectangle (minimap closed loop) and report whether all corners are visible and clickable clear of UI panels (fits). Camera only.",
             new Dictionary<string, object>(area) { ["tolerance"] = new { type = "number", minimum = 0.5, maximum = 50 } }, WorldAreaRequired);
         yield return Spec("editor_overview",
-            "Screenshot annotated with live unit IDs (yellow origin cross + white ID label) for visible objects, plus a JSON legend (id, proto, player, pixel, position, heading). Filters: player, proto substring; maxLabels 1..300 (default 80); maxWidth 320..2560 (default 1280); labelScale 1..4. Read-only.",
+            "Screenshot annotated with live unit IDs (yellow origin cross + white ID label) for visible objects, plus a JSON legend (id, proto, player, pixel, position, heading). Filters: player, proto substring; maxLabels 1..300 (default 80); maxWidth 320..2560 (default 1280); labelScale 1..4. resolutionScale 0.1..1 (default 1) multiplies output size after maxWidth (0.6 = 60% width/height, ~36% pixels); markers/labels are drawn after scaling so they stay readable. Images consume tokens: recommended to use resolutionScale <1 (e.g. 0.5-0.6) to save context/token cost. Legend pixels stay full-resolution client pixels; imageScale = image/client ratio. includeHelpers (default false): aura/effect/projectile helper objects (shipped proto NotSelectable+NotPlayerPlaceable, or runtime proto absent from proto.xml) are hidden and summarized in hiddenHelpers; true draws them with cyan cross/ID. Stacked labels 'id/id' (each ID in its own color; legend stackedWith): helpers join nearest regular object within 1.5 world units; objects of same kind within 0.25 share a label. Read-only.",
             new Dictionary<string, object>
             {
                 ["player"] = player, ["proto"] = new { type = "string" }, ["maxLabels"] = new { type = "integer", minimum = 1, maximum = 300 },
                 ["maxWidth"] = new { type = "integer", minimum = 320, maximum = 2560 }, ["labelScale"] = new { type = "integer", minimum = 1, maximum = 4 },
+                ["resolutionScale"] = new { type = "number", minimum = Ui.MinResolutionScale, maximum = Ui.MaxResolutionScale, @default = 1 },
+                ["includeHelpers"] = new { type = "boolean", @default = false },
             }, [], true);
         yield return Spec("editor_resource_balance",
             "Per-player resource report: Gaia resource objects/huntables within radii (default [30,60] world units) of each player's TownCenter (or explicit centers [{player,x,z}]): counts, static initial amounts, nearest distance, protos per resource. Read-only.",

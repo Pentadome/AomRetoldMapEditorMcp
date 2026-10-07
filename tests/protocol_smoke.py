@@ -268,6 +268,15 @@ def assert_search_isolation(full_specs, expected_core, mode):
     status = tool('editor_toolset')['structuredContent']
     assert status['toolset'] == mode
     assert_tool_search(full_specs, expected_core, mode)
+    assert full_specs['editor_focus']['annotations'] == {'readOnlyHint': False, 'destructiveHint': False,
+                                                        'idempotentHint': True, 'openWorldHint': False}, full_specs['editor_focus']
+    shot = full_specs['editor_screenshot']
+    assert shot['inputSchema']['properties']['resolutionScale'] == {'type': 'number', 'minimum': 0.1, 'maximum': 1, 'default': 1}, shot
+    assert 'resolutionScale' in shot['description'] and 'token' in shot['description'], shot
+    overview = full_specs['editor_overview']
+    assert overview['inputSchema']['properties']['resolutionScale'] == shot['inputSchema']['properties']['resolutionScale'], overview
+    assert 'resolutionScale' in overview['description'] and 'token' in overview['description'], overview
+    assert overview['inputSchema']['properties']['includeHelpers'] == {'type': 'boolean', 'default': False}, overview
     assert_search_validation()
     action = next(name for name in sorted(full_specs) if name.startswith('action_'))
     queries = ('editor_search_tools', 'editor_uiPlaceAtPointer', action, 'Shipped editor UI action:')
@@ -856,6 +865,10 @@ try:
     preflight_refusal('editor_delete_units', {'units': [{'unitId': 1, 'proto': 'Hoplite', 'player': 1}] * 2,
                                               'confirmDestructive': True}, 'INVALID_ARGUMENT')
     preflight_refusal('editor_apply_layout', {}, 'INVALID_ARGUMENT')
+    # Screenshot resolutionScale bounds/type refuse before any game connection.
+    for bad in (0, 0.05, 1.5, 'half'):
+        preflight_refusal('editor_screenshot', {'resolutionScale': bad}, 'INVALID_ARGUMENT')
+        preflight_refusal('editor_overview', {'resolutionScale': bad}, 'INVALID_ARGUMENT')
     # World helpers refuse destructive strokes without confirmation, before any game connection.
     preflight_refusal('editor_paint_world', {'kind': 'water', 'type': 'GreekLake', 'points': [[1, 1]]}, 'INVALID_ARGUMENT')
     preflight_refusal('editor_elevation', {'operation': 'set', 'minX': 0, 'minZ': 0, 'maxX': 10, 'maxZ': 10,

@@ -79,6 +79,7 @@ if (selfTest)
 {
     Catalog.SelfTest();
     Ui.SelfTest();
+    Server.OverviewSelfTest();
     ScreenProbe.SelfTest();
     UiLayouts.SelfTest();
     UiRead.SelfTest();

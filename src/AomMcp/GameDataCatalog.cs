@@ -98,6 +98,20 @@ internal sealed class GameDataCatalog
         return _footprints = result;
     }
 
+    Dictionary<string, string[]>? _flags;
+
+    /// <summary>Shipped proto.xml flag tags per prototype (case-insensitive name); absent name = not a shipped proto.</summary>
+    internal Dictionary<string, string[]> Flags(string exe, string hash)
+    {
+        CheckFresh(exe, hash);
+        if (_flags is not null) return _flags;
+        var result = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        foreach (var e in _data.GetProperty("catalogs").GetProperty("prototypes").EnumerateArray())
+            result.TryAdd(e.GetProperty("name").GetString()!,
+                e.TryGetProperty("flags", out var f) && f.ValueKind == JsonValueKind.Array ? f.EnumerateArray().Select(x => x.GetString()!).ToArray() : []);
+        return _flags = result;
+    }
+
     Dictionary<string, (string? Resource, double Amount, string[] UnitTypes)>? _resources;
 
     /// <summary>Static resource subtype/initial amount/unit types per prototype (case-insensitive name).</summary>

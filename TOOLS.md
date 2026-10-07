@@ -1063,8 +1063,8 @@ Focus/restore game window. Editor only.
 
 ```json
 {
-  "destructiveHint": true,
-  "idempotentHint": false,
+  "destructiveHint": false,
+  "idempotentHint": true,
   "openWorldHint": false,
   "readOnlyHint": false
 }
@@ -1781,7 +1781,7 @@ Save through native game writer to unique active-profile scenario staging file, 
 
 ### `editor_screenshot`
 
-Capture only foreground game client as PNG. Focuses game. maxWidth default 1280.
+Capture foreground game client PNG. maxWidth default 1280; region [x,y,w,h] uses full-resolution client pixels, optional scale 1..4 nearest (output max 1600×1600). resolutionScale 0.1..1 (default 1) multiplies final output size (e.g. 0.6 = 60% width/height, ~36% pixels) after maxWidth/region/scale. Screenshots consume tokens: recommended to use resolutionScale <1 (e.g. 0.5-0.6) and/or small regions to save context/token cost; pixel coordinates you derive must be mapped back to full-resolution client pixels.
 
 **Required arguments:** None.
 
@@ -1803,7 +1803,28 @@ Capture only foreground game client as PNG. Focuses game. maxWidth default 1280.
   "type": "object",
   "properties": {
     "maxWidth": {
-      "type": "integer"
+      "type": "integer",
+      "minimum": 320,
+      "maximum": 2560
+    },
+    "region": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "integer"
+      }
+    },
+    "scale": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4
+    },
+    "resolutionScale": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 1,
+      "default": 1
     }
   },
   "required": [],

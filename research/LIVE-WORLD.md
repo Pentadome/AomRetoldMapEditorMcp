@@ -133,7 +133,7 @@ holds the alternative-UI minimap gate. The profile `UserProfile.xml` option
 | `editor_elevation` | elevation/elevationsample/smooth tools; set = bump + bisected slope sample + test dab + 2 serpentine passes + touch-up dabs |
 | `editor_transform_unit` | exact selection, moveunit drag, `uiRotateSelection(±1)` steps verified by heading readback |
 | `editor_terrain_catalog` | live texture/water/forest/cliff/lighting/civ tables; generated mixes; edit-mode table |
-| `editor_overview` | screenshot + projected unit IDs |
+| `editor_overview` | screenshot + projected unit IDs; `resolutionScale` 0.1..1 shrinks image (labels drawn after scaling, legend pixels stay full-resolution). Helpers (shipped proto `NotSelectable`+`NotPlayerPlaceable`, or runtime proto absent from proto.xml such as `MythUnitDamageAuraGuardians`) hidden by default (`hiddenHelpers`); `includeHelpers=true` shows cyan cross/ID. Labels stack `id/id`: helper joins nearest regular object within 1.5 world units (live auras drift 0.04..0.62 from hero), same-kind objects within 0.25 share. Live-verified 9 Atalanta+aura pairs |
 
 Live verification (2026-10-07, normal UI, 256×256 map): texture by sampling and by palette OCR (row 127 "Greek Dirt 2"),
 mix "Greek Grass 1" (OCR-verified label), water GreekLake, forest GreekOak (29 objects), cliff "Greek Grass";

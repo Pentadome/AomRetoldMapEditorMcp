@@ -472,7 +472,7 @@ internal sealed partial class Server(
                 metadataCoverage = "Command/UI counts show shipped coverage, not proof of semantic effects. Toolset resets when MCP host reconnects; call editor_toolset mode=full when needed.",
                 triggerEditing = "editor_trigger_list reads bounded TR v12 exports with player/arg/references filters. editor_trigger_player_parity audits template→target gaps. editor_trigger_edit previews/writes NEW-file patch/clone or up to 64 distinct-trigger edits in one output (value/label replacements, condition/effect removal, duplicates); requires source SHA and expected names, verifies unrelated records. editor_triggers apply requires reviewed live export/hash; game round-trip compared semantically. XS compile/runtime effects unproven.",
                 playerSettings = "editor_players/editor_player_dependency_audit read game-written checkpoints (stances 1 ally, 2 enemy, 3 neutral; 0 self/unset). editor_set_diplomacy changes batches directed cells with per-click RGB gates and one final checkpoint. editor_player_settings supports reviewed fields in both UIs (alternative Players Settings or normal Scenario > Player Data, auto-detected), including AI path via INSTALLPATH game\\ai file browser; startAge changes can reset minor gods, requiring observedOnly assertions. Apply is pinned to 2560x1440 or 1920x1080 and requires backups. Player name compares the editable display name. Direct AI-name text entry did not persist. Neither proves XS runtime.",
-                sceneTools = "Core world-space helpers: editor_place_at_world/editor_apply_layout (world X/Z, observed unitIds, optional heading), editor_camera_look_at (minimap closed loop, normal or alternative UI auto-detected; reviewed 2560x1440/1920x1080 layouts, other 16:9 clients 1280..2560 wide get read-only derived geometry with layoutReviewed=false: camera/occluders/OCR presets, no palette selection, writers stay pinned), editor_view_info/editor_ui_state, editor_units_snapshot/diff (undo/redo reidentification), editor_scene_summary, editor_check_footprints, editor_terrain_grid, editor_delete_units (tuple-verified, confirmDestructive). Not saved; no retries.",
+                sceneTools = "Core world-space helpers: editor_place_at_world/editor_apply_layout (world X/Z, observed unitIds, optional heading), editor_camera_look_at (minimap closed loop, normal or alternative UI auto-detected; reviewed 2560x1440/1920x1080 layouts, other 16:9 clients 1280..2560 wide get read-only derived geometry with layoutReviewed=false: camera/occluders/OCR presets, world helpers, palette selection untested, writers stay pinned), editor_view_info/editor_ui_state, editor_units_snapshot/diff (undo/redo reidentification), editor_scene_summary, editor_check_footprints, editor_terrain_grid, editor_delete_units (tuple-verified, confirmDestructive). Not saved; no retries.",
                 worldTools = "Core world helpers (research/LIVE-WORLD.md): editor_terrain_info (tile texture/water/passability), editor_live_players (name/team/civ/age/diplomacy without checkpoint), editor_edit_mode (read/enter/exit tool mode, UI kind, paint selections), editor_paint_world (texture/mix/water/forest/cliff along world points), editor_elevation (set/flatten/smooth area), editor_transform_unit (move/rotate with 22.5° steps), editor_terrain_catalog (textures/water/forest/cliff/mixes/lighting/civs/editModes), editor_camera_frame, editor_overview (ID-annotated screenshot), editor_resource_balance, editor_mirror_units, editor_scatter. Strokes use the current brush; verify reports included.",
                 scenarioEditing = "Never edit .mythscn directly. Use game editor, game-writer checkpoints and normal Load Scenario UI; native loadScenario disabled after crash.",
                 aiScripts = "Computer-player .xs personality must be under INSTALLPATH\\game\\ai (or its subdirectory). Active-profile Games\\Age of Mythology Retold\\<id>\\ai did NOT work. Triggers belong in active-profile trigger directory; use filename stems for uiLoadTriggers/uiSaveTriggers.",
@@ -591,10 +591,11 @@ internal sealed partial class Server(
         if (name == "editor_ui_read") return UiRead.Query(game, args, _layout.ExeSha256);
         if (name == "editor_screenshot")
         {
-            Catalog.ValidateObject(args, ["maxWidth", "region", "scale"]);
+            Catalog.ValidateObject(args, ["maxWidth", "region", "scale", "resolutionScale"]);
             // Host default 1280 px is half the tested 2560-wide client; region uses full-resolution pixels.
             var region = args.TryGetProperty("region", out var rect) ? rect.EnumerateArray().Select(n => n.GetInt32()).ToArray() : null;
-            return new ImageResult(Ui.Screenshot(game, Int(args, "maxWidth", 1280), region, Int(args, "scale", 1)));
+            var resolutionScale = args.TryGetProperty("resolutionScale", out var rs) ? rs.GetDouble() : 1;
+            return new ImageResult(Ui.Screenshot(game, Int(args, "maxWidth", 1280), region, Int(args, "scale", 1), resolutionScale));
         }
         if (name == "editor_mouse_move")
         {
@@ -805,7 +806,9 @@ internal sealed partial class Server(
         string description,
         Dictionary<string, object> properties,
         string[] required,
-        bool readOnly = false
+        bool readOnly = false,
+        bool? destructive = null,
+        bool? idempotent = null
     ) =>
         new
         {
@@ -821,8 +824,8 @@ internal sealed partial class Server(
             annotations = new
             {
                 readOnlyHint = readOnly,
-                destructiveHint = !readOnly,
-                idempotentHint = readOnly,
+                destructiveHint = destructive ?? !readOnly,
+                idempotentHint = idempotent ?? readOnly,
                 openWorldHint = false,
             },
         };
@@ -1221,15 +1224,17 @@ internal sealed partial class Server(
                 + " Read-only, no running game required. name=exact identifier; filter=name/label substring. offset>=0, limit=1..200 (default 50); includeDefinition=false by default. Missing/stale data: --generate generated, then restart MCP.",
                 GameDataCatalog.Properties(kind), [], true);
         }
-        yield return Spec("editor_focus", "Focus/restore game window. Editor only.", [], []);
+        // Changes OS foreground only (no editor/scene effect); repeat calls converge on the same state.
+        yield return Spec("editor_focus", "Focus/restore game window. Editor only.", [], [], destructive: false, idempotent: true);
         yield return Spec(
             "editor_screenshot",
-            "Capture foreground game client PNG. maxWidth default 1280; region [x,y,w,h] uses full-resolution client pixels, optional scale 1..4 nearest (output max 1600×1600). Screenshots consume tokens; prefer small regions.",
+            "Capture foreground game client PNG. maxWidth default 1280; region [x,y,w,h] uses full-resolution client pixels, optional scale 1..4 nearest (output max 1600×1600). resolutionScale 0.1..1 (default 1) multiplies final output size (e.g. 0.6 = 60% width/height, ~36% pixels) after maxWidth/region/scale. Screenshots consume tokens: recommended to use resolutionScale <1 (e.g. 0.5-0.6) and/or small regions to save context/token cost; pixel coordinates you derive must be mapped back to full-resolution client pixels.",
             new Dictionary<string, object>
             {
                 ["maxWidth"] = new { type = "integer", minimum = 320, maximum = 2560 },
                 ["region"] = new { type = "array", minItems = 4, maxItems = 4, items = new { type = "integer" } },
                 ["scale"] = new { type = "integer", minimum = 1, maximum = 4 },
+                ["resolutionScale"] = new { type = "number", minimum = Ui.MinResolutionScale, maximum = Ui.MaxResolutionScale, @default = 1 },
             },
             []
         );

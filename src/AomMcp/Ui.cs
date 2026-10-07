@@ -258,17 +258,50 @@ internal static class Ui
     /// <remarks>Captures screen pixels, so overlays must not cover the game client.</remarks>
     public static byte[] Screenshot(Game game, int maxWidth) => Screenshot(game, maxWidth, null, 1);
 
-    public static byte[] Screenshot(Game game, int maxWidth, int[]? region, int scale)
+    /// <summary>Host token-saving policy: 0.1..1 multiplies final output size; 1 keeps prior behavior.</summary>
+    public const double MinResolutionScale = 0.1, MaxResolutionScale = 1;
+
+    public static byte[] Screenshot(Game game, int maxWidth, int[]? region, int scale, double resolutionScale = 1)
     {
         if (scale is < 1 or > 4) throw new ArgumentException("Screenshot scale must be 1..4.");
         if (region is null && scale != 1) throw new ArgumentException("scale requires region.");
-        var (width, height, pixels) = CapturePixels(game, region is null ? maxWidth : 2560);
+        if (!double.IsFinite(resolutionScale) || resolutionScale < MinResolutionScale || resolutionScale > MaxResolutionScale)
+            throw new ArgumentException("Screenshot resolutionScale must be 0.1..1.");
+        // Full frame: GDI HALFTONE scales once straight to the reduced size (no second resample).
+        var (width, height, pixels) = CapturePixels(game, region is null ? maxWidth : 2560, region is null ? resolutionScale : 1);
         if (region is null) return Png(width, height, pixels);
         var (clientWidth, clientHeight) = ClientSize(game);
         if (clientWidth != width || clientHeight != height)
             throw new ArgumentException("Region requires full-resolution client ≤2560 pixels wide.");
         var crop = CropZoom(pixels, width, height, region, scale);
-        return Png(crop.Width, crop.Height, crop.Bgra);
+        var small = Downscale(crop.Bgra, crop.Width, crop.Height, resolutionScale);
+        return Png(small.Width, small.Height, small.Bgra);
+    }
+
+    /// <summary>Area-average (box) downscale of BGRA pixels; factor 1 returns the input unchanged.</summary>
+    internal static (int Width, int Height, byte[] Bgra) Downscale(byte[] pixels, int width, int height, double factor)
+    {
+        if (factor >= 1) return (width, height, pixels);
+        int w = Math.Max(1, (int)Math.Round(width * factor)), h = Math.Max(1, (int)Math.Round(height * factor));
+        var dest = new byte[checked(w * h * 4)];
+        Span<int> sum = stackalloc int[4];
+        for (var row = 0; row < h; row++)
+        {
+            int y0 = row * height / h, y1 = Math.Max(y0 + 1, (row + 1) * height / h);
+            for (var col = 0; col < w; col++)
+            {
+                int x0 = col * width / w, x1 = Math.Max(x0 + 1, (col + 1) * width / w);
+                sum.Clear();
+                for (var y = y0; y < y1; y++)
+                    for (var x = x0; x < x1; x++)
+                        for (var c = 0; c < 4; c++)
+                            sum[c] += pixels[(y * width + x) * 4 + c];
+                var count = (y1 - y0) * (x1 - x0);
+                for (var c = 0; c < 4; c++)
+                    dest[(row * w + col) * 4 + c] = (byte)((sum[c] + count / 2) / count);
+            }
+        }
+        return (w, h, dest);
     }
 
     internal static (int Width, int Height) ClientSize(Game game)
@@ -292,12 +325,14 @@ internal static class Ui
         return (w * scale, h * scale, dest);
     }
 
-    internal static (int Width, int Height, byte[] Bgra) CapturePixels(Game game, int maxWidth)
+    internal static (int Width, int Height, byte[] Bgra) CapturePixels(Game game, int maxWidth, double resolutionScale = 1)
     {
         // Host output/allocation policy: 320..2560 px, default 1280 in Server; 2560 matches tested client.
         // 80 ms below allows focus/render to settle; timing is empirical, not a GDI requirement.
         if (maxWidth is < 320 or > 2560)
             throw new ArgumentException("Screenshot maxWidth 320..2560.");
+        if (!double.IsFinite(resolutionScale) || resolutionScale < MinResolutionScale || resolutionScale > MaxResolutionScale)
+            throw new ArgumentException("Screenshot resolutionScale must be 0.1..1.");
         game.Focus(requireEditor: false); // Read-only observation also works during playtest.
         Thread.Sleep(80);
         Win.Check(Win.GetClientRect(game.Window, out var rect), "GetClientRect");
@@ -305,7 +340,7 @@ internal static class Ui
         Win.Check(Win.ClientToScreen(game.Window, ref origin), "ClientToScreen");
         int sw = rect.Right,
             sh = rect.Bottom,
-            width = Math.Min(sw, maxWidth),
+            width = Math.Max(1, (int)Math.Round(Math.Min(sw, maxWidth) * resolutionScale)),
             height = Math.Max(1, sh * width / sw);
         // Win32 GetDC(NULL/0) selects screen DC; only the game's client rectangle is copied.
         nint screen = Win.GetDC(0),
@@ -447,6 +482,12 @@ internal static class Ui
             || !crop.Bgra.AsSpan(0, 4).SequenceEqual(new byte[] { 0, 0, 255, 0 })
             || !crop.Bgra.AsSpan(12, 4).SequenceEqual(new byte[] { 0, 0, 255, 0 }))
             throw new InvalidOperationException("Screenshot region/nearest scale self-test failed.");
+        // 4x2 fixture: left 2x2 block blue=0/200 averages 100, right block constant 50; 0.5 -> 2x1.
+        var half = Downscale([0, 0, 0, 0, 200, 0, 0, 0, 50, 0, 0, 0, 50, 0, 0, 0,
+                              200, 0, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 50, 0, 0, 0], 4, 2, 0.5);
+        if (half.Width != 2 || half.Height != 1 || half.Bgra[0] != 100 || half.Bgra[4] != 50
+            || Downscale(png, 1, 1, 1).Bgra != png || Downscale([1, 2, 3, 4], 1, 1, 0.1).Width != 1)
+            throw new InvalidOperationException("Screenshot resolutionScale downscale self-test failed.");
         if (
             !png.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 })
             || VirtualKey("F12") != 0x7b
