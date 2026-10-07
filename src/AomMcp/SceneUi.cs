@@ -22,7 +22,7 @@ internal sealed class SceneUi
     /// <summary>False for a layout derived from the 2560×1440 reference at an unreviewed 16:9 client size.</summary>
     internal bool Reviewed { get; private set; } = true;
     int Radius { get; set; }
-    internal string Describe => Reviewed ? $"reviewed {Kind} UI ({File})" : $"derived {Kind} UI ({File}; scaled from reviewed 2560x1440, not live-reviewed at this size; conditional panels treated as present, palette selection disabled)";
+    internal string Describe => Reviewed ? $"reviewed {Kind} UI ({File})" : $"derived {Kind} UI ({File}; scaled from reviewed 2560x1440, not live-reviewed at this size; conditional panels treated as present, palette list geometry scaled but not live-tested)";
 
     // Reviewed layout files per client size; normal first: its menu-bar detect gate discriminates (minimap frames are identical in both UIs).
     static readonly string[] Kinds = ["normal", "alternative"];
@@ -96,8 +96,8 @@ internal sealed class SceneUi
 
     internal bool MinimapVisible(ScreenProbe.Frame frame) => Gate(frame, _root.GetProperty("minimap"));
 
-    /// <summary>Reviewed bottom list-panel palette geometry (normal UI only); null when not reviewed.</summary>
-    internal JsonElement? Palette => Reviewed && _root.TryGetProperty("palette", out var p) ? p : null;
+    /// <summary>List-palette geometry (normal bottom 2-column list; alternative left 1-column list). Derived layouts use the scaled 2560 geometry (not live-tested); selection stays safe: exact-name OCR match before click, texture memory readback / mix label OCR after.</summary>
+    internal JsonElement? Palette => _root.TryGetProperty("palette", out var p) ? p : null;
 
     /// <summary>Static panels plus pixel-gated conditional panels; unknown frame treats conditionals as active.</summary>
     internal Area[] Occluders(ScreenProbe.Frame? frame)
