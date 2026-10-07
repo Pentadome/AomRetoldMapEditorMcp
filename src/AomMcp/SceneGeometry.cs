@@ -140,12 +140,20 @@ internal static class SceneGeometry
     }
 
     /// <summary>Gate check helper: counts sample points within per-channel tolerance.</summary>
-    internal static int GateMatches(ScreenProbe.Frame frame, JsonElement gate, int tolerance) =>
+    internal static int GateMatches(ScreenProbe.Frame frame, JsonElement gate, int tolerance) => GateMatches(frame, gate, tolerance, 0);
+
+    /// <summary>Gate points matching within tolerance at the exact frame pixel, or (radius &gt; 0, derived layouts) any pixel of the clamped neighborhood.</summary>
+    internal static int GateMatches(ScreenProbe.Frame frame, JsonElement gate, int tolerance, int radius) =>
         gate.EnumerateArray().Count(p =>
         {
-            var c = frame.At(p.GetProperty("x").GetInt32(), p.GetProperty("y").GetInt32());
-            return Math.Abs(c.R - p.GetProperty("r").GetInt32()) <= tolerance && Math.Abs(c.G - p.GetProperty("g").GetInt32()) <= tolerance
-                && Math.Abs(c.B - p.GetProperty("b").GetInt32()) <= tolerance;
+            int x = p.GetProperty("x").GetInt32(), y = p.GetProperty("y").GetInt32();
+            int r = p.GetProperty("r").GetInt32(), g = p.GetProperty("g").GetInt32(), b = p.GetProperty("b").GetInt32();
+            bool Near(ScreenProbe.Rgb c) => Math.Abs(c.R - r) <= tolerance && Math.Abs(c.G - g) <= tolerance && Math.Abs(c.B - b) <= tolerance;
+            if (radius <= 0) return Near(frame.At(x, y));
+            for (var dy = -radius; dy <= radius; dy++)
+                for (var dx = -radius; dx <= radius; dx++)
+                    if (frame.Contains(x + dx, y + dy) && Near(frame.At(x + dx, y + dy))) return true;
+            return false;
         });
 
     /// <summary>Synthetic fixtures for minimap model, formations, diffs, overlaps and flat search.</summary>

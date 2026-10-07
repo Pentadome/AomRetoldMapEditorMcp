@@ -15,6 +15,7 @@ internal static class ScreenProbe
         internal int ClientHeight => clientHeight;
         /// <summary>Frame pixel to full-resolution client pixel.</summary>
         internal int ToClient(int frameCoordinate) => (int)Math.Round(frameCoordinate * (double)clientWidth / width, MidpointRounding.AwayFromZero);
+        internal bool Contains(int x, int y) => x >= 0 && y >= 0 && x < width && y < height;
         internal Rgb At(int x, int y)
         {
             if (x < 0 || y < 0 || x >= width || y >= height) throw new InvalidDataException("Screen probe outside frame.");
@@ -102,8 +103,19 @@ internal static class ScreenProbe
         return ((int)Math.Round(x * scale, MidpointRounding.AwayFromZero), (int)Math.Round(y * scale, MidpointRounding.AwayFromZero));
     }
 
-    /// <summary>Exact-pixel gate for the reviewed alternative-UI Players Settings panel (fails closed for unreviewed client widths).</summary>
-    internal static bool PlayersPanelVisible(Frame frame) => Exact(frame, AltPlayersPanel);
+    /// <summary>Exact-pixel gate for the reviewed alternative-UI Players Settings panel. Derived (unreviewed 16:9) clients: read-only
+    /// tolerant match of either reviewed reference (±20, DerivedGateRadius neighborhood); writers never see derived frames (Capture refuses).</summary>
+    internal static bool PlayersPanelVisible(Frame frame) => Exact(frame, AltPlayersPanel)
+        || (UiLayouts.IsDerivable(frame.ClientWidth, frame.ClientHeight) && AltPlayersPanel.Values.Any(points => points.All(p => Near(frame, p.X, p.Y, p.C, 20, UiLayouts.DerivedGateRadius))));
+
+    static bool Near(Frame frame, int x, int y, Rgb c, int tolerance, int radius)
+    {
+        for (var dy = -radius; dy <= radius; dy++)
+            for (var dx = -radius; dx <= radius; dx++)
+                if (frame.Contains(x + dx, y + dy) && frame.At(x + dx, y + dy) is var o
+                    && Math.Abs(o.R - c.R) <= tolerance && Math.Abs(o.G - c.G) <= tolerance && Math.Abs(o.B - c.B) <= tolerance) return true;
+        return false;
+    }
 
     internal static void RequirePlayersPanel(Frame frame)
     {

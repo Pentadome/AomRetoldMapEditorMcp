@@ -16,13 +16,23 @@ internal static class UiRead
     /// <summary>Alternative-UI preset for the given reviewed client size.</summary>
     internal static int[] Resolve(string field, int width, int height, string hash) => Resolve(field, width, height, hash, UiLayouts.Alt(width, height));
 
+    /// <summary>Reviewed layout file by name, or "derived:&lt;file&gt;" for the in-memory layout derived at this client size.</summary>
+    static JsonElement? LoadRoot(string file, int width, int height)
+    {
+        if (file.StartsWith("derived:", StringComparison.Ordinal))
+        {
+            var layout = UiLayouts.Load(file.StartsWith("derived:normal", StringComparison.Ordinal) ? "normal" : "alternative", width, height);
+            return layout is { Reviewed: false } && layout.File == file ? layout.Root : null;
+        }
+        if (!File.Exists(LayoutPath(file))) return null;
+        using var document = JsonDocument.Parse(File.ReadAllText(LayoutPath(file)));
+        return document.RootElement.Clone();
+    }
+
     internal static int[] Resolve(string field, int width, int height, string hash, string file)
     {
-        if (!File.Exists(LayoutPath(file)))
-            throw new WorkflowFailure("UI_LAYOUT_MISMATCH", "ui-observe", $"No reviewed OCR layout {file} (reviewed clients: {UiLayouts.ReviewedText}).", false, false,
+        var root = LoadRoot(file, width, height) ?? throw new WorkflowFailure("UI_LAYOUT_MISMATCH", "ui-observe", $"No OCR layout {file} for {width}x{height} ({UiLayouts.SupportedText}).", false, false,
                 "Use explicit region for read-only OCR. No input sent.");
-        using var document = JsonDocument.Parse(File.ReadAllText(LayoutPath(file)));
-        var root = document.RootElement;
         var ui = root.GetProperty("ui").GetString();
         if (!LayoutMatches(root, width, height, hash))
             throw new WorkflowFailure("UI_LAYOUT_MISMATCH", "ui-observe", $"OCR field preset only reviewed for {ui} UI at {root.GetProperty("width").GetInt32()}x{root.GetProperty("height").GetInt32()} on pinned build; client is {width}x{height}.", false, false,
@@ -48,15 +58,13 @@ internal static class UiRead
     /// <summary>Frame-only check of one reviewed normal-UI dialog gate (half-resolution pixels of the frame's client size; no build check).</summary>
     internal static bool NormalGate(ScreenProbe.Frame frame, string name, out string detail)
     {
-        var file = UiLayouts.Normal(frame.ClientWidth, frame.ClientHeight);
-        if (!File.Exists(LayoutPath(file))) { detail = $"no reviewed normal layout for {frame.ClientWidth}x{frame.ClientHeight}"; return false; }
-        using var document = JsonDocument.Parse(File.ReadAllText(LayoutPath(file)));
-        var root = document.RootElement;
+        var layout = UiLayouts.Load("normal", frame.ClientWidth, frame.ClientHeight);
+        if (layout is null) { detail = $"no normal layout for {frame.ClientWidth}x{frame.ClientHeight}"; return false; }
+        var root = layout.Root;
         var gate = root.GetProperty("ocrGates").GetProperty(name);
-        var hits = SceneGeometry.GateMatches(frame, gate.GetProperty("gate"), root.GetProperty("ocrGateTolerance").GetInt32());
-        var need = gate.GetProperty("minimumMatches").GetInt32();
-        detail = $"{name} {hits}/{gate.GetProperty("gate").GetArrayLength()} (need {need})";
-        return hits >= need;
+        var ok = UiLayouts.GatePasses(frame, gate, root.GetProperty("ocrGateTolerance").GetInt32(), layout.Radius, out var hits);
+        detail = $"{name} {hits}/{gate.GetProperty("gate").GetArrayLength()} (need {gate.GetProperty("minimumMatches").GetInt32()})";
+        return ok;
     }
 
     static bool LayoutMatches(JsonElement root, int width, int height, string hash) =>
@@ -68,13 +76,12 @@ internal static class UiRead
     internal static (string Kind, string File) DetectFieldUi(ScreenProbe.Frame frame, string field, int width, int height, string hash)
     {
         var notes = new List<string>();
-        var normalFile = UiLayouts.Normal(width, height);
-        if (!UiLayouts.IsReviewed(width, height) || !File.Exists(LayoutPath(normalFile)))
-            throw new WorkflowFailure("UI_LAYOUT_UNREVIEWED", "ui-observe", $"OCR field presets only reviewed for {UiLayouts.ReviewedText} clients; client is {width}x{height}.", false, false,
-                "Use explicit region for read-only OCR, or switch the game to a reviewed resolution. No input sent.");
-        using (var document = JsonDocument.Parse(File.ReadAllText(LayoutPath(normalFile))))
+        var normal = UiLayouts.Load("normal", width, height);
+        if (normal is null)
+            throw new WorkflowFailure("UI_LAYOUT_UNREVIEWED", "ui-observe", $"OCR field presets only available for {UiLayouts.SupportedText} clients; client is {width}x{height}.", false, false,
+                "Use explicit region for read-only OCR, or switch the game to a supported resolution. No input sent.");
         {
-            var root = document.RootElement;
+            var root = normal.Root;
             var group = field.Split('.')[0];
             if (!LayoutMatches(root, width, height, hash)) notes.Add("normal layout: client size/build not reviewed");
             else if (!root.GetProperty("fieldGates").TryGetProperty(group, out var gates)) notes.Add($"normal layout: no '{group}' presets");
@@ -84,15 +91,14 @@ internal static class UiRead
                 var failed = gates.EnumerateArray().Select(g => g.GetString()!).Select(name =>
                 {
                     var gate = root.GetProperty("ocrGates").GetProperty(name);
-                    var hits = SceneGeometry.GateMatches(frame, gate.GetProperty("gate"), tolerance);
-                    var need = gate.GetProperty("minimumMatches").GetInt32();
-                    return hits >= need ? null : $"{name} {hits}/{gate.GetProperty("gate").GetArrayLength()} (need {need})";
+                    var ok = UiLayouts.GatePasses(frame, gate, tolerance, normal.Radius, out var hits);
+                    return ok ? null : $"{name} {hits}/{gate.GetProperty("gate").GetArrayLength()} (need {gate.GetProperty("minimumMatches").GetInt32()})";
                 }).Where(f => f is not null).ToArray();
-                if (failed.Length == 0) return ("normal", normalFile);
+                if (failed.Length == 0) return ("normal", normal.File);
                 notes.Add("normal gates failed: " + string.Join(", ", failed));
             }
         }
-        if (ScreenProbe.PlayersPanelVisible(frame)) return ("alternative", UiLayouts.Alt(width, height));
+        if (ScreenProbe.PlayersPanelVisible(frame) && UiLayouts.Load("alternative", width, height) is { } alt) return ("alternative", alt.File);
         notes.Add("alternative Players Settings gate failed");
         throw new WorkflowFailure("UI_LAYOUT_UNREVIEWED", "ui-observe", $"No reviewed panel for '{field}' detected ({string.Join("; ", notes)}).", false, false,
             "Normal UI: open Scenario > Player Data (agePopup.*: its Age Settings popup; fileBrowser.*: AI Set Load Menu). Alternative UI: open Players Settings. Or use explicit region. No input sent.");
@@ -105,15 +111,18 @@ internal static class UiRead
         if ((field is null) == !explicitRegion) throw new ArgumentException("Provide exactly one of field or region.");
         var (width, height) = Ui.ClientSize(game);
         string? uiKind = null;
+        bool? layoutReviewed = null;
         int[] region;
         if (explicitRegion) region = r.EnumerateArray().Select(e => e.GetInt32()).ToArray();
         else
         {
-            if (!UiLayouts.IsReviewed(width, height))
-                throw new WorkflowFailure("UI_LAYOUT_UNREVIEWED", "ui-observe", $"OCR field presets only reviewed for {UiLayouts.ReviewedText} clients; client is {width}x{height}.", false, false,
-                    "Use explicit region for read-only OCR, or switch the game to a reviewed resolution. No input sent.");
-            var (kind, file) = DetectFieldUi(ScreenProbe.Capture(game), field!, width, height, buildHash);
+            if (!UiLayouts.IsSupported(width, height))
+                throw new WorkflowFailure("UI_LAYOUT_UNREVIEWED", "ui-observe", $"OCR field presets only available for {UiLayouts.SupportedText} clients; client is {width}x{height}.", false, false,
+                    "Use explicit region for read-only OCR, or switch the game to a supported resolution. No input sent.");
+            // Read-only: SceneUi.Capture does not require a reviewed size (ScreenProbe.Capture, used by writers, does).
+            var (kind, file) = DetectFieldUi(SceneUi.Capture(game), field!, width, height, buildHash);
             uiKind = kind;
+            layoutReviewed = !file.StartsWith("derived:", StringComparison.Ordinal);
             region = Resolve(field!, width, height, buildHash, file);
         }
         if (region.Length != 4) throw new ArgumentException("OCR region must be [x,y,w,h].");
@@ -128,7 +137,7 @@ internal static class UiRead
         var result = Engine.Value.Run(crop.Bgra, crop.Width, crop.Height, format: ImagePixelFormat.Bgra32);
         return new
         {
-            field, uiKind, region, scale, text = result.Text,
+            field, uiKind, layoutReviewed, region, scale, text = result.Text,
             lines = result.Lines.Select(line => new
             {
                 line.Text, score = line.RecognitionScore,
@@ -141,7 +150,7 @@ internal static class UiRead
                     new[] { region[0] + line.Box.X4 / scale, region[1] + line.Box.Y4 / scale },
                 },
             }).ToArray(),
-            limitation = "OCR guesses text, not widget state or checkpoint proof. Named presets pinned to reviewed normal/alternative English panels at 2560×1440 or 1920×1080, detected by pixel gates. Do not retry a mutation based solely on OCR.",
+            limitation = "OCR guesses text, not widget state or checkpoint proof. Named presets pinned to reviewed normal/alternative English panels at 2560×1440 or 1920×1080 (other 16:9 sizes 1280..2560 wide: derived by scaling, layoutReviewed=false), detected by pixel gates. Do not retry a mutation based solely on OCR.",
         };
     }
 
@@ -153,8 +162,8 @@ internal static class UiRead
             || rect[2] > 850 || rect[3] > 500 || (long)rect[2] * rect[3] > 300_000)
             throw new ArgumentException("UI readback region outside guarded bound.");
         var capture = Ui.CapturePixels(game, 2560);
-        if (!UiLayouts.IsReviewed(capture.Width, capture.Height))
-            throw new WorkflowFailure("UI_LAYOUT_MISMATCH", "ui-observe", $"Unreviewed UI client size {capture.Width}x{capture.Height} (reviewed: {UiLayouts.ReviewedText}).", false, false, "Stop without input.");
+        if (!UiLayouts.IsSupported(capture.Width, capture.Height))
+            throw new WorkflowFailure("UI_LAYOUT_MISMATCH", "ui-observe", $"Unsupported UI client size {capture.Width}x{capture.Height} ({UiLayouts.SupportedText}).", false, false, "Stop without input.");
         var crop = Ui.CropZoom(capture.Bgra, capture.Width, capture.Height, rect, scale);
         return Engine.Value.Run(crop.Bgra, crop.Width, crop.Height, format: ImagePixelFormat.Bgra32)
             .Lines.Select(l => new ObservedLine(l.Text,
@@ -182,6 +191,13 @@ internal static class UiRead
         var smallAlt = Resolve("players.6.pop", 1920, 1080, hash);
         if (small[0] != 322 || small[1] != 574 || small[3] != 32 || smallAlt[0] != 1577 || smallAlt[1] != 585)
             throw new InvalidDataException("1920×1080 OCR preset geometry changed.");
+        // Derived 1600×900 (scale 0.625): reference name box x 429 → 268; alternative row-6 pop x 2102 → 1314.
+        var derived = Resolve("players.12.name", 1600, 900, hash, "derived:" + UiLayouts.Normal(1600, 900));
+        var derivedAlt = Resolve("players.6.pop", 1600, 900, hash, "derived:" + UiLayouts.Alt(1600, 900));
+        if (derived[0] != 268 || derivedAlt[0] != 1314)
+            throw new InvalidDataException("Derived 1600×900 OCR preset geometry changed.");
+        try { _ = Resolve("players.1.name", 1600, 900, hash, UiLayouts.Normal(1600, 900)); throw new InvalidDataException("Missing reviewed 1600x900 file accepted."); }
+        catch (WorkflowFailure e) when (e.Code == "UI_LAYOUT_MISMATCH") { }
         try { _ = Resolve("players.1.name", 2560, 1440, hash, UiLayouts.Normal(1920, 1080)); throw new InvalidDataException("1080p layout accepted 1440p client."); }
         catch (WorkflowFailure e) when (e.Code == "UI_LAYOUT_MISMATCH") { }
         var blank = new ScreenProbe.Frame(new byte[1280 * 720 * 3], 1280, 720);

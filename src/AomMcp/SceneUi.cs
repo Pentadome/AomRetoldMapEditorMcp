@@ -19,20 +19,23 @@ internal sealed class SceneUi
     internal double MinimapHalf { get; private set; }
     internal int Tolerance { get; private set; }
     internal int SafeMargin { get; private set; }
+    /// <summary>False for a layout derived from the 2560×1440 reference at an unreviewed 16:9 client size.</summary>
+    internal bool Reviewed { get; private set; } = true;
+    int Radius { get; set; }
+    internal string Describe => Reviewed ? $"reviewed {Kind} UI ({File})" : $"derived {Kind} UI ({File}; scaled from reviewed 2560x1440, not live-reviewed at this size; conditional panels treated as present, palette selection disabled)";
 
     // Reviewed layout files per client size; normal first: its menu-bar detect gate discriminates (minimap frames are identical in both UIs).
-    static string[] LayoutFiles(int width, int height) => [UiLayouts.Normal(width, height), UiLayouts.Alt(width, height)];
+    static readonly string[] Kinds = ["normal", "alternative"];
 
-    static string LayoutPath(string file) => UiLayouts.Path(file);
-
-    /// <summary>Loads one reviewed layout without pixel detection; null with reason when build/size mismatch.</summary>
-    static SceneUi? Load(Game game, string file, out string reason)
+    /// <summary>Loads one reviewed or derived layout without pixel detection; null with reason when build/size mismatch.</summary>
+    static SceneUi? Load(Game game, string kind, out string reason)
     {
         reason = "";
-        if (!System.IO.File.Exists(LayoutPath(file))) { reason = $"uilayouts/{file} missing."; return null; }
-        using var document = JsonDocument.Parse(System.IO.File.ReadAllText(LayoutPath(file)));
-        var root = document.RootElement;
         var (width, height) = Ui.ClientSize(game);
+        var layout = UiLayouts.Load(kind, width, height);
+        if (layout is null) { reason = $"uilayouts/{UiLayouts.File(kind, width, height)} missing."; return null; }
+        var root = layout.Root;
+        var file = layout.File;
         if (!root.TryGetProperty("editorScene", out var scene))
         { reason = $"{file} lacks reviewed editorScene section."; return null; }
         if (width != root.GetProperty("width").GetInt32() || height != root.GetProperty("height").GetInt32()
@@ -42,8 +45,8 @@ internal sealed class SceneUi
         var center = minimap.GetProperty("center");
         return new SceneUi
         {
-            _root = scene.Clone(), File = file,
-            Kind = scene.TryGetProperty("uiKind", out var kind) ? kind.GetString()! : "alternative",
+            _root = scene.Clone(), File = file, Reviewed = layout.Reviewed, Radius = layout.Radius,
+            Kind = scene.TryGetProperty("uiKind", out var uiKind) ? uiKind.GetString()! : "alternative",
             MinimapX = center[0].GetDouble(), MinimapY = center[1].GetDouble(),
             MinimapHalf = minimap.GetProperty("halfDiagonal").GetDouble(),
             Tolerance = scene.GetProperty("gateTolerance").GetInt32(),
@@ -60,14 +63,14 @@ internal sealed class SceneUi
         var reasons = new List<string>();
         var candidates = new List<SceneUi>();
         var (width, height) = Ui.ClientSize(game);
-        if (!UiLayouts.IsReviewed(width, height))
+        if (!UiLayouts.IsSupported(width, height))
         {
-            reason = $"Editor scene UI geometry only reviewed for {UiLayouts.ReviewedText} clients on pinned build; client is {width}x{height}.";
+            reason = $"Editor scene UI geometry only available for {UiLayouts.SupportedText} clients on pinned build; client is {width}x{height}.";
             return null;
         }
-        foreach (var file in LayoutFiles(width, height))
+        foreach (var kind in Kinds)
         {
-            var ui = Load(game, file, out var why);
+            var ui = Load(game, kind, out var why);
             if (ui is null) reasons.Add(why); else candidates.Add(ui);
         }
         if (candidates.Count == 0) { reason = string.Join(" ", reasons.Distinct()); return null; }
@@ -85,8 +88,7 @@ internal sealed class SceneUi
         return ScreenProbe.DecodePng(Ui.Screenshot(game, 1280), width, height);
     }
 
-    bool Gate(ScreenProbe.Frame frame, JsonElement gated) =>
-        SceneGeometry.GateMatches(frame, gated.GetProperty("gate"), Tolerance) >= gated.GetProperty("minimumMatches").GetInt32();
+    bool Gate(ScreenProbe.Frame frame, JsonElement gated) => UiLayouts.GatePasses(frame, gated, Tolerance, Radius, out _);
 
     /// <summary>UI-kind identification: optional detect gate (normal-UI menu bar) plus the minimap frame gate.</summary>
     internal bool Detected(ScreenProbe.Frame frame) =>
@@ -95,7 +97,7 @@ internal sealed class SceneUi
     internal bool MinimapVisible(ScreenProbe.Frame frame) => Gate(frame, _root.GetProperty("minimap"));
 
     /// <summary>Reviewed bottom list-panel palette geometry (normal UI only); null when not reviewed.</summary>
-    internal JsonElement? Palette => _root.TryGetProperty("palette", out var p) ? p : null;
+    internal JsonElement? Palette => Reviewed && _root.TryGetProperty("palette", out var p) ? p : null;
 
     /// <summary>Static panels plus pixel-gated conditional panels; unknown frame treats conditionals as active.</summary>
     internal Area[] Occluders(ScreenProbe.Frame? frame)
@@ -109,11 +111,16 @@ internal sealed class SceneUi
         foreach (var p in _root.GetProperty("conditionalOccluders").EnumerateObject())
         {
             var r = R(p.Value.GetProperty("rect"));
-            bool? active = frame is null ? null : Gate(frame, p.Value);
+            // Derived layouts never trust a failed conditional gate: the panel is treated as present (fail closed for clicks).
+            bool? active = !Reviewed ? true : frame is null ? null : Gate(frame, p.Value);
             list.Add(new Area(p.Name, r[0], r[1], r[2], r[3], true, active));
         }
         return list.ToArray();
     }
+
+    /// <summary>Raw conditional-panel gate observations (independent of the derived-layout fail-closed occluder policy).</summary>
+    internal Dictionary<string, bool> ConditionalGates(ScreenProbe.Frame frame) =>
+        _root.GetProperty("conditionalOccluders").EnumerateObject().ToDictionary(p => p.Name, p => Gate(frame, p.Value));
 
     internal bool Clear(Area[] occluders, double x, double y, int width, int height) =>
         x >= SafeMargin && y >= SafeMargin && x < width - SafeMargin && y < height - SafeMargin

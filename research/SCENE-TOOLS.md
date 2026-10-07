@@ -41,4 +41,4 @@ Eleven core helpers added after a hands-on editor session showed agents had to h
 
 ## Limits
 
-Camera targeting depends on reviewed minimap geometry; camera bounds keep edge targets offset. Footprints are axis-aligned shipped radii (rotation, terrain type, water, build rules ignored). Terrain heights are quantized nodes, not collision. Snapshots live only in host memory. Deletion moves the camera; undo recreates objects with new IDs. Nothing saves the scenario.
+Camera targeting depends on reviewed minimap geometry (or the derived layout for other 16:9 clients 1280..2560 wide, `layoutReviewed:false`, live-verified at 1600×900 and 1280×720 in both UIs); camera bounds keep edge targets offset. Footprints are axis-aligned shipped radii (rotation, terrain type, water, build rules ignored). Terrain heights are quantized nodes, not collision. Snapshots live only in host memory. Deletion moves the camera; undo recreates objects with new IDs. Nothing saves the scenario.

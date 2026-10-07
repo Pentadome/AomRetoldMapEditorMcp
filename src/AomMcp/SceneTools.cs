@@ -152,7 +152,7 @@ internal sealed partial class Server
                 note = "Camera already centered within tolerance; no input sent." };
         RequireNoCursor(game);
         var ui = SceneUi.TryLoad(game, out var reason) ?? throw new WorkflowFailure("UI_LAYOUT_UNREVIEWED", "ui-preflight",
-            "Minimap camera targeting needs reviewed UI geometry (normal or alternative, 2560x1440 or 1920x1080): " + reason, false, false,
+            $"Minimap camera targeting needs known UI geometry (normal or alternative; {UiLayouts.SupportedText}): " + reason, false, false,
             "Center camera with editor_uiLookAtUnit on a nearby unit, or pan manually; no input sent.");
         if (!ui.MinimapVisible(SceneUi.Capture(game)))
             throw new WorkflowFailure("MINIMAP_NOT_VISIBLE", "ui-preflight", "Minimap chrome pixel gate failed (hidden, covered by dialog, or different UI).",
@@ -186,7 +186,8 @@ internal sealed partial class Server
             residual, withinTolerance = residual <= tolerance, clicks, cameraOnly = true,
             note = residual <= tolerance ? "Camera center (forward ray on quantized terrain) verified by live camera read."
                 : "Residual above tolerance: camera bounds near map edges/minimap pixel resolution limit. Projection of target still usable if visible.",
-            limitation = "Left clicks on the reviewed minimap (normal or alternative UI); no scene mutation intended. Camera center measured from live pose, not occlusion proof.",
+            limitation = ui.Reviewed ? "Left clicks on the reviewed minimap (normal or alternative UI); no scene mutation intended. Camera center measured from live pose, not occlusion proof."
+                : "Left clicks on a derived (scaled, not live-reviewed at this size) minimap; no scene mutation intended. Camera center measured from live pose, not occlusion proof.",
         };
     }
 
@@ -239,7 +240,8 @@ internal sealed partial class Server
             groundCorners = ground.Select(g => new { g.Name, hit = g.Hit is { } h ? P(h) : null, insideMap = g.Hit is { } i && view.InsideMap(i.X, i.Z) }).ToArray(),
             visibleGroundBounds = bounds,
             uiKind = ui?.Kind ?? "unknown",
-            uiGeometry = ui is null ? "unreviewed: " + reason : probeUi ? $"reviewed {ui.Kind} UI ({ui.File}), pixel-gated" : $"reviewed {ui.Kind} UI ({ui.File}), conditional panels assumed active (probeUi=false)",
+            uiGeometry = ui is null ? "unreviewed: " + reason : probeUi ? ui.Describe + ", pixel-gated" : ui.Describe + ", conditional panels assumed active (probeUi=false)",
+            layoutReviewed = ui?.Reviewed,
             occluders = occluders?.Select(o => new { o.Name, rect = new[] { o.X, o.Y, o.W, o.H }, o.Conditional, active = o.Active }).ToArray(),
             safeClickRule = ui is null ? "Unreviewed UI: only central 40%x50% client region trusted for map clicks."
                 : $"Map clicks must be ≥{ui.SafeMargin}px from client edges and active/unknown occluders.",
@@ -266,7 +268,7 @@ internal sealed partial class Server
             panels = new
             {
                 minimapVisible = ui.MinimapVisible(frame),
-                conditional = ui.Occluders(frame).Where(o => o.Conditional).ToDictionary(o => o.Name, o => o.Active),
+                conditional = ui.ConditionalGates(frame),
             };
         }
         return new
@@ -278,7 +280,7 @@ internal sealed partial class Server
             cameraTarget = target is { } t ? P(t) : null,
             editMode = editMode is { } m ? LiveWorld.ModeName(m) ?? $"unknown({m})" : null,
             uiKind = ui?.Kind ?? "unknown", profileAlternativeUiHint = SceneUi.ProfileAlternativeHint(),
-            panels, uiGeometry = ui is null ? "unreviewed: " + reason : $"reviewed {ui.Kind} UI ({ui.File})",
+            panels, uiGeometry = ui is null ? "unreviewed: " + reason : ui.Describe, layoutReviewed = ui?.Reviewed,
             limitation = "Placement cursor/selection read from memory; panel flags from pixel gates on a fresh screenshot (focuses game). Gate failure means not detected, not proof of absence. Dialogs/menus outside reviewed gates are not enumerated.",
         };
     }
@@ -704,7 +706,7 @@ internal sealed partial class Server
         var coord = new { type = "number", minimum = -LiveUnits.MaxCoordinate, maximum = LiveUnits.MaxCoordinate };
         var player = new { type = "integer", minimum = 0, maximum = LiveUnits.MaxPlayer };
         yield return Spec("editor_camera_look_at",
-            "Center editor camera on world X/Z by clicking the reviewed minimap (normal or alternative UI, auto-detected; 2560×1440 or 1920×1080, pinned build) in a closed loop: each click is verified from the live camera pose and corrected (maxClicks 1..6, default 4; tolerance world units default 3). Refuses if placement cursor active, minimap pixel gate fails, or first click has no effect. Camera only; no scene mutation. Edge targets may stay offset because of camera bounds.",
+            "Center editor camera on world X/Z by clicking the minimap (normal or alternative UI, auto-detected; reviewed 2560×1440/1920×1080 or derived for other 16:9 clients 1280..2560 wide, pinned build) in a closed loop: each click is verified from the live camera pose and corrected (maxClicks 1..6, default 4; tolerance world units default 3). Refuses if placement cursor active, minimap pixel gate fails, or first click has no effect. Camera only; no scene mutation. Edge targets may stay offset because of camera bounds.",
             new Dictionary<string, object> { ["x"] = coord, ["z"] = coord,
                 ["tolerance"] = new { type = "number", minimum = 0.5, maximum = 50 }, ["maxClicks"] = new { type = "integer", minimum = 1, maximum = 6 } },
             ["x", "z"]);

@@ -171,7 +171,7 @@ internal sealed partial class Server
             action,
             editMode = LiveWorld.ModeName(mode) ?? $"unknown({mode})", editModeValue = mode,
             placementCursorActive = unchecked((int)game.UInt(game.Editor() + (int)_layout.ProtoOffset)) != -1,
-            uiKind = ui?.Kind ?? "unknown", uiDetection = ui is null ? reason : $"pixel gates matched {ui.File}",
+            uiKind = ui?.Kind ?? "unknown", uiDetection = ui is null ? reason : $"pixel gates matched {ui.File}", layoutReviewed = ui?.Reviewed,
             profileAlternativeUiHint = SceneUi.ProfileAlternativeHint(),
             panels = ui?.Occluders(frame).Where(o => o.Conditional).ToDictionary(o => o.Name, o => o.Active),
             paintSelections = new
@@ -433,7 +433,7 @@ internal sealed partial class Server
         var frame = SceneUi.Capture(game);
         var ui = SceneUi.TryLoad(game, frame, out var reason);
         if (ui?.Palette is not { } palette)
-            throw new WorkflowFailure("PALETTE_UNREVIEWED", "select", "No reviewed palette list geometry" + (ui is null ? ": " + reason : $" for {ui.Kind} UI ({ui.File})."),
+            throw new WorkflowFailure("PALETTE_UNREVIEWED", "select", "No reviewed palette list geometry" + (ui is null ? ": " + reason : $" for {ui.Describe}."),
                 true, false, kind(mix) + " not on visible map to sample. Select it manually in the palette, then retry (already-selected types are accepted).");
         static string kind(bool m) => m ? "Mix" : "Texture";
         static int[] R(JsonElement e) => e.EnumerateArray().Select(v => v.GetInt32()).ToArray();
