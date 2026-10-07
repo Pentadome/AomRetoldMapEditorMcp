@@ -80,6 +80,16 @@ Notation: `ctx = [base + contextRva]`, `world = [ctx + 8]` (same as map `worldOf
 * Dab footprint (live): a click at world (114,100) set nodes x 110..118 × z 96..104 minus corners — i.e. the
   brush centers on the **lower-left node of the tile under the pointer** (pointer exactly on a node can
   round to the neighbouring tile). Strokes therefore aim at tile middles (+half tile).
+* Stale pointer (live, 2026-10-07): after a press/stroke elsewhere, a click that moved via `SetCursorPos` and
+  waited 80 ms sampled/painted at the PREVIOUS press position (left click after a sample right click flattened
+  the bump instead of the test node; bump clicks after a smooth stroke raised a 33-unit spike at the stroke end).
+  250 ms was flaky; one 500 ms wait or two moves with 250 ms settles landed correctly. Host now uses
+  `Ui.Settle`/`SettledClick` for elevation presses and drag starts, and aborts bump loops whose anchor does not change.
+* Occlusion: a node behind freshly raised terrain (far corner from the camera) cannot be dabbed directly; the
+  quantized `GroundHit` back-check accepted such pixels. Touch-ups test the camera ray against node heights and
+  aim up to three nodes farther along the camera's horizontal forward (brush disc still covers the node).
+* Steep bump slopes (≈1.8 height per world unit) make `set` sampling pixel-limited (~0.1-0.2 height per pixel);
+  `SAMPLE_NOT_CONVERGED` then reports the tried t/measured pairs. Larger tolerance or flatten-from-reference works.
 
 ## Unit heading
 

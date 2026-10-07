@@ -31,6 +31,33 @@ internal static class Ui
         };
     }
 
+    /// <summary>Hovers near then onto a point so editor brush tools re-target before a press.</summary>
+    /// <param name="game">Validated editor connection.</param>
+    /// <param name="x">Horizontal client-pixel coordinate.</param>
+    /// <param name="y">Vertical client-pixel coordinate.</param>
+    /// <remarks>Live elevation-sample test (research/LIVE-WORLD.md style, 2026-10-07): after a press elsewhere, a click
+    /// that moved and waited 80 ms painted at the PREVIOUS press position; 250 ms was flaky, two moves with 250 ms
+    /// settles (or one 500 ms) landed correctly. Empirical host timing, not an engine constant.</remarks>
+    internal static void Settle(Game game, int x, int y)
+    {
+        var (w, h) = ClientSize(game);
+        game.Move(Math.Clamp(x + 3, 0, w - 1), Math.Clamp(y + 3, 0, h - 1));
+        Thread.Sleep(250);
+        game.Move(x, y);
+        Thread.Sleep(250);
+    }
+
+    /// <summary>Settle (see <see cref="Settle"/>) then click; for brush tools that track the pointer lazily.</summary>
+    /// <param name="game">Validated editor connection.</param>
+    /// <param name="x">Horizontal client-pixel coordinate.</param>
+    /// <param name="y">Vertical client-pixel coordinate.</param>
+    /// <param name="button">Mouse button: left, right, or middle.</param>
+    internal static void SettledClick(Game game, int x, int y, string button)
+    {
+        Settle(game, x, y);
+        Click(game, x, y, button);
+    }
+
     /// <summary>Clicks a client-pixel position with a frame-visible hold and finally releases the button.</summary>
     /// <param name="game">Validated editor connection.</param>
     /// <param name="x">Horizontal client-pixel coordinate.</param>
@@ -93,10 +120,9 @@ internal static class Ui
             var last = path.Count > 0 ? path[^1] : points[0];
             while (path.Count < 20) path.Add(last); // Stationary dwell keeps the press visible for frame-polled tools.
         }
-        game.Move(points[0].X, points[0].Y);
-        // Same 80 ms settle as Click: without it the press could land at the stale previous pointer
-        // position (observed: first drag segment started away from x1,y1). Empirical, not an engine value.
-        Thread.Sleep(80);
+        // Without a settle the press could land at the stale previous pointer position (observed: first drag
+        // segment started away from x1,y1; 80 ms was not always enough for brush tools). Empirical, not engine.
+        Settle(game, points[0].X, points[0].Y);
         Send(Mouse(2)); // winuser.h MOUSEEVENTF_LEFTDOWN.
         try
         {
@@ -171,7 +197,7 @@ internal static class Ui
         Thread.Sleep(30);
     }
 
-    static ushort VirtualKey(string name)
+    internal static ushort VirtualKey(string name)
     {
         // Windows SDK virtual-key codes: letters/digits equal ASCII 'A'..'Z'/'0'..'9';
         // F1=0x70 through F12=0x7b, hence 0x6f+f. Named-key values below are VK_* from winuser.h.
@@ -182,21 +208,21 @@ internal static class Ui
             return (ushort)(0x6f + f);
         return name switch
         {
-            "ESC" => 0x1b,
-            "ENTER" => 0x0d,
+            "ESC" or "ESCAPE" => 0x1b,
+            "ENTER" or "RETURN" => 0x0d,
             "TAB" => 9,
-            "SPACE" => 0x20,
+            "SPACE" or "SPACEBAR" => 0x20,
             "LEFT" => 0x25,
             "UP" => 0x26,
             "RIGHT" => 0x27,
             "DOWN" => 0x28,
-            "DELETE" => 0x2e,
+            "DELETE" or "DEL" => 0x2e,
             "BACKSPACE" => 8,
             "HOME" => 0x24,
             "END" => 0x23,
-            "PGUP" => 0x21,
-            "PGDN" => 0x22,
-            _ => throw new ArgumentException("Unsupported key."),
+            "PGUP" or "PAGEUP" => 0x21,
+            "PGDN" or "PAGEDOWN" => 0x22,
+            _ => throw new ArgumentException("Unsupported key '" + name + "'. Use A-Z, 0-9, F1-F12, ESC, ENTER, TAB, SPACE, LEFT/UP/RIGHT/DOWN, DELETE, BACKSPACE, HOME, END, PGUP, PGDN."),
         };
     }
 
@@ -257,7 +283,7 @@ internal static class Ui
         var (x, y, w, h) = (region[0], region[1], region[2], region[3]);
         if (x < 0 || y < 0 || w < 1 || h < 1 || (long)x + w > width || (long)y + h > height
             || (long)w * scale > 1600 || (long)h * scale > 1600 || pixels.Length != checked(width * height * 4))
-            throw new ArgumentException("Screenshot crop outside client/output bounds.");
+            throw new ArgumentException($"Screenshot crop outside client/output bounds: region must lie inside the {width}x{height} client and width/height x scale must be <=1600 output pixels.");
         var dest = new byte[checked(w * scale * h * scale * 4)];
         for (var row = 0; row < h * scale; row++)
             for (var col = 0; col < w * scale; col++)
@@ -425,6 +451,7 @@ internal static class Ui
             !png.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 })
             || VirtualKey("F12") != 0x7b
             || VirtualKey("ESC") != 0x1b
+            || VirtualKey("Escape") != 0x1b
             || Key(0x0d, false).Key.Scan != 0x1c
             || Key(0x23, false).Key.Flags != 9
             || Key(0x23, true).Key.Flags != 11

@@ -309,6 +309,20 @@ internal static class PlayerSettings
         return errors.Take(100).ToArray();
     }
 
+    /// <summary>Side-effect-free apply argument checks so missing confirmations/paths refuse as preflight errors before any connection.</summary>
+    internal static void PreflightApply(JsonElement args)
+    {
+        if (!args.TryGetProperty("confirmDestructive", out var conf) || conf.ValueKind != JsonValueKind.True
+            || !args.TryGetProperty("confirmIsolatedScene", out var isolated) || isolated.ValueKind != JsonValueKind.True)
+            throw new ArgumentException("apply requires confirmDestructive=true and confirmIsolatedScene=true.");
+        var missing = PlayerWorkflow.ApplyPathFields
+            .Where(f => !args.TryGetProperty(f, out var v) || v.ValueKind != JsonValueKind.String).ToArray();
+        if (missing.Length > 0)
+            throw new ArgumentException("apply requires new backup paths, existing verificationDirectory and profile directories; missing: " + string.Join(", ", missing) + ".");
+        _ = EditorFiles.ApprovedNewPath(args.GetProperty("backupScenarioPath").GetString()!, ".mythscn");
+        _ = EditorFiles.ApprovedNewPath(args.GetProperty("backupTriggerPath").GetString()!, ".trg");
+    }
+
     internal static object Execute(Game? game, JsonElement args, string exe, string hash, Action<string, JsonElement> native)
     {
         var source = ScenarioReader.Read(args.GetProperty("scenarioPath").GetString()!);

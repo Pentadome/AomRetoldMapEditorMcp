@@ -330,25 +330,31 @@ internal sealed partial class Server(
         };
     }
 
-    static void ValidateSchema(JsonElement args, JsonElement schema)
+    static void ValidateSchema(JsonElement args, JsonElement schema, string path = "")
     {
         // JSON Schema keywords (properties, required, type, enum, const, min/maxItems) are standard;
         // argument names in Extras are this host's API, not undocumented engine property names.
         var properties = schema.GetProperty("properties");
-        Catalog.ValidateObject(args, properties.EnumerateObject().Select(p => p.Name));
+        if (path.Length == 0)
+            Catalog.ValidateObject(args, properties.EnumerateObject().Select(p => p.Name));
+        else
+            foreach (var p in args.EnumerateObject())
+                if (!properties.TryGetProperty(p.Name, out _))
+                    throw new ArgumentException($"Unknown argument {path}.{p.Name}. Allowed: {string.Join(", ", properties.EnumerateObject().Select(q => q.Name))}.");
         foreach (var required in schema.GetProperty("required").EnumerateArray())
             if (!args.TryGetProperty(required.GetString()!, out _))
-                throw new ArgumentException($"Missing required argument '{required.GetString()}'." + (required.GetString() switch
+                throw new ArgumentException($"Missing required argument '{(path.Length == 0 ? "" : path + ".")}{required.GetString()}'." + (required.GetString() switch
                 {
                     "token" => " Obtain one from editor_units_snapshot (host memory, last 16 kept).",
                     "confirmDestructive" or "confirmPlacement" or "confirmWrite" => " Set it to true to authorize this mutation.",
                     _ => "",
                 }));
         foreach (var p in args.EnumerateObject())
-            ValidateValue(p.Value, properties.GetProperty(p.Name));
+            ValidateValue(p.Value, properties.GetProperty(p.Name), path.Length == 0 ? p.Name : path + "." + p.Name);
     }
 
-    static void ValidateValue(JsonElement value, JsonElement schema)
+    /// <summary>Validates one value against the host's JSON Schema subset; messages name the argument path and constraint.</summary>
+    static void ValidateValue(JsonElement value, JsonElement schema, string path)
     {
         var valid = schema.GetProperty("type").GetString() switch
         {
@@ -364,14 +370,18 @@ internal sealed partial class Server(
         if (!valid || (schema.TryGetProperty("const", out var c) && !JsonElement.DeepEquals(value, c))
             || (schema.TryGetProperty("enum", out var choices)
                 && !choices.EnumerateArray().Any(c => JsonElement.DeepEquals(value, c))))
-            throw new ArgumentException("Invalid batch argument value.");
+            throw new ArgumentException($"Invalid value for '{path}': expected " + (schema.TryGetProperty("enum", out var allowed)
+                ? "one of " + string.Join(", ", allowed.EnumerateArray().Select(a => a.ToString()))
+                : schema.TryGetProperty("const", out var exact) ? exact.ToString() : schema.GetProperty("type").GetString()) + ".");
         if (value.ValueKind == JsonValueKind.Number
             && ((schema.TryGetProperty("minimum", out var lower) && value.GetDouble() < lower.GetDouble())
                 || (schema.TryGetProperty("maximum", out var upper) && value.GetDouble() > upper.GetDouble())))
-            throw new ArgumentException("Argument outside schema bounds.");
+            throw new ArgumentException($"Argument '{path}' outside schema bounds"
+                + (schema.TryGetProperty("minimum", out var lo) ? $" (minimum {lo})" : "")
+                + (schema.TryGetProperty("maximum", out var hi) ? $" (maximum {hi})" : "") + ".");
         if (value.ValueKind == JsonValueKind.Object)
         {
-            ValidateSchema(value, schema);
+            ValidateSchema(value, schema, path);
             return;
         }
         if (value.ValueKind != JsonValueKind.Array)
@@ -379,9 +389,12 @@ internal sealed partial class Server(
         var length = value.GetArrayLength();
         if ((schema.TryGetProperty("minItems", out var min) && length < min.GetInt32())
             || (schema.TryGetProperty("maxItems", out var max) && length > max.GetInt32()))
-            throw new ArgumentException("Invalid batch array length.");
+            throw new ArgumentException($"Argument '{path}' has {length} items; expected "
+                + (schema.TryGetProperty("minItems", out var mn) ? mn.ToString() : "0") + ".."
+                + (schema.TryGetProperty("maxItems", out var mx) ? mx.ToString() : "any") + ".");
+        var index = 0;
         foreach (var item in value.EnumerateArray())
-            ValidateValue(item, schema.GetProperty("items"));
+            ValidateValue(item, schema.GetProperty("items"), $"{path}[{index++}]");
     }
 
     static bool ConnectionFree(string name, JsonElement args) => WorkflowNames.Contains(name) || name is "editor_toolset" or "editor_search_tools" or "editor_catalog" or "editor_capabilities" or "editor_export_recovery" or "editor_trigger_list" or "editor_trigger_player_parity" or "editor_trigger_edit" or "editor_players" or "editor_player_dependency_audit" or "editor_stage_ai" or "editor_pantheon" or "editor_dependencies"
@@ -404,6 +417,8 @@ internal sealed partial class Server(
             if (query.Length > ToolSearchMaxQueryLength || string.IsNullOrWhiteSpace(query))
                 throw new ArgumentException("query must be nonblank and at most 256 characters.");
         }
+        if (name == "editor_key")
+            _ = Ui.VirtualKey(String(args, "key")); // Unknown key names refuse before focus/input.
         if (name == "editor_map_info" && args.TryGetProperty("planeY", out _) && !args.TryGetProperty("screen", out _))
             throw new ArgumentException("planeY requires screen coordinates.");
         if (name.StartsWith("editor_", StringComparison.Ordinal)
@@ -418,6 +433,8 @@ internal sealed partial class Server(
         PreflightWorld(name, args);
         if (name == "editor_set_diplomacy" && args.GetProperty("operation").GetString() == "apply")
             PlayerWorkflow.PreflightApply(args, exe);
+        if (name == "editor_player_settings" && args.GetProperty("operation").GetString() == "apply")
+            PlayerSettings.PreflightApply(args);
         if (name == "editor_place_formation")
         {
             _ = Formations.Plan(args);
@@ -425,7 +442,7 @@ internal sealed partial class Server(
                 throw new InvalidDataException("Formation observation requires reviewed live-unit layout; no placement requested.");
         }
         if (name == "editor_validate_scenario" && args.TryGetProperty("triggerPath", out var path))
-            TriggerCodec.Parse(TriggerCodec.ReadFile(path.GetString()!));
+            _ = ScenarioChecks.LoadController(path.GetString()!, out _);
     }
 
     object Invoke(string name, JsonElement args, Game? batchGame = null)

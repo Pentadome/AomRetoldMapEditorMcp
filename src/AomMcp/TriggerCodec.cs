@@ -29,6 +29,27 @@ internal static class TriggerCodec
 
     internal static Controller Parse(byte[] bytes)
     {
+        try { return ParseController(bytes); }
+        catch (InvalidDataException e) when (ShapeHint(bytes) is { } hint) { throw new InvalidDataException(e.Message + " " + hint, e); }
+    }
+
+    /// <summary>Number of triggers when bytes are a general TR export (campaign codec), else null.</summary>
+    internal static int? GeneralTriggerCount(byte[] bytes)
+    {
+        try { return CampaignTriggers.Parse(bytes).Triggers.Length; }
+        catch (Exception e) when (e is InvalidDataException or ArgumentException or OverflowException) { return null; }
+    }
+
+    static string? ShapeHint(byte[] bytes) => GeneralTriggerCount(bytes) switch
+    {
+        0 => "File is a valid TR export with 0 triggers (empty trigger set); this tool only handles the single Always/CodeSnippet controller shape. Use editor_trigger_list for general exports.",
+        1 => null, // Same shape family; original message is specific enough.
+        { } n => $"File is a TR export with {n} triggers, not the single verified controller shape. Use editor_trigger_list / editor_trigger_edit.",
+        null => null,
+    };
+
+    static Controller ParseController(byte[] bytes)
+    {
         var template = Template();
         if (bytes.Length is < NameStart or > MaxBytes || bytes[0] != 'T' || bytes[1] != 'R'
             || BitConverter.ToInt32(bytes,SizeOffset) != bytes.Length - HeaderSize

@@ -45,6 +45,14 @@ internal static partial class ScenarioChecks
         return findings.ToArray();
     }
 
+    /// <summary>Reads the verified single-controller shape; a valid TR export with zero triggers yields null instead of refusing.</summary>
+    internal static TriggerCodec.Controller? LoadController(string path, out bool empty)
+    {
+        var bytes = TriggerCodec.ReadFile(path);
+        empty = TriggerCodec.GeneralTriggerCount(bytes) == 0;
+        return empty ? null : TriggerCodec.Parse(bytes);
+    }
+
     /// <summary>Flags missing caller-declared references, suspicious object/configuration states and controller heuristics without fixes.</summary>
     /// <param name="game">Read-only guarded editor connection.</param>
     /// <param name="args">Optional exported triggerPath, required live IDs/players and bounded findings pagination.</param>
@@ -52,7 +60,8 @@ internal static partial class ScenarioChecks
     public static object Query(Game game, JsonElement args)
     {
         var units = LiveUnits.Read(game);
-        var controller = args.TryGetProperty("triggerPath", out var path) ? TriggerCodec.Parse(TriggerCodec.ReadFile(path.GetString()!)) : null;
+        var controller = args.TryGetProperty("triggerPath", out var path) ? LoadController(path.GetString()!, out _) : null;
+        var triggersEmpty = path.ValueKind == JsonValueKind.String && controller is null;
         var required = args.TryGetProperty("requiredUnitIds", out var ids) ? ids.EnumerateArray().Select(v => v.GetInt32()).ToArray() : [];
         var players = args.TryGetProperty("requireTownCenterPlayers", out var p) ? p.EnumerateArray().Select(v => v.GetInt32()).ToArray() : [];
         double? width = null, depth = null;
@@ -71,7 +80,8 @@ internal static partial class ScenarioChecks
             nextOffset = offset < findings.Length && page.Length < findings.Length - offset ? (int?)(offset + page.Length) : null,
             findings = page, automaticFixes = false, atomic = false, triggerSourceIsLive = false,
             skippedChecks = new[] {
-                controller is null ? "No exported triggerPath supplied; triggers not inspected." : "Only supplied verified controller shape inspected; file is not proof of current scene trigger state.",
+                triggersEmpty ? "Supplied trigger export contains 0 triggers; no controller heuristics run (file is not proof of current scene trigger state)."
+                    : controller is null ? "No exported triggerPath supplied; triggers not inspected." : "Only supplied verified controller shape inspected; file is not proof of current scene trigger state.",
                 width is null ? "Map layout unavailable; object/map bounds not inspected." : "Map bounds checked against separately measured non-atomic snapshot.",
                 "Objective UI, diplomacy, scenario modes, native trigger references in other shapes, XS compilation, dynamic/scenario-name unit references and external scripts not inspected.",
             }, limitation = "Partial diagnostics, not a valid/invalid scenario verdict. Only caller-declared full live IDs treated as required references; script literals never guessed as simulation IDs. Rule/outcome scans are textual candidates, not semantic validation." };

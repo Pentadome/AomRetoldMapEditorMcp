@@ -157,6 +157,9 @@ internal static class PlayerWorkflow
             aiLocation = "Computer-player .xs: INSTALLPATH\\game\\ai. Active-profile ai folder did NOT work; trigger scripts: active-profile trigger directory." };
     }
 
+    /// <summary>Apply arguments naming new backups, verification directory and profile directories.</summary>
+    internal static readonly string[] ApplyPathFields = ["backupScenarioPath", "backupTriggerPath", "verificationDirectory", "scenarioProfileDirectory", "triggerProfileDirectory"];
+
     internal static void PreflightApply(JsonElement args, string exe)
     {
         _ = Diplomacy(args, exe); // Includes saved source SHA, directional value and AI path preconditions.
@@ -166,6 +169,10 @@ internal static class PlayerWorkflow
             throw new WorkflowFailure("AI_TEXT_UNVERIFIED", "ui-preflight",
                 "Alternative UI AI Name Unicode text entry returned acknowledgement but saved P5 AI path stayed unchanged in isolated-scene test. No input sent by this tool.",
                 false, false, "Set AI Name manually in Players Settings; install personality under INSTALLPATH\\game\\ai (profile ai did not work). Export checkpoint and call verify.");
+        var missing = ApplyPathFields
+            .Where(f => !args.TryGetProperty(f, out var v) || v.ValueKind != JsonValueKind.String).ToArray();
+        if (missing.Length > 0)
+            throw new ArgumentException("apply requires new backup paths, existing verificationDirectory and profile directories; missing: " + string.Join(", ", missing) + ".");
         foreach (var (field, extension) in new[] { ("backupScenarioPath", ".mythscn"), ("backupTriggerPath", ".trg") })
             _ = EditorFiles.ApprovedNewPath(args.GetProperty(field).GetString()!, extension);
         if (args.GetProperty("scenarioPath").GetString()!.Equals(args.GetProperty("backupScenarioPath").GetString(), StringComparison.OrdinalIgnoreCase))

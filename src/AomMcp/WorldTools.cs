@@ -501,6 +501,25 @@ internal sealed partial class Server
         return path.ToArray();
     }
 
+    /// <summary>True when the camera ray to (x, current height, z) passes above node heights for 8 world units before it.
+    /// Live: GroundHit accepted a far-corner tile hidden behind a freshly raised plateau, so the dab painted the plateau.</summary>
+    static bool RayClear(EditorView.ViewState v, double x, double z)
+    {
+        if (!v.InsideMap(x, z)) return false;
+        var g = v.Height(x, z).Height;
+        var cam = v.Pose.Position;
+        double dx = cam.X - x, dz = cam.Z - z, dist = Math.Sqrt(dx * dx + dz * dz);
+        if (dist < 1e-3) return true;
+        var slope = (cam.Y - g) / dist; dx /= dist; dz /= dist;
+        for (var d = 0.5; d <= 8; d += 0.5) // Host bound: brush-scale neighbourhood toward the camera, half-unit steps.
+        {
+            double sx = x + dx * d, sz = z + dz * d;
+            if (!v.InsideMap(sx, sz)) break;
+            if (v.Height(sx, sz).Height > g + d * slope + 0.1) return false;
+        }
+        return true;
+    }
+
     sealed record HeightStats(int Nodes, int Within, float Min, float Max, double Mean);
 
     static HeightStats AreaHeights(EditorView.ViewState v, double minX, double minZ, double maxX, double maxZ, double target, double tolerance)
@@ -556,7 +575,7 @@ internal sealed partial class Server
                     if (maxX - minX < 7 * view.Scale || maxZ - minZ < 7 * view.Scale)
                         throw new WorkflowFailure("AREA_TOO_SMALL", "preflight", "operation=set needs an area of at least 7×7 nodes (bump + test dab inside the area).",
                             false, false, "Enlarge the area or use operation=flatten with a reference point at the wanted height. No input sent.");
-                    steps.AddRange(SetSample(game, target!.Value, cx, cz, minX, minZ, tolerance, out var s));
+                    steps.AddRange(SetSample(game, target!.Value, cx, cz, minX, minZ, maxX, maxZ, tolerance, out var s));
                     sampled = s;
                 }
                 else
@@ -566,7 +585,7 @@ internal sealed partial class Server
                     var v = EditorView.ReadView(game);
                     var refPixel = Screen(game, [(rx, rz)], moveCamera, 1).Pixels[0];
                     RequireNoHeldInput();
-                    Ui.Click(game, refPixel.X, refPixel.Y, "right"); // Right click samples height under pointer (elevationsample tool).
+                    Ui.SettledClick(game, refPixel.X, refPixel.Y, "right"); // Right click samples height under pointer (elevationsample tool).
                     sampled = v.Height(rx, rz).Height;
                     steps.Add(new { sampledAt = new { x = rx, z = rz }, referenceNodeHeight = sampled });
                 }
@@ -584,6 +603,7 @@ internal sealed partial class Server
                 steps.Add(new { paintStroke = path.Length, passes = 2 });
                 // Touch-up: dab remaining off-target nodes (stroke ends/disc corners), host bound 40 dabs.
                 var touched = 0;
+                var aims = new List<int>();
                 for (var round = 0; round < 2; round++)
                 {
                     var v2 = EditorView.ReadView(game);
@@ -598,10 +618,35 @@ internal sealed partial class Server
                     }
                     if (misses.Count == 0 || touched + misses.Count > 40) break;
                     var dabs = Screen(game, misses.ToArray(), false, 4, goalHeight);
-                    foreach (var d in dabs.Pixels) { RequireNoHeldInput(); Ui.Click(game, d.X, d.Y, "left"); touched++; }
+                    // The brush lands where the pointer ray meets CURRENT terrain. A node still far from the goal (e.g. the
+                    // corner farthest from the camera next to a raised plateau) projected at goal height lands ~2 nodes beyond
+                    // it, so prefer the current-terrain pixel when its ground-hit back-check lands on the node's tile.
+                    var (cw, ch) = Ui.ClientSize(game);
+                    // Nodes hidden behind already-raised terrain (far corner from the camera) cannot be hit directly; aim up to
+                    // two nodes farther along the camera's horizontal forward so the brush disc (~2.5 nodes) still covers them.
+                    var fwd = new Vector2(dabs.View.Pose.Forward.X, dabs.View.Pose.Forward.Z);
+                    fwd = fwd.LengthSquared() > 1e-6f ? Vector2.Normalize(fwd) : Vector2.Zero;
+                    (int X, int Y)? Aim((double X, double Z) p)
+                    {
+                        for (var k = 0; k <= 3; k++)
+                            if (RayClear(dabs.View, p.X + fwd.X * k * v2.Scale, p.Z + fwd.Y * k * v2.Scale)
+                                && PixelFor(dabs.View, dabs.Ui, dabs.Occluders, cw, ch, p.X + fwd.X * k * v2.Scale, p.Z + fwd.Y * k * v2.Scale, half) is { } hit)
+                            {
+                                aims.Add(k);
+                                return hit;
+                            }
+                        aims.Add(-1); // Fallback: goal-height projection (may hit raised terrain in front of the node).
+                        return null;
+                    }
+                    var pixels = misses.Select((p, i) => Aim(p) ?? dabs.Pixels[i]).ToArray();
+                    foreach (var d in pixels)
+                    {
+                        RequireNoHeldInput();
+                        Ui.SettledClick(game, d.X, d.Y, "left"); touched++; // Brush must leave the previous stroke/dab spot.
+                    }
                     Thread.Sleep(200);
                 }
-                if (touched > 0) steps.Add(new { touchUpDabs = touched });
+                if (touched > 0) steps.Add(new { touchUpDabs = touched, touchUpAimOffsetsNodes = aims }); // -1 = goal-height fallback.
             }
             Thread.Sleep(300);
         }
@@ -622,14 +667,19 @@ internal sealed partial class Server
     }
 
     /// <summary>Closed loop for an exact sample height: bump at area center, slope bisection sampling, test dab verification.</summary>
-    List<object> SetSample(Game game, double h, double cx, double cz, double minX, double minZ, double tolerance, out double sampled)
+    List<object> SetSample(Game game, double h, double cx, double cz, double minX, double minZ, double maxX, double maxZ, double tolerance, out double sampled)
     {
         var steps = new List<object>();
         var v = EditorView.ReadView(game);
         var s = v.Scale;
-        // Snap anchor to a node; test node 3 nodes inside the min corner (>4 nodes from the anchor for 7x7+ areas).
+        // Snap anchor to a node; test node at an area corner node (>=3 nodes from the anchor per axis for 7x7+ areas, and
+        // >=3 nodes from the +X sampling slope row). Live: a test node only 2 nodes from the anchor let each sample dab
+        // (brush radius ~2.5 nodes) flatten the bump, so sampling never converged. Corner dab bleed matches area painting.
+        // First corner clear of UI panels wins (normal-UI tool panel covers the bottom-left screen corner).
         double ax = Math.Round(cx / s) * s, az = Math.Round(cz / s) * s;
-        double tx = Math.Ceiling(minX / s) * s + 2 * s, tz = Math.Ceiling(minZ / s) * s + 2 * s;
+        double cx0 = Math.Ceiling(minX / s) * s, cz0 = Math.Ceiling(minZ / s) * s, cx1 = Math.Floor(maxX / s) * s, cz1 = Math.Floor(maxZ / s) * s;
+        (double X, double Z)[] corners = [(cx0, cz0), (cx0, cz1), (cx1, cz1), (cx1, cz0)];
+        double tx = cx0, tz = cz0;
         var (width, height) = Ui.ClientSize(game);
         EnterMode(game, "elevation");
         var raise = h > v.Height(ax, az).Height;
@@ -637,15 +687,22 @@ internal sealed partial class Server
         var ui = SceneUi.TryLoad(game, frame, out _);
         var occ = ui?.Occluders(frame);
         var clicks = 0;
+        var startHeight = v.Height(ax, az).Height;
         for (; clicks < 60; clicks++) // Host bound: ~1 world unit per click observed; 60 covers tall targets.
         {
             v = EditorView.ReadView(game);
             var now = v.Height(ax, az).Height;
             if (raise ? now >= h + 0.5 : now <= h - 0.5) break; // Overshoot 0.5 so the slope brackets h.
+            // Live failure: after a smooth stroke every bump click applied at the stale stroke-end pointer position, far
+            // from the anchor. Stop once several clicks leave the anchor unchanged instead of spending all 60 elsewhere.
+            if (clicks >= 4 && Math.Abs(now - startHeight) < 0.2)
+                throw new WorkflowFailure("BRUSH_NOT_AT_TARGET", "elevation", $"{clicks} bump clicks did not change the anchor node ({ax},{az}); the brush may have applied at another (stale pointer) position.",
+                    true, false, "Inspect terrain with editor_terrain_grid around the area AND the previous pointer position; editor_undo reverts strokes. Move the mouse over the map, then retry.");
             var px = PixelFor(v, ui, occ, width, height, ax + s / 2, az + s / 2, 2, now) // Tile middle → brush centers on node (ax,az).
                 ?? throw new WorkflowFailure("TARGET_NOT_CLICKABLE", "elevation", "Anchor not clickable.", clicks > 0, false, "Inspect area; undo partial bump if needed.");
             RequireNoHeldInput();
-            Ui.Click(game, px.X, px.Y, raise ? "left" : "right");
+            if (clicks == 0) Ui.SettledClick(game, px.X, px.Y, raise ? "left" : "right"); // Brush must leave the old pointer spot.
+            else Ui.Click(game, px.X, px.Y, raise ? "left" : "right");
             Thread.Sleep(60);
         }
         v = EditorView.ReadView(game);
@@ -672,12 +729,19 @@ internal sealed partial class Server
             frame = SceneUi.Capture(game); occ = ui?.Occluders(frame);
             var sp = PixelFor(v, ui, occ, width, height, sx, az, 2, sh)
                 ?? throw new WorkflowFailure("TARGET_NOT_CLICKABLE", "sample", "Sample point not clickable.", true, false, "Undo bump and retry with camera closer.");
+            if (iter == 0)
+            {
+                var pick = Array.FindIndex(corners, c => PixelFor(v, ui, occ, width, height, c.X + s / 2, c.Z + s / 2, 2) is not null);
+                if (pick < 0)
+                    throw new WorkflowFailure("TARGET_NOT_CLICKABLE", "sample", "No area corner clickable for the test node.", true, false, "Undo bump and retry with camera closer.");
+                (tx, tz) = corners[pick];
+            }
             var tp = PixelFor(v, ui, occ, width, height, tx + s / 2, tz + s / 2, 2)
                 ?? throw new WorkflowFailure("TARGET_NOT_CLICKABLE", "sample", "Test node not clickable.", true, false, "Undo bump and retry with camera closer.");
             RequireNoHeldInput();
-            Ui.Click(game, sp.X, sp.Y, "right");
+            Ui.SettledClick(game, sp.X, sp.Y, "right"); // Unsettled presses sampled/painted at the previous pointer spot (live).
             Thread.Sleep(80);
-            Ui.Click(game, tp.X, tp.Y, "left");
+            Ui.SettledClick(game, tp.X, tp.Y, "left");
             Thread.Sleep(200);
             measured = EditorView.ReadView(game).Height(tx, tz).Height;
             tested.Add((t, measured));
@@ -690,7 +754,7 @@ internal sealed partial class Server
         sampled = measured;
         steps.Add(new { sampleIterations = tested.Select(p => new { t = p.T, measured = p.M }).ToArray(), testNode = new { x = tx, z = tz } });
         if (Math.Abs(measured - h) > tolerance)
-            throw new WorkflowFailure("SAMPLE_NOT_CONVERGED", "sample", $"Sampled height {measured:F3} not within {tolerance} of {h} after {tested.Count} tries.", true, false,
+            throw new WorkflowFailure("SAMPLE_NOT_CONVERGED", "sample", $"Sampled height {measured:F3} not within {tolerance} of {h} after {tested.Count} tries (t/measured: {string.Join("; ", tested.Select(p => FormattableString.Invariant($"{p.T:F3}/{p.M:F3}")))}; slope nodes {lo}->{hi} heights {ha:F3}->{hb:F3}).", true, false,
                 "Bump and test dabs remain inside the area; editor_undo reverts them, or raise tolerance.");
         return steps;
     }
