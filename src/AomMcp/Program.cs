@@ -82,6 +82,7 @@ if (selfTest)
     ScreenProbe.SelfTest();
     UiRead.SelfTest();
     LiveUnits.SelfTest();
+    LiveWorld.SelfTest();
     EditorView.SelfTest();
     TriggerCodec.SelfTest();
     CampaignTriggers.SelfTest();

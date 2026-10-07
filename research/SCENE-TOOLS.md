@@ -26,6 +26,8 @@ Eleven core helpers added after a hands-on editor session showed agents had to h
 
 `uilayouts/alt-2560x1440.json` → `editorScene` (alternative UI, 2560×1440, pinned build): minimap center (2318,1196), half-diagonal 205 px, orientation screen-up = +X+Z, screen-right = +X−Z; static occluders (top buttons, active-player panel, minimap, toolbar); pixel-gated conditional occluders (object palette, object tool bar). Gates sample 1280×720 screenshots. Minimap corner buttons excluded from the gate after hover-highlight changes made it fail. Object tool bar is translucent; its gate uses opaque icons/text. Unreviewed UI: minimap camera refuses; placement only trusts the central 40%×50% of the client.
 
+`uilayouts/normal-en-2560x1440.json` → `editorScene` (normal UI, English, 2560×1440): `uiKind: normal`, `detect` gate = top menu bar (15 samples, ≥12), minimap gate identical to the alternative UI (same frame), static occluders menu bar [0,0,2560,84] + minimap; conditional `toolPanel` [0,1030,636,410] and `objectPalette` (list panel) [636,1030,1364,410]; `palette` geometry for texture/mix list OCR selection. `SceneUi.TryLoad` checks normal first (menu-bar gate) then alternative; results report `uiKind`. `editor_place_at_world` in normal UI always treats both bottom panels as occluders because PlaceUnit opens them; cleanup loops `editMode("None")` until mode 0 (PlaceUnit → 27 → 0) so the palette closes.
+
 ## Live evidence (2026-10-06, blank 128×128 scene, alternative UI 2560×1440, build dd15d1d8…)
 
 - `editor_camera_look_at` (128,128) → target (129.45,126.92) after 1 click; (60,200) → (60.70,199.46); (3,3) → (3.30,0.78) residual 2.24 (camera bounds).

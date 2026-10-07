@@ -48,6 +48,10 @@ public sealed record Layout
     public MapReadLayout? Map { get; init; }
     /// <summary>Gets optional independently corroborated runtime telemetry; unregistered candidates refuse loading.</summary>
     public RuntimeReadLayout? Runtime { get; init; }
+    /// <summary>Gets optional reviewed terrain-type/water/edit-mode/paint-selection/heading fields (research/LIVE-WORLD.md).</summary>
+    public WorldReadLayout? World { get; init; }
+    /// <summary>Gets optional reviewed live player fields; obfuscated resources are intentionally absent.</summary>
+    public PlayerReadLayout? Players { get; init; }
     /// <summary>Gets the dispatcher signature bytes decoded from <see cref="PrefixHex"/>.</summary>
     // Spaces are human-readable byte separators in layout JSON, not part of the runtime signature.
     public byte[] Prefix => Convert.FromHexString(PrefixHex.Replace(" ", ""));
@@ -91,6 +95,10 @@ public sealed record Layout
             LiveUnits.ValidateLayout(units);
         if (layout.Runtime is { } runtime)
             RuntimeTelemetry.ValidateLayout(runtime, hash);
+        if (layout.World is { } world)
+            LiveWorld.ValidateLayout(world);
+        if (layout.Players is { } players)
+            LiveWorld.ValidateLayout(players);
         return layout;
     }
 }

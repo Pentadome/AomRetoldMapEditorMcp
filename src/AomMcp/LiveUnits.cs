@@ -47,7 +47,25 @@ internal static class LiveUnits
     const int MaxOffset = 65536, MinSignatures = 5, MaxSignatures = 16, MinSignatureBytes = 16, MaxSignatureBytes = 512;
     internal sealed record Position(float X, float Y, float Z);
     internal sealed record Unit(int UnitId, int ProtoId, string? Proto, int Player, Position Position,
-        float Health, float MaxHealth);
+        float Health, float MaxHealth, float? HeadingDegrees = null);
+
+    // Host tolerance for treating the reviewed transform's rotation block as a pure Y rotation.
+    const float RotationTolerance = 0.01f;
+
+    /// <summary>Derives a Y-axis heading from the reviewed 3x4 transform rotation block (research/LIVE-WORLD.md).</summary>
+    /// <param name="m00">Row 0 column 0.</param><param name="m02">Row 0 column 2.</param>
+    /// <param name="m20">Row 2 column 0.</param><param name="m22">Row 2 column 2.</param>
+    /// <returns>Degrees in [0,360) where untouched editor placements read 180; null when not a pure Y rotation.</returns>
+    internal static float? Heading(float m00, float m02, float m20, float m22)
+    {
+        if (!float.IsFinite(m00) || !float.IsFinite(m02) || !float.IsFinite(m20) || !float.IsFinite(m22)
+            || Math.Abs(m00 * m00 + m02 * m02 - 1) > RotationTolerance || Math.Abs(m20 * m20 + m22 * m22 - 1) > RotationTolerance
+            || Math.Abs(m00 - m22) > RotationTolerance || Math.Abs(m02 + m20) > RotationTolerance)
+            return null;
+        var degrees = (float)(Math.Atan2(m02, m22) * 180 / Math.PI);
+        degrees = (degrees % 360 + 360) % 360;
+        return (float)Math.Round(degrees, 2);
+    }
 
     internal static void ValidateLayout(UnitReadLayout layout)
     {
@@ -128,6 +146,7 @@ internal static class LiveUnits
             "Live-unit layout unavailable for this build. Passive review required; offsets are never guessed.");
         ValidateLayout(layout);
         var editor = ValidateRuntime(game, layout.Signatures);
+        if (game.Layout.World is { } world) ValidateRuntime(game, world.Signatures); // Heading fields are pinned by world signatures.
         var units = Capture(game.Read, game.Base, game.Layout);
         if (game.Editor() != editor)
             throw new InvalidDataException("Editor context changed during unit read; no listing returned.");
@@ -206,8 +225,9 @@ internal static class LiveUnits
             names[id] = name; // Player-local IDs remain explicitly unresolved.
             return name;
         }
+        var rotation = accepted.World?.RotationOffsets is { Length: 4 } r && r.All(o => o is >= 0 and <= MaxOffset) ? r : null;
         var length = new[] { layout.IdOffset, layout.ProtoOffset, layout.PlayerOffset,
-            layout.HealthOffset, layout.MaxHealthOffset }.Concat(layout.PositionOffsets).Max() + ScalarSize;
+            layout.HealthOffset, layout.MaxHealthOffset }.Concat(layout.PositionOffsets).Concat(rotation ?? []).Max() + ScalarSize;
         var results = new List<Unit>();
         for (var slot = 0; slot < count; slot++)
         {
@@ -225,8 +245,10 @@ internal static class LiveUnits
                 || position.Any(v => !float.IsFinite(v) || Math.Abs(v) > MaxCoordinate)
                 || !float.IsFinite(hp) || !float.IsFinite(maximum) || hp < 0 || maximum < 0)
                 throw new InvalidDataException("Invalid/torn live object record; no listing returned.");
+            float? heading = rotation is null ? null : Heading(BitConverter.ToSingle(bytes, rotation[0]),
+                BitConverter.ToSingle(bytes, rotation[1]), BitConverter.ToSingle(bytes, rotation[2]), BitConverter.ToSingle(bytes, rotation[3]));
             results.Add(new Unit(id, proto, Name(proto), player,
-                new Position(position[0], position[1], position[2]), hp, maximum));
+                new Position(position[0], position[1], position[2]), hp, maximum, heading));
             if (Pointer(table + slot * PointerSize) != address || Int(address + layout.IdOffset) != id
                 || Int(address + layout.ProtoOffset) != proto || Int(address + layout.PlayerOffset) != player)
                 throw new InvalidDataException("Object changed during unit read; no listing returned.");
@@ -330,6 +352,10 @@ internal static class LiveUnits
             return Read(address, count);
         }, module, accepted));
         if (!changed) throw new InvalidOperationException("Live units race fixture not reached.");
+        // Heading fixtures: editor default diag(-1,1,-1) reads 180; pi/8 step reads 202.5; scaled block refuses.
+        if (Heading(-1, 0, 0, -1) != 180 || Heading(-0.9238795f, -0.3826834f, 0.3826834f, -0.9238795f) != 202.5f
+            || Heading(-2, 0, 0, -2) is not null)
+            throw new InvalidOperationException("Heading fixture failed.");
         Set(world, BitConverter.GetBytes(0)); Set(world + 8, BitConverter.GetBytes(0L));
         if (Capture(Read, module, accepted).Length != 0) throw new InvalidOperationException("Empty world fixture failed.");
     }

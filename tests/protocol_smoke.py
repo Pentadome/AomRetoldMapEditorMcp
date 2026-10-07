@@ -659,7 +659,8 @@ try:
     assert not local_trigger_batch['isError'], local_trigger_batch
     pantheon_spec = next(t for t in tools if t['name'] == 'editor_pantheon')
     assert pantheon_spec['annotations']['readOnlyHint'] and not pantheon_spec['annotations']['destructiveHint']
-    assert pantheon_spec['inputSchema']['required'] == ['pantheon']
+    # pantheon or its alias culture; one is required at call time.
+    assert pantheon_spec['inputSchema']['required'] == [] and {'pantheon', 'culture'} <= set(pantheon_spec['inputSchema']['properties'])
     greek = tool('editor_pantheon', {'pantheon': ' greeks '})
     assert not greek['isError'], greek
     roster = greek['structuredContent']
@@ -671,6 +672,7 @@ try:
     assert roster['units'] == sorted(set(roster['units'])) and roster['buildings'] == sorted(set(roster['buildings']))
     assert 'Zeus' in roster['majorGods'] and 'Data.bar' in roster['source'] and not roster['unresolvedTechs']
     assert tool('editor_pantheon', {'pantheon': 'GREEK'})['structuredContent'] == roster
+    assert tool('editor_pantheon', {'culture': 'greeks'})['structuredContent'] == roster
     egyptian = tool('editor_pantheon', {'pantheon': 'Egyptians'})['structuredContent']
     assert 'Barracks' in egyptian['buildings'] and 'MilitaryAcademy' not in egyptian['buildings']
     assert 'VillagerEgyptian' in egyptian['units']
@@ -831,7 +833,11 @@ try:
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
     expected_core = (helper_names - workflow_names) | core_native
-    assert len(expected_core) == 60 and len(names) == 910
+    assert len(expected_core) == 72 and len(names) == 922
+    world_tools = {'editor_terrain_info', 'editor_live_players', 'editor_edit_mode', 'editor_paint_world', 'editor_elevation',
+                   'editor_transform_unit', 'editor_terrain_catalog', 'editor_camera_frame', 'editor_overview',
+                   'editor_resource_balance', 'editor_mirror_units', 'editor_scatter'}
+    assert world_tools <= expected_core, world_tools - expected_core
     scene_tools = {'editor_camera_look_at', 'editor_view_info', 'editor_ui_state', 'editor_place_at_world',
                    'editor_units_snapshot', 'editor_units_diff', 'editor_scene_summary', 'editor_delete_units',
                    'editor_check_footprints', 'editor_terrain_grid', 'editor_apply_layout'}
@@ -846,6 +852,11 @@ try:
     preflight_refusal('editor_delete_units', {'units': [{'unitId': 1, 'proto': 'Hoplite', 'player': 1}] * 2,
                                               'confirmDestructive': True}, 'INVALID_ARGUMENT')
     preflight_refusal('editor_apply_layout', {}, 'INVALID_ARGUMENT')
+    # World helpers refuse destructive strokes without confirmation, before any game connection.
+    preflight_refusal('editor_paint_world', {'kind': 'water', 'type': 'GreekLake', 'points': [[1, 1]]}, 'INVALID_ARGUMENT')
+    preflight_refusal('editor_elevation', {'operation': 'set', 'minX': 0, 'minZ': 0, 'maxX': 10, 'maxZ': 10,
+                                           'confirmDestructive': True}, 'INVALID_ARGUMENT')
+    preflight_refusal('editor_transform_unit', {'unitId': 1, 'proto': 'House', 'player': 1}, 'INVALID_ARGUMENT')
     preflight_refusal('editor_apply_layout', {'items': [{'proto': 'Hoplite', 'x': 1, 'z': 1}], 'preview': False}, 'INVALID_ARGUMENT')
     preflight_refusal('editor_apply_layout', {'formation': {'proto': 'Hoplite', 'shape': 'ring', 'count': 3, 'spacing': 2,
                                                             'x': 5, 'z': 5, 'columns': 2}}, 'INVALID_ARGUMENT')

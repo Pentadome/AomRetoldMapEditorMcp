@@ -66,21 +66,47 @@ internal static class Ui
     /// <param name="x2">Ending horizontal coordinate.</param>
     /// <param name="y2">Ending vertical coordinate.</param>
     /// <param name="duration">Drag duration in milliseconds, from 100 to 5000.</param>
-    public static void Drag(Game game, int x1, int y1, int x2, int y2, int duration)
+    public static void Drag(Game game, int x1, int y1, int x2, int y2, int duration) =>
+        DragPath(game, [(x1, y1), (x2, y2)], duration);
+
+    /// <summary>Holds the left button along a client-pixel polyline; one point is a stationary press.</summary>
+    /// <param name="game">Validated editor connection.</param>
+    /// <param name="points">1..256 client-pixel vertices.</param>
+    /// <param name="duration">Total stroke duration in milliseconds, from 100 to 5000.</param>
+    public static void DragPath(Game game, IReadOnlyList<(int X, int Y)> points, int duration)
     {
-        // Host policy: bound drag to 0.1..5 s, interpolate 20 positions; not an engine constant.
+        // Host policy: bound stroke to 0.1..5 s and 256 vertices; ~20 px interpolation spacing,
+        // at least 20 total pointer updates. Not engine constants.
         if (duration is < 100 or > 5000)
             throw new ArgumentException("Drag duration 100..5000 ms.");
-        game.Move(x1, y1);
+        if (points.Count is < 1 or > 256)
+            throw new ArgumentException("Drag path needs 1..256 points.");
+        var path = new List<(int X, int Y)>();
+        for (var s = 1; s < points.Count; s++)
+        {
+            var (ax, ay) = points[s - 1]; var (bx, by) = points[s];
+            var n = Math.Max(1, (int)Math.Ceiling(Math.Sqrt((double)(bx - ax) * (bx - ax) + (double)(by - ay) * (by - ay)) / 20));
+            for (var i = 1; i <= n; i++) path.Add((ax + (bx - ax) * i / n, ay + (by - ay) * i / n));
+        }
+        if (path.Count < 20)
+        {
+            var last = path.Count > 0 ? path[^1] : points[0];
+            while (path.Count < 20) path.Add(last); // Stationary dwell keeps the press visible for frame-polled tools.
+        }
+        game.Move(points[0].X, points[0].Y);
+        // Same 80 ms settle as Click: without it the press could land at the stale previous pointer
+        // position (observed: first drag segment started away from x1,y1). Empirical, not an engine value.
+        Thread.Sleep(80);
         Send(Mouse(2)); // winuser.h MOUSEEVENTF_LEFTDOWN.
         try
         {
-            const int steps = 20;
-            for (var i = 1; i <= steps; i++)
+            Thread.Sleep(60); // Let the press register at the start point before motion (frame polling).
+            foreach (var (x, y) in path)
             {
-                game.Move(x1 + (x2 - x1) * i / steps, y1 + (y2 - y1) * i / steps);
-                Thread.Sleep(duration / steps);
+                game.Move(x, y);
+                Thread.Sleep(Math.Max(1, duration / path.Count));
             }
+            Thread.Sleep(60); // Let the final position register before release.
         }
         finally
         {

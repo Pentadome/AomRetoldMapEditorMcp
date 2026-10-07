@@ -51,6 +51,15 @@ internal static class Generator
             if (powers.Length == 0)
                 throw new InvalidDataException("No shipped godpower definitions found.");
             paths.AddRange(powers);
+            // Forest/cliff definitions and terrain mixes (paint palette names/order) for editor_terrain_catalog.
+            paths.Add("map_definitions/forest.xml.XMB");
+            paths.Add("map_definitions/cliff_types.xml.XMB");
+            var mixes = entries.RootElement.EnumerateArray().Select(e => e.GetProperty("Path").GetString()!)
+                .Where(p => p.StartsWith("map_definitions/mixes/", StringComparison.Ordinal) && p.EndsWith(".xml.XMB", StringComparison.Ordinal)).ToArray();
+            Directory.CreateDirectory(Path.Combine(data, "mixes"));
+            foreach (var mix in mixes)
+                _ = Run(crybar, ["bar", "export", archive, mix, "--decompress", "--convert", "-o",
+                    Path.Combine(data, "mixes", Path.GetFileName(mix)[..^4])]);
             foreach (var path in paths)
                 _ = Run(crybar, ["bar", "export", archive, path, "--decompress", "--convert", "-o",
                     Path.Combine(data, Path.GetFileName(path)[..^4])]); // Remove .XMB after decoding.

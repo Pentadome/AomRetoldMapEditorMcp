@@ -1,6 +1,6 @@
 # Session workflow helpers
 
-Seven new helpers are **full-only**. Core is now 60 tools (eleven scene helpers added, see SCENE-TOOLS.md); full is 910 (58 helpers + 434 native commands + 418 actions). Switch with standalone `editor_toolset mode=full`, then refresh `tools/list` without an old cursor. Exact live schemas are authoritative; the historical `TOOLS.md` catalog is not regenerated.
+Seven new helpers are **full-only**. Core is now 72 tools (eleven scene helpers, SCENE-TOOLS.md; twelve world helpers, LIVE-WORLD.md); full is 922 (70 helpers + 434 native commands + 418 actions). Switch with standalone `editor_toolset mode=full`, then refresh `tools/list` without an old cursor. Exact live schemas are authoritative; the historical `TOOLS.md` catalog is not regenerated.
 
 ## Identity and write boundaries
 

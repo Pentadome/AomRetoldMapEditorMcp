@@ -98,6 +98,32 @@ internal sealed class GameDataCatalog
         return _footprints = result;
     }
 
+    Dictionary<string, (string? Resource, double Amount, string[] UnitTypes)>? _resources;
+
+    /// <summary>Static resource subtype/initial amount/unit types per prototype (case-insensitive name).</summary>
+    internal Dictionary<string, (string? Resource, double Amount, string[] UnitTypes)> Resources(string exe, string hash)
+    {
+        CheckFresh(exe, hash);
+        if (_resources is not null) return _resources;
+        var result = new Dictionary<string, (string?, double, string[])>(StringComparer.OrdinalIgnoreCase);
+        foreach (var e in _data.GetProperty("catalogs").GetProperty("prototypes").EnumerateArray())
+        {
+            var name = e.GetProperty("name").GetString()!;
+            if (result.ContainsKey(name)) continue;
+            string? resource = e.TryGetProperty("resourceSubtype", out var r) && r.ValueKind == JsonValueKind.String ? r.GetString() : null;
+            double amount = 0;
+            if (e.TryGetProperty("initialResources", out var ir) && ir.ValueKind == JsonValueKind.Array)
+                foreach (var item in ir.EnumerateArray())
+                {
+                    resource ??= item.GetProperty("resource").GetString();
+                    if (double.TryParse(item.GetProperty("amount").GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var a)) amount += a;
+                }
+            var types = e.TryGetProperty("unitTypes", out var ut) ? ut.EnumerateArray().Select(t => t.GetString()!).ToArray() : [];
+            result[name] = (resource, amount, types);
+        }
+        return _resources = result;
+    }
+
     /// <summary>Ranks close exact-name candidates by containment then edit distance; metadata only.</summary>
     internal static string[] Suggest(string requested, IEnumerable<string> names, int max = 5)
     {

@@ -215,7 +215,10 @@ internal sealed partial class Server(
             if (value is ImageResult image)
                 return new()
                 {
-                    Content = [ImageContentBlock.FromBytes(image.Bytes, "image/png")], // Registered PNG media type (MCP image content).
+                    // Registered PNG media type (MCP image content); optional JSON legend follows as text/structured content.
+                    Content = image.Data is null ? [ImageContentBlock.FromBytes(image.Bytes, "image/png")]
+                        : [ImageContentBlock.FromBytes(image.Bytes, "image/png"), new TextContentBlock { Text = JsonSerializer.Serialize(image.Data, Json) }],
+                    StructuredContent = image.Data is null ? null : JsonSerializer.SerializeToElement(image.Data, Json),
                     IsError = false,
                 };
             return new()
@@ -335,7 +338,12 @@ internal sealed partial class Server(
         Catalog.ValidateObject(args, properties.EnumerateObject().Select(p => p.Name));
         foreach (var required in schema.GetProperty("required").EnumerateArray())
             if (!args.TryGetProperty(required.GetString()!, out _))
-                throw new ArgumentException("Missing " + required.GetString());
+                throw new ArgumentException($"Missing required argument '{required.GetString()}'." + (required.GetString() switch
+                {
+                    "token" => " Obtain one from editor_units_snapshot (host memory, last 16 kept).",
+                    "confirmDestructive" or "confirmPlacement" or "confirmWrite" => " Set it to true to authorize this mutation.",
+                    _ => "",
+                }));
         foreach (var p in args.EnumerateObject())
             ValidateValue(p.Value, properties.GetProperty(p.Name));
     }
@@ -378,6 +386,7 @@ internal sealed partial class Server(
 
     static bool ConnectionFree(string name, JsonElement args) => WorkflowNames.Contains(name) || name is "editor_toolset" or "editor_search_tools" or "editor_catalog" or "editor_capabilities" or "editor_export_recovery" or "editor_trigger_list" or "editor_trigger_player_parity" or "editor_trigger_edit" or "editor_players" or "editor_player_dependency_audit" or "editor_stage_ai" or "editor_pantheon" or "editor_dependencies"
         || GameDataCatalog.ToolKinds.ContainsKey(name)
+        || (name == "editor_terrain_catalog" && args.TryGetProperty("kind", out var catalogKind) && catalogKind.GetString() is "mixes" or "editModes")
         || (name is "editor_set_diplomacy" or "editor_player_settings" && (args.GetProperty("operation").GetString() is "preview" or "verify"))
         || (name == "editor_triggers" && args.GetProperty("operation").GetString() is "inspect" or "validate" or "patch")
         || (name == "editor_place_formation" && Formations.Preview(args));
@@ -406,6 +415,7 @@ internal sealed partial class Server(
         if (name == "editor_trigger_edit") TriggerEdits.Preflight(args);
         PreflightWorkflow(name, args);
         PreflightScene(name, args);
+        PreflightWorld(name, args);
         if (name == "editor_set_diplomacy" && args.GetProperty("operation").GetString() == "apply")
             PlayerWorkflow.PreflightApply(args, exe);
         if (name == "editor_place_formation")
@@ -422,6 +432,7 @@ internal sealed partial class Server(
     {
         if (WorkflowNames.Contains(name)) return InvokeWorkflow(name, args);
         if (SceneNames.Contains(name)) return InvokeScene(name, args, batchGame);
+        if (WorldNames.Contains(name)) return InvokeWorld(name, args, batchGame);
         if (name == "editor_search_tools") return SearchTools(args);
         if (name == "editor_toolset")
         {
@@ -444,7 +455,8 @@ internal sealed partial class Server(
                 metadataCoverage = "Command/UI counts show shipped coverage, not proof of semantic effects. Toolset resets when MCP host reconnects; call editor_toolset mode=full when needed.",
                 triggerEditing = "editor_trigger_list reads bounded TR v12 exports with player/arg/references filters. editor_trigger_player_parity audits template→target gaps. editor_trigger_edit previews/writes NEW-file patch/clone or up to 64 distinct-trigger edits in one output (value/label replacements, condition/effect removal, duplicates); requires source SHA and expected names, verifies unrelated records. editor_triggers apply requires reviewed live export/hash; game round-trip compared semantically. XS compile/runtime effects unproven.",
                 playerSettings = "editor_players/editor_player_dependency_audit read game-written checkpoints (stances 1 ally, 2 enemy, 3 neutral; 0 self/unset). editor_set_diplomacy changes batches directed cells with per-click RGB gates and one final checkpoint. editor_player_settings supports reviewed alternative-UI fields, including AI path via INSTALLPATH game\\ai file browser; startAge changes can reset minor gods, requiring observedOnly assertions. Apply is pinned to 2560x1440 alternative UI and requires backups; normal UI refuses. Direct AI-name text entry did not persist. Neither proves XS runtime.",
-                sceneTools = "Core world-space helpers: editor_place_at_world/editor_apply_layout (world X/Z, observed unitIds), editor_camera_look_at (reviewed alt-UI minimap closed loop), editor_view_info/editor_ui_state, editor_units_snapshot/diff (undo/redo reidentification), editor_scene_summary, editor_check_footprints, editor_terrain_grid, editor_delete_units (tuple-verified, confirmDestructive). Not saved; no retries.",
+                sceneTools = "Core world-space helpers: editor_place_at_world/editor_apply_layout (world X/Z, observed unitIds, optional heading), editor_camera_look_at (minimap closed loop, normal or alternative UI auto-detected), editor_view_info/editor_ui_state, editor_units_snapshot/diff (undo/redo reidentification), editor_scene_summary, editor_check_footprints, editor_terrain_grid, editor_delete_units (tuple-verified, confirmDestructive). Not saved; no retries.",
+                worldTools = "Core world helpers (research/LIVE-WORLD.md): editor_terrain_info (tile texture/water/passability), editor_live_players (name/team/civ/age/diplomacy without checkpoint), editor_edit_mode (read/enter/exit tool mode, UI kind, paint selections), editor_paint_world (texture/mix/water/forest/cliff along world points), editor_elevation (set/flatten/smooth area), editor_transform_unit (move/rotate with 22.5° steps), editor_terrain_catalog (textures/water/forest/cliff/mixes/lighting/civs/editModes), editor_camera_frame, editor_overview (ID-annotated screenshot), editor_resource_balance, editor_mirror_units, editor_scatter. Strokes use the current brush; verify reports included.",
                 scenarioEditing = "Never edit .mythscn directly. Use game editor, game-writer checkpoints and normal Load Scenario UI; native loadScenario disabled after crash.",
                 aiScripts = "Computer-player .xs personality must be under INSTALLPATH\\game\\ai (or its subdirectory). Active-profile Games\\Age of Mythology Retold\\<id>\\ai did NOT work. Triggers belong in active-profile trigger directory; use filename stems for uiLoadTriggers/uiSaveTriggers.",
                 exportRecovery = "On unknown export outcome, use editor_export_recovery inspect on reported staging path. Recover only to a new file with expectedSha256; no second native dispatch.",
@@ -479,8 +491,10 @@ internal sealed partial class Server(
         }
         if (name == "editor_pantheon")
         {
-            Catalog.ValidateObject(args, ["pantheon"]);
-            return (_gameData ??= new GameDataCatalog()).Lookup(exe, _layout.ExeSha256, String(args, "pantheon"));
+            Catalog.ValidateObject(args, ["pantheon", "culture"]);
+            var pantheon = args.TryGetProperty("pantheon", out var pv) ? pv.GetString() : args.TryGetProperty("culture", out var cv) ? cv.GetString() : null;
+            return (_gameData ??= new GameDataCatalog()).Lookup(exe, _layout.ExeSha256,
+                pantheon ?? throw new ArgumentException("Missing required argument 'pantheon' (alias 'culture'), e.g. greeks."));
         }
         if (name == "editor_catalog")
         {
@@ -724,6 +738,12 @@ internal sealed partial class Server(
             _bridge.Execute(game, "uiClearCursor()");
             _bridge.Execute(game, "editMode(\"None\")");
             WaitSelection(game, clear: true, player);
+            // PlaceUnit → editMode("None") lands in PlaceUnitSelect (27) with the palette still open; a second call reaches 0.
+            if (_layout.World is not null && WaitMode(game, m => m == 0, 300) != 0)
+            {
+                _bridge.Execute(game, "editMode(\"None\")");
+                WaitMode(game, m => m == 0, 600);
+            }
         }
     }
 
@@ -760,7 +780,8 @@ internal sealed partial class Server(
 
     /// <summary>Carries an encoded screenshot for MCP image transport.</summary>
     /// <param name="Bytes">PNG image bytes.</param>
-    sealed record ImageResult(byte[] Bytes);
+    /// <param name="Data">Optional JSON legend returned alongside the image.</param>
+    sealed record ImageResult(byte[] Bytes, object? Data = null);
 
     static object Spec(
         string name,
@@ -819,7 +840,7 @@ internal sealed partial class Server(
             }, ["query"], true);
         yield return Spec(
             "editor_batch",
-            "Run 1..32 existing tool calls sequentially in one connection. Schema/native-confirmation preflight; every step retains guards. Optional delayMs before a step for queued UI effects. Stops on first error; earlier effects remain (NOT atomic), no retries. Put screenshot last; inspect native acknowledgements independently.",
+            "Run 1..32 existing tool calls sequentially in one connection. Schema/native-confirmation preflight; every step retains guards. Optional delayMs before a step for queued UI effects. Stops on first error; earlier effects remain (NOT atomic), no retries. Put screenshot last; inspect native acknowledgements independently. Steps are static: a step's output (e.g. observed unitId, projected pixel) cannot be referenced by later steps; split into separate calls when arguments depend on earlier results.",
             new Dictionary<string, object>
             {
                 ["steps"] = new
@@ -1162,9 +1183,9 @@ internal sealed partial class Server(
         );
         yield return Spec(
             "editor_pantheon",
-            "Get exact unit/building proto names by pantheon (e.g. greeks -> VillagerGreek, MilitaryAcademy). Case-insensitive singular/plural culture names. Generated from shipped culture/start/tech metadata, not guessed names or IDs. Potential union across gods/ages, not current-player trainability; unresolved techs reported. No game connection. Run --generate generated if missing/stale.",
-            Props(("pantheon", "string")),
-            ["pantheon"],
+            "Get exact unit/building proto names by pantheon (alias culture; e.g. greeks -> VillagerGreek, MilitaryAcademy). Case-insensitive singular/plural culture names. Generated from shipped culture/start/tech metadata, not guessed names or IDs. Potential union across gods/ages, not current-player trainability; unresolved techs reported. No game connection. Run --generate generated if missing/stale.",
+            Props(("pantheon", "string"), ("culture", "string")),
+            [],
             true
         );
         foreach (var (name, kind) in GameDataCatalog.ToolKinds)
@@ -1260,5 +1281,7 @@ internal sealed partial class Server(
         );
         foreach (var scene in SceneExtras())
             yield return scene;
+        foreach (var world in WorldExtras())
+            yield return world;
     }
 }

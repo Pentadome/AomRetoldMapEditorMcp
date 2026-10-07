@@ -1,0 +1,92 @@
+{
+  "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+  "ui": "normal",
+  "width": 2560,
+  "height": 1440,
+  "notes": "Measured on English normal (non-alternative) editor UI, 2560x1440, 256x256 map. Rects are full-res client px [x,y,w,h]; gates are 1280x720 half-res screenshot samples (ScreenProbe frame), stable across 5 captures (no panel, elevation panel, paint panel, object palette, palette after editMode None). Bottom tool panel (left, 'Paint Terrain'/'Elevation'/'Place Object') opens for most edit modes; the list panel (right, terrain/object list with filter dropdown) opens for paint/forest/object placement modes. Minimap frame outer diamond 2092..2540 x 971..1421; inner map diamond center (2316,1196) half-diagonal ~201. Minimap frame is identical to the alternative UI (same gate pixels match); the UI kind is told apart by the normal-UI top menu-bar detect gate (alternative UI has no menu bar).",
+  "editorScene": {
+    "uiKind": "normal",
+    "detect": {
+      "gate": [
+        {"x": 300, "y": 10, "r": 27, "g": 27, "b": 27},
+        {"x": 1100, "y": 10, "r": 27, "g": 27, "b": 27},
+        {"x": 980, "y": 30, "r": 27, "g": 27, "b": 27},
+        {"x": 151, "y": 24, "r": 185, "g": 197, "b": 204},
+        {"x": 521, "y": 24, "r": 28, "g": 28, "b": 28},
+        {"x": 854, "y": 24, "r": 27, "g": 27, "b": 27},
+        {"x": 965, "y": 24, "r": 28, "g": 28, "b": 28},
+        {"x": 1039, "y": 24, "r": 26, "g": 26, "b": 26},
+        {"x": 1113, "y": 24, "r": 28, "g": 28, "b": 28},
+        {"x": 1224, "y": 24, "r": 28, "g": 28, "b": 28},
+        {"x": 640, "y": 30, "r": 21, "g": 55, "b": 5},
+        {"x": 100, "y": 30, "r": 168, "g": 181, "b": 181},
+        {"x": 30, "y": 30, "r": 113, "g": 117, "b": 122},
+        {"x": 1000, "y": 30, "r": 114, "g": 114, "b": 114},
+        {"x": 10, "y": 10, "r": 46, "g": 46, "b": 46}
+      ],
+      "minimumMatches": 12
+    },
+    "minimap": {
+      "center": [2316, 1196],
+      "halfDiagonal": 201,
+      "gate": [
+        {"x": 1049, "y": 596, "r": 214, "g": 175, "b": 92},
+        {"x": 1145, "y": 504, "r": 254, "g": 210, "b": 117},
+        {"x": 1173, "y": 504, "r": 255, "g": 241, "b": 145},
+        {"x": 1265, "y": 594, "r": 219, "g": 182, "b": 92},
+        {"x": 1251, "y": 616, "r": 109, "g": 90, "b": 52},
+        {"x": 1175, "y": 692, "r": 111, "g": 74, "b": 34},
+        {"x": 1157, "y": 702, "r": 116, "g": 71, "b": 44},
+        {"x": 1063, "y": 664, "r": 144, "g": 108, "b": 51}
+      ],
+      "minimumMatches": 7
+    },
+    "occluders": {
+      "menuBar": [0, 0, 2560, 84],
+      "minimap": [2084, 964, 476, 476],
+      "fpsCounter": [0, 0, 40, 20]
+    },
+    "conditionalOccluders": {
+      "toolPanel": {
+        "rect": [0, 1030, 636, 410],
+        "gate": [
+          {"x": 20, "y": 526, "r": 27, "g": 27, "b": 27},
+          {"x": 100, "y": 526, "r": 27, "g": 27, "b": 27},
+          {"x": 250, "y": 526, "r": 28, "g": 28, "b": 28},
+          {"x": 300, "y": 526, "r": 28, "g": 28, "b": 28},
+          {"x": 5, "y": 600, "r": 110, "g": 110, "b": 110},
+          {"x": 310, "y": 600, "r": 110, "g": 110, "b": 110},
+          {"x": 60, "y": 526, "r": 28, "g": 28, "b": 28},
+          {"x": 200, "y": 526, "r": 28, "g": 28, "b": 28}
+        ],
+        "minimumMatches": 6
+      },
+      "objectPalette": {
+        "rect": [636, 1030, 1364, 410],
+        "gate": [
+          {"x": 330, "y": 526, "r": 28, "g": 28, "b": 28},
+          {"x": 500, "y": 526, "r": 28, "g": 28, "b": 28},
+          {"x": 800, "y": 526, "r": 28, "g": 28, "b": 28},
+          {"x": 990, "y": 526, "r": 28, "g": 28, "b": 28},
+          {"x": 330, "y": 560, "r": 72, "g": 72, "b": 72},
+          {"x": 990, "y": 560, "r": 0, "g": 0, "b": 0},
+          {"x": 995, "y": 600, "r": 110, "g": 110, "b": 110},
+          {"x": 400, "y": 526, "r": 28, "g": 28, "b": 28},
+          {"x": 700, "y": 526, "r": 28, "g": 28, "b": 28},
+          {"x": 900, "y": 526, "r": 28, "g": 28, "b": 28},
+          {"x": 325, "y": 600, "r": 110, "g": 110, "b": 110}
+        ],
+        "minimumMatches": 8
+      }
+    },
+    "gateTolerance": 14,
+    "safeMargin": 24,
+    "palette": {
+      "notes": "Terrain/mix list in the bottom list panel (normal UI): 2 columns, 2 visible rows, one wheel notch scrolls one row (2 items). Textures are sorted by display name (case-insensitive); mixes follow file order. Click the label to select.",
+      "labelColumns": [[860, 1180, 320, 180], [1370, 1180, 320, 180]],
+      "selectedLabel": [40, 1108, 560, 36],
+      "scrollAnchor": [1300, 1270],
+      "columns": 2
+    }
+  }
+}

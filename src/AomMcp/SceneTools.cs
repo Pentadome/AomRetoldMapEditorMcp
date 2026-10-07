@@ -84,8 +84,8 @@ internal sealed partial class Server
                 if (args.GetProperty("minX").GetDouble() >= args.GetProperty("maxX").GetDouble()
                     || args.GetProperty("minZ").GetDouble() >= args.GetProperty("maxZ").GetDouble())
                     throw new ArgumentException("Terrain area requires minX<maxX and minZ<maxZ.");
-                if (args.TryGetProperty("flatSize", out _) != args.TryGetProperty("maxDelta", out _))
-                    throw new ArgumentException("flatSize and maxDelta must be supplied together.");
+                if (args.TryGetProperty("maxDelta", out _) && !args.TryGetProperty("flatSize", out _))
+                    throw new ArgumentException("maxDelta requires flatSize (flat-site search).");
                 break;
             case "editor_apply_layout":
                 var items = LayoutItems(args);
@@ -111,7 +111,8 @@ internal sealed partial class Server
             "editor_view_info" => ViewInfo(game, !args.TryGetProperty("probeUi", out var probe) || probe.GetBoolean()),
             "editor_ui_state" => UiState(game),
             "editor_place_at_world" => PlaceAtWorld(game, String(args, "proto"), Int(args, "player", 1), args.GetProperty("x").GetDouble(),
-                args.GetProperty("z").GetDouble(), !args.TryGetProperty("moveCamera", out var mc) || mc.GetBoolean(), Dbl(args, "tolerance", 4)),
+                args.GetProperty("z").GetDouble(), !args.TryGetProperty("moveCamera", out var mc) || mc.GetBoolean(), Dbl(args, "tolerance", 4),
+                args.TryGetProperty("heading", out var heading) ? heading.GetDouble() : null),
             "editor_units_snapshot" => Snapshot(game, args.TryGetProperty("label", out var label) ? label.GetString() : null),
             "editor_units_diff" => UnitsDiff(game, args),
             "editor_scene_summary" => SceneSummary(game, args),
@@ -151,7 +152,7 @@ internal sealed partial class Server
                 note = "Camera already centered within tolerance; no input sent." };
         RequireNoCursor(game);
         var ui = SceneUi.TryLoad(game, out var reason) ?? throw new WorkflowFailure("UI_LAYOUT_UNREVIEWED", "ui-preflight",
-            "Minimap camera targeting needs reviewed UI geometry: " + reason, false, false,
+            "Minimap camera targeting needs reviewed UI geometry (normal or alternative 2560x1440): " + reason, false, false,
             "Center camera with editor_uiLookAtUnit on a nearby unit, or pan manually; no input sent.");
         if (!ui.MinimapVisible(SceneUi.Capture(game)))
             throw new WorkflowFailure("MINIMAP_NOT_VISIBLE", "ui-preflight", "Minimap chrome pixel gate failed (hidden, covered by dialog, or different UI).",
@@ -185,7 +186,7 @@ internal sealed partial class Server
             residual, withinTolerance = residual <= tolerance, clicks, cameraOnly = true,
             note = residual <= tolerance ? "Camera center (forward ray on quantized terrain) verified by live camera read."
                 : "Residual above tolerance: camera bounds near map edges/minimap pixel resolution limit. Projection of target still usable if visible.",
-            limitation = "Left clicks on reviewed alternative-UI minimap only; no scene mutation intended. Camera center measured from live pose, not occlusion proof.",
+            limitation = "Left clicks on the reviewed minimap (normal or alternative UI); no scene mutation intended. Camera center measured from live pose, not occlusion proof.",
         };
     }
 
@@ -224,9 +225,10 @@ internal sealed partial class Server
             minX = Math.Clamp(hits.Min(h => h.X), 0, view.WorldWidth), maxX = Math.Clamp(hits.Max(h => h.X), 0, view.WorldWidth),
             minZ = Math.Clamp(hits.Min(h => h.Z), 0, view.WorldDepth), maxZ = Math.Clamp(hits.Max(h => h.Z), 0, view.WorldDepth),
         };
-        var ui = SceneUi.TryLoad(game, out var reason);
+        var frame = SceneUi.Capture(game);
+        var ui = SceneUi.TryLoad(game, frame, out var reason);
         SceneUi.Area[]? occluders = null;
-        if (ui is not null) occluders = ui.Occluders(probeUi ? SceneUi.Capture(game) : null);
+        if (ui is not null) occluders = ui.Occluders(probeUi ? frame : null);
         view.Verify();
         return new
         {
@@ -236,11 +238,12 @@ internal sealed partial class Server
             viewport = vp,
             groundCorners = ground.Select(g => new { g.Name, hit = g.Hit is { } h ? P(h) : null, insideMap = g.Hit is { } i && view.InsideMap(i.X, i.Z) }).ToArray(),
             visibleGroundBounds = bounds,
-            uiGeometry = ui is null ? "unreviewed: " + reason : probeUi ? "reviewed alternative UI, pixel-gated" : "reviewed alternative UI, conditional panels assumed active (probeUi=false)",
+            uiKind = ui?.Kind ?? "unknown",
+            uiGeometry = ui is null ? "unreviewed: " + reason : probeUi ? $"reviewed {ui.Kind} UI ({ui.File}), pixel-gated" : $"reviewed {ui.Kind} UI ({ui.File}), conditional panels assumed active (probeUi=false)",
             occluders = occluders?.Select(o => new { o.Name, rect = new[] { o.X, o.Y, o.W, o.H }, o.Conditional, active = o.Active }).ToArray(),
             safeClickRule = ui is null ? "Unreviewed UI: only central 40%x50% client region trusted for map clicks."
                 : $"Map clicks must be ≥{ui.SafeMargin}px from client edges and active/unknown occluders.",
-            limitation = "Corner rays intersect quantized terrain node heights (not rendered collision); hills can hide ground. Visible bounds approximate the frustum footprint, not occlusion. Pixel probe captures a screenshot (focuses game).",
+            limitation = "Corner rays intersect quantized terrain node heights (not rendered collision); hills can hide ground. Visible bounds approximate the frustum footprint, not occlusion. UI kind detection always captures one screenshot (focuses game); probeUi=false only skips panel gates.",
         };
     }
 
@@ -254,11 +257,12 @@ internal sealed partial class Server
         if (_layout.Selection is not null) selected = EditorView.ReadSelection(game).Length;
         var view = EditorView.ReadView(game);
         var target = view.Target();
-        var ui = SceneUi.TryLoad(game, out var reason);
+        var frame = SceneUi.Capture(game);
+        var ui = SceneUi.TryLoad(game, frame, out var reason);
+        int? editMode = _layout.World is null ? null : LiveWorld.EditMode(game);
         object? panels = null;
         if (ui is not null)
         {
-            var frame = SceneUi.Capture(game);
             panels = new
             {
                 minimapVisible = ui.MinimapVisible(frame),
@@ -272,7 +276,9 @@ internal sealed partial class Server
             placementCursorActive = placementProto != -1, placementProtoId = placementProto, placementPlayer,
             selectedCount = selected,
             cameraTarget = target is { } t ? P(t) : null,
-            panels, uiGeometry = ui is null ? "unreviewed: " + reason : "reviewed alternative UI 2560x1440",
+            editMode = editMode is { } m ? LiveWorld.ModeName(m) ?? $"unknown({m})" : null,
+            uiKind = ui?.Kind ?? "unknown", profileAlternativeUiHint = SceneUi.ProfileAlternativeHint(),
+            panels, uiGeometry = ui is null ? "unreviewed: " + reason : $"reviewed {ui.Kind} UI 2560x1440 ({ui.File})",
             limitation = "Placement cursor/selection read from memory; panel flags from pixel gates on a fresh screenshot (focuses game). Gate failure means not detected, not proof of absence. Dialogs/menus outside reviewed gates are not enumerated.",
         };
     }
@@ -300,7 +306,10 @@ internal sealed partial class Server
             var hit = v.GroundHit(v.RayAt(q.X, q.Y));
             return hit is { } g && Math.Sqrt(Math.Pow(g.X - x, 2) + Math.Pow(g.Z - z, 2)) <= Math.Max(1, tolerance / 2);
         }
-        var occluders = ui?.Occluders(SceneUi.Capture(game));
+        // Normal UI: PlaceUnit mode opens the bottom tool panel + object list palette, so treat those conditional
+        // panels as active even if closed now (a click there placed objects hidden under the palette).
+        SceneUi.Area[]? Occ() => ui is null ? null : ui.Kind == "normal" ? ui.Occluders(null) : ui.Occluders(SceneUi.Capture(game));
+        var occluders = Occ();
         object? camera = null;
         var moved = false;
         if (!Clickable(view, out var projected, occluders))
@@ -313,7 +322,7 @@ internal sealed partial class Server
             camera = CameraLookAt(game, x, z, Math.Max(1, tolerance), 4);
             moved = true;
             view = EditorView.ReadView(game);
-            occluders = ui.Occluders(SceneUi.Capture(game));
+            occluders = Occ();
             if (!Clickable(view, out projected, occluders))
                 throw new WorkflowFailure("TARGET_NOT_CLICKABLE", "camera", "Target still not clickable after camera move (map edge, camera bounds or elevation).",
                     false, false, "Camera moved; scene unchanged. Inspect editor_view_info; choose a point further from the map edge. No placement requested.");
@@ -329,20 +338,53 @@ internal sealed partial class Server
             catch (InvalidDataException e) { last = e; Thread.Sleep(100); }
         }
         if (unit is null)
-            throw new WorkflowFailure("PLACEMENT_NOT_OBSERVED", "observe", "Placement command returned but exactly one new matching object was not observed: " + last?.Message,
+            throw new WorkflowFailure("PLACEMENT_NOT_OBSERVED", "observe", "Placement command returned but exactly one new matching object was not observed: " + last?.Message
+                + PlacementDiagnostics(game, proto, x, z),
                 true, true, "Do not retry. Inspect editor_units_diff/editor_units around target; obstruction or invalid terrain may have blocked placement.");
         var error = Math.Sqrt(Math.Pow(unit.Position.X - x, 2) + Math.Pow(unit.Position.Z - z, 2));
         return new(unit, pixel, error, moved, camera);
     }
 
-    object PlaceAtWorld(Game game, string proto, int player, double x, double z, bool moveCamera, double tolerance)
+    /// <summary>Best-effort read-only hints after a failed placement: footprint overlaps/slope and terrain class.</summary>
+    string PlacementDiagnostics(Game game, string proto, double x, double z)
+    {
+        var hints = new List<string>();
+        try
+        {
+            var report = JsonSerializer.SerializeToElement(FootprintCore(game, [new FootprintItem(0, proto, x, z)], true, 0, 2).Result);
+            foreach (var item in report.GetProperty("items").EnumerateArray())
+                foreach (var issue in item.GetProperty("issues").EnumerateArray())
+                    hints.Add(issue.GetProperty("kind").GetString() + (issue.TryGetProperty("Proto", out var p) && issue.TryGetProperty("UnitId", out var id)
+                        ? $" {p.GetString()}#{id.GetInt32()}" : ""));
+        }
+        catch (Exception e) when (e is InvalidDataException or KeyNotFoundException or InvalidOperationException or WorkflowFailure) { hints.Add("footprint check unavailable"); }
+        if (_layout.World is not null)
+            try
+            {
+                var info = JsonSerializer.SerializeToElement(LiveWorld.TerrainInfo(game, JsonSerializer.SerializeToElement(new { points = new[] { new[] { x, z } } })));
+                var point = info.GetProperty("points")[0];
+                hints.Add($"terrain {point.GetProperty("texture").GetString()} ({point.GetProperty("passability").GetString()})");
+            }
+            catch (Exception e) when (e is InvalidDataException or KeyNotFoundException or InvalidOperationException or ArgumentException) { }
+        return hints.Count == 0 ? " No footprint/terrain issue detected (hidden UI panel or rule outside host checks)." : " Diagnostics: " + string.Join("; ", hints.Take(8)) + ".";
+    }
+
+    object PlaceAtWorld(Game game, string proto, int player, double x, double z, bool moveCamera, double tolerance, double? heading = null)
     {
         var placed = PlaceWorld(game, proto, player, x, z, moveCamera, tolerance);
+        object? rotation = null;
+        if (heading is { } h)
+        {
+            if (_layout.World is null || _layout.Selection is null) throw new InvalidDataException("Heading requires reviewed world/selection layouts; object placed without rotation.");
+            rotation = RotateTo(game, placed.Unit.UnitId, h, true);
+            placed = placed with { Unit = LiveUnits.Read(game).First(u => u.UnitId == placed.Unit.UnitId) };
+        }
         return new
         {
             placed = true, requested = new { proto, player, x, z }, unit = placed.Unit,
             pixel = new { x = placed.Pixel.X, y = placed.Pixel.Y }, positionError = placed.Error,
-            withinTolerance = placed.Error <= tolerance, cameraMoved = placed.CameraMoved, camera = placed.Camera,
+            withinTolerance = placed.Error <= tolerance, snapped = placed.Error > 0.05, // Host threshold: >0.05 units = engine grid snap/obstruction shift.
+            cameraMoved = placed.CameraMoved, camera = placed.Camera, rotation,
             note = placed.Error <= tolerance ? "Exactly one new object observed at requested world position (within tolerance). Scenario not saved."
                 : "Object observed but offset from request (snapping/obstruction). Not undone; inspect and decide.",
         };
@@ -576,7 +618,7 @@ internal sealed partial class Server
         if (args.TryGetProperty("flatSize", out var fs))
         {
             var window = Math.Max(2, (int)Math.Ceiling(fs.GetDouble() * view.InverseScale) + 1);
-            flats = SceneGeometry.FlatSpots(heights, ix0, iz0, view.Scale, window, args.GetProperty("maxDelta").GetDouble(), Int(args, "maxResults", 10))
+            flats = SceneGeometry.FlatSpots(heights, ix0, iz0, view.Scale, window, Dbl(args, "maxDelta", 0.5), Int(args, "maxResults", 10)) // Host default flatness 0.5 height units.
                 .Select(f => new { x = f.X, z = f.Z, f.MinHeight, f.MaxHeight, f.Delta, size = fs.GetDouble() }).ToArray();
         }
         view.Verify();
@@ -662,20 +704,21 @@ internal sealed partial class Server
         var coord = new { type = "number", minimum = -LiveUnits.MaxCoordinate, maximum = LiveUnits.MaxCoordinate };
         var player = new { type = "integer", minimum = 0, maximum = LiveUnits.MaxPlayer };
         yield return Spec("editor_camera_look_at",
-            "Center editor camera on world X/Z by clicking the reviewed alternative-UI minimap (2560×1440, pinned build) in a closed loop: each click is verified from the live camera pose and corrected (maxClicks 1..6, default 4; tolerance world units default 3). Refuses if placement cursor active, minimap pixel gate fails, or first click has no effect. Camera only; no scene mutation. Edge targets may stay offset because of camera bounds.",
+            "Center editor camera on world X/Z by clicking the reviewed minimap (normal or alternative UI, auto-detected; 2560×1440, pinned build) in a closed loop: each click is verified from the live camera pose and corrected (maxClicks 1..6, default 4; tolerance world units default 3). Refuses if placement cursor active, minimap pixel gate fails, or first click has no effect. Camera only; no scene mutation. Edge targets may stay offset because of camera bounds.",
             new Dictionary<string, object> { ["x"] = coord, ["z"] = coord,
                 ["tolerance"] = new { type = "number", minimum = 0.5, maximum = 50 }, ["maxClicks"] = new { type = "integer", minimum = 1, maximum = 6 } },
             ["x", "z"]);
         yield return Spec("editor_view_info",
-            "Read which part of the map is visible: camera target, map size, ground hits of viewport corners/edges, visible world bounds, and UI panels covering the screen (reviewed alternative UI: static panels plus pixel-gated object palette/tool bar; probeUi=false skips screenshot and treats them as active). Use before pixel-based clicks. Read-only.",
+            "Read which part of the map is visible: camera target, map size, ground hits of viewport corners/edges, visible world bounds, and UI panels covering the screen (auto-detected normal/alternative UI: static panels plus pixel-gated panels — normal: bottom tool panel/list palette; alternative: object palette/tool bar; probeUi=false skips screenshot and treats them as active). Use before pixel-based clicks. Read-only.",
             new Dictionary<string, object> { ["probeUi"] = new { type = "boolean" } }, [], true);
         yield return Spec("editor_ui_state",
-            "Read editor UI state: placement cursor active/proto/player, selection count, foreground, client size, camera target, and pixel-gated panels (minimap visible, object palette open, object tool bar) on reviewed alternative UI. Captures one screenshot (focuses game). Read-only.",
+            "Read editor UI state: placement cursor active/proto/player, selection count, current edit mode (memory), detected UI kind (normal/alternative via pixel gates, plus profile hint), foreground, client size, camera target, and pixel-gated panels (minimap visible; normal UI: toolPanel/objectPalette bottom panels; alternative UI: object palette/tool bar). Captures one screenshot (focuses game). Read-only.",
             [], [], true);
         yield return Spec("editor_place_at_world",
-            "Place one object at WORLD X/Z (not pixels). Validates proto against shipped catalog (suggestions on typo), moves camera via minimap if target is not clearly clickable (moveCamera default true), projects terrain-height point to pixels avoiding UI panels and back-checks the ray, places with existing guarded placement, then observes exactly one new object and returns its full live unitId, actual position and positionError (tolerance default 4). Does not save. Never retry on PLACEMENT_NOT_OBSERVED.",
+            "Place one object at WORLD X/Z (not pixels). Validates proto against shipped catalog (suggestions on typo), moves camera via minimap if target is not clearly clickable (moveCamera default true), projects terrain-height point to pixels avoiding UI panels and back-checks the ray, places with existing guarded placement, then observes exactly one new object and returns its full live unitId, actual position and positionError (tolerance default 4). Optional heading (degrees, 180 = editor default facing) rotates the new object afterwards in native 22.5° steps (verified). Does not save. Never retry on PLACEMENT_NOT_OBSERVED.",
             new Dictionary<string, object> { ["proto"] = new { type = "string" }, ["player"] = player, ["x"] = coord, ["z"] = coord,
-                ["moveCamera"] = new { type = "boolean" }, ["tolerance"] = new { type = "number", minimum = 0.5, maximum = 50 } },
+                ["moveCamera"] = new { type = "boolean" }, ["tolerance"] = new { type = "number", minimum = 0.5, maximum = 50 },
+                ["heading"] = new { type = "number", minimum = -3600, maximum = 3600 } },
             ["proto", "x", "z"]);
         yield return Spec("editor_units_snapshot",
             "Capture live object registry into host memory and return a token for editor_units_diff (last 16 kept, reset on reconnect). Optional label. Read-only.",
@@ -713,7 +756,7 @@ internal sealed partial class Server
                 ["maxHeightDelta"] = new { type = "number", minimum = 0, maximum = 1000 } },
             ["items"], true);
         yield return Spec("editor_terrain_grid",
-            "Read terrain node heights over a world rectangle (≤512×512 nodes) with stats and a downsampled grid (≤4096 values; step in world units, default fits 32×32). Optional flatSize+maxDelta find up to maxResults (default 10) non-overlapping flat square sites, nearest area center first. Read-only.",
+            "Read terrain node heights over a world rectangle (≤512×512 nodes) with stats and a downsampled grid (≤4096 values; step in world units, default fits 32×32). Optional flatSize (+maxDelta, default 0.5) finds up to maxResults (default 10) non-overlapping flat square sites, nearest area center first. Read-only.",
             new Dictionary<string, object> { ["minX"] = coord, ["minZ"] = coord, ["maxX"] = coord, ["maxZ"] = coord,
                 ["step"] = new { type = "number", minimum = 0.1, maximum = 10000 }, ["flatSize"] = new { type = "number", minimum = 0.1, maximum = 10000 },
                 ["maxDelta"] = new { type = "number", minimum = 0, maximum = 1000 }, ["maxResults"] = new { type = "integer", minimum = 1, maximum = 50 } },
