@@ -259,7 +259,7 @@ internal sealed partial class Server
                 return Directory.GetFiles(dir, "*.xml").OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal)
                     .Select(f => XDocument.Load(f).Root?.Element("title")?.Value.Trim() ?? Path.GetFileNameWithoutExtension(f)).ToArray();
         }
-        throw new FileNotFoundException("Mix definitions missing. Run --generate generated (CryBar) to export map_definitions/mixes.");
+        throw new FileNotFoundException("Mix definitions missing. Run editor_generate_catalog to export map_definitions/mixes.");
     }
 
     sealed record TileSnapshot(int X0, int Z0, int X1, int Z1, LiveWorld.Tile[,] Tiles, float[][] Heights);
@@ -1240,7 +1240,7 @@ internal sealed partial class Server
             "Read/change the editor tool mode. No args: current edit mode (from memory), active UI kind (normal/alternative via pixel gates + profile hint), open bottom panels, current texture/water/forest/cliff paint selections. exit=true leaves any tool (loops editMode None until mode 0; closes palettes). mode=<name> enters a tool and verifies.",
             new Dictionary<string, object> { ["mode"] = new { type = "string", @enum = LiveWorld.Modes.Select(m => m.Name).ToArray() }, ["exit"] = new { type = "boolean" } }, []);
         yield return Spec("editor_paint_world",
-            "Paint along WORLD points (1..64 [x,z], one point = dab, stroke follows the polyline): kind texture|mix|water|forest|cliff with exact type name (editor_terrain_catalog; case/space-insensitive accepted). Exits current tool, enters the paint tool, selects the type (native setter verified from memory; textures by sampling a visible tile or list-palette OCR; mixes via palette OCR; derived-size palette geometry is scaled, not live-tested), moves camera if needed, drags with the current brush, exits tool (keepMode=false), then verifies tiles/water/heights/objects changed. confirmDestructive=true required (overwrites terrain; forest tool may remove objects).",
+            "Paint along WORLD points (1..64 [x,z], one point = dab, stroke follows the polyline): kind texture|mix (mix needs editor_generate_catalog)|water|forest|cliff with exact type name (editor_terrain_catalog; case/space-insensitive accepted). Exits current tool, enters the paint tool, selects the type (native setter verified from memory; textures by sampling a visible tile or list-palette OCR; mixes via palette OCR; derived-size palette geometry is scaled, not live-tested), moves camera if needed, drags with the current brush, exits tool (keepMode=false), then verifies tiles/water/heights/objects changed. confirmDestructive=true required (overwrites terrain; forest tool may remove objects).",
             new Dictionary<string, object>
             {
                 ["kind"] = new { type = "string", @enum = PaintKinds }, ["type"] = new { type = "string" },
@@ -1267,7 +1267,7 @@ internal sealed partial class Server
                 ["durationMs"] = new { type = "integer", minimum = 100, maximum = 5000 },
             }, TransformRequired);
         yield return Spec("editor_terrain_catalog",
-            "List exact names the editor accepts: textures (with group/type/subtype), water, forest, cliff, lighting (uiApplyLightingSet index→name), civs (civ id→major god), mixes (titles, palette order), editModes. Live kinds read the running game's loaded definitions. filter substring, offset/limit (≤500). Read-only.",
+            "List exact names the editor accepts: textures (with group/type/subtype), water, forest, cliff, lighting (uiApplyLightingSet index→name), civs (civ id→major god), mixes (titles, palette order; needs editor_generate_catalog), editModes. Live kinds read the running game's loaded definitions. filter substring, offset/limit (≤500). Read-only.",
             new Dictionary<string, object>
             {
                 ["kind"] = new { type = "string", @enum = TerrainCatalogKinds }, ["filter"] = new { type = "string" },
@@ -1286,7 +1286,7 @@ internal sealed partial class Server
                 ["includeHelpers"] = new { type = "boolean", @default = false },
             }, [], true);
         yield return Spec("editor_resource_balance",
-            "Per-player resource report: Gaia resource objects/huntables within radii (default [30,60] world units) of each player's TownCenter (or explicit centers [{player,x,z}]): counts, static initial amounts, nearest distance, protos per resource. Read-only.",
+            "Per-player resource report: Gaia resource objects/huntables within radii (default [30,60] world units) of each player's TownCenter (or explicit centers [{player,x,z}]): counts, static initial amounts, nearest distance, protos per resource. Read-only. Needs catalog: editor_generate_catalog.",
             new Dictionary<string, object>
             {
                 ["radii"] = new { type = "array", minItems = 1, maxItems = 5, items = new { type = "number", minimum = 1, maximum = 1000 } },
@@ -1294,7 +1294,7 @@ internal sealed partial class Server
                     properties = new Dictionary<string, object> { ["player"] = player, ["x"] = coord, ["z"] = coord }, required = CenterRequired, additionalProperties = false } },
             }, [], true);
         yield return Spec("editor_mirror_units",
-            "Mirror a player's objects (optionally only within x/z/radius; includeGaiaNear also copies Gaia objects there) to targetPlayer using map symmetry mode point (180° about map center), flipX, flipZ or swapXZ. Preview by default (plan + footprint check); preview=false + confirmPlacement=true places via the world-placement pipeline (≤32 objects). Headings not mirrored.",
+            "Mirror a player's objects (optionally only within x/z/radius; includeGaiaNear also copies Gaia objects there) to targetPlayer using map symmetry mode point (180° about map center), flipX, flipZ or swapXZ. Preview by default (plan + footprint check); preview=false + confirmPlacement=true places via the world-placement pipeline (≤32 objects). Headings not mirrored. Footprint check needs catalog: editor_generate_catalog.",
             new Dictionary<string, object>
             {
                 ["sourcePlayer"] = player, ["targetPlayer"] = player, ["mode"] = new { type = "string", @enum = MirrorModes },
@@ -1304,7 +1304,7 @@ internal sealed partial class Server
                 ["tolerance"] = new { type = "number", minimum = 0.5, maximum = 50 },
             }, MirrorRequired);
         yield return Spec("editor_scatter",
-            "Generate a deterministic cluster of 1..32 objects (e.g. gold mines, trees, berry bushes, hunt) around x/z: shape disc|ring|line (line uses angleDegrees), radius, minSpacing, seed, player (default 0 Gaia). Preview by default with footprint check; preview=false + confirmPlacement=true places via the world-placement pipeline. Large forests: prefer editor_paint_world kind=forest.",
+            "Generate a deterministic cluster of 1..32 objects (e.g. gold mines, trees, berry bushes, hunt) around x/z: shape disc|ring|line (line uses angleDegrees), radius, minSpacing, seed, player (default 0 Gaia). Preview by default with footprint check; preview=false + confirmPlacement=true places via the world-placement pipeline. Large forests: prefer editor_paint_world kind=forest. Footprint check needs catalog: editor_generate_catalog.",
             new Dictionary<string, object>
             {
                 ["proto"] = new { type = "string" }, ["count"] = new { type = "integer", minimum = 1, maximum = SceneGeometry.MaxLayoutItems },

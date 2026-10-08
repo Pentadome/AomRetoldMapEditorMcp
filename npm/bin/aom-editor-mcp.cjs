@@ -23,8 +23,7 @@ aom-editor-mcp setup -GameExe <path> [-Toolset core|full]
 aom-editor-mcp --runtime-dir
 
 Windows x64 only. Bundled .NET runtime; no SDK needed.
-Place separately downloaded CryBar CLI and its dependencies in:
-  ${join(runtime, 'crybar')}
+Game-data catalogs: call MCP tool editor_generate_catalog, or run setup.
 Run setup once, then configure MCP client to launch aom-editor-mcp.
 Server options pass through unchanged, e.g. --exe <path> --toolset core|full.
 Use only in offline scenario editor, never multiplayer.`);

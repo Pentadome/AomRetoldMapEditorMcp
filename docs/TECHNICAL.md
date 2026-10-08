@@ -4,7 +4,7 @@ Detailed reference for developers and AI agents. For a quick overview, see the [
 
 ## Build and run
 
-Windows source build requires .NET 10 SDK and MSVC x64 Build Tools. Metadata generation needs installed Retold and `crybar/crybar.exe`; live operations need running scenario editor. NuGet restores `ModelContextProtocol.Core` 2.2.0 plus `Sdcb.SimdPaddleOCR`/embedded ChineseV6Tiny OCR models; Python smoke checks use only stdlib. Self-contained releases include the OCR assemblies, model DLL, reviewed UI layout and OCR fixtures.
+Windows source build requires .NET 10 SDK and MSVC x64 Build Tools. Clone with `--recurse-submodules` (or `git submodule update --init lib/CryBarEditor`): CryBar's BAR/XMB library is built from that submodule and linked in-process. Metadata generation needs installed Retold; live operations need running scenario editor. NuGet restores `ModelContextProtocol.Core` 2.2.0 plus `Sdcb.SimdPaddleOCR`/embedded ChineseV6Tiny OCR models; Python smoke checks use only stdlib. Self-contained releases include the OCR assemblies, model DLL, reviewed UI layout and OCR fixtures.
 
 ```powershell
 .\build.ps1 -Generate -Test
@@ -56,7 +56,7 @@ Example tag only: use a new, unpublished semver version for each release. Packag
 
 ## Tool surface
 
-Default **core exposes 72 tools**: 63 core helpers plus nine essential native commands. **Full exposes 922 tools**:
+Default **core exposes 73 tools**: 64 core helpers plus nine essential native commands. **Full exposes 923 tools**:
 
 - **434 `editor_*` command tools**: typed scalar/vector arguments from native help. Editor/UI/gadget functions, core editor operations, and additional functions referenced by shipped editor controls/hotkeys. Selected multiplayer/online prefixes excluded.
 - **418 `action_*` tools**: 116 XML command elements, 41 command attributes, 261 `editor.con` hotkey/context expressions. Original compound expressions preserved; `confirmDestructive: true` required.
@@ -124,7 +124,7 @@ Returns separate `units` and `buildings` arrays of exact prototype names, e.g. `
 
 Source: `Data.bar` major-god starting units, reachable active/obtainable tech effects, explicit prototype culture tags and Unit/Building classes—not reused artwork. Results are a potential union across gods/ages; prerequisites/exclusions, god-power scripts and scenario overrides are not fully evaluated. Not a current-player trainability query. Japanese data currently references two missing tech definitions, reported in `unresolvedTechs` rather than hidden.
 
-Run `--generate generated` once (CryBar required) to create ignored `generated/game_catalog.json`; builds copy it beside the host for standalone deployment. This shared cache replaces the earlier pantheon-only artifact. Missing/stale metadata refuses lookup with regeneration guidance. Executable hash plus executable/archive size and UTC modification time detect ordinary updates; file stamps are not cryptographic authenticity checks. Restart host after regeneration. All metadata-only batches also need no game connection.
+Run MCP tool `editor_generate_catalog` (or `--generate generated`) once to create ignored `generated/game_catalog.json`; builds copy it beside the host for standalone deployment. This shared cache replaces the earlier pantheon-only artifact. Missing/stale metadata refuses lookup with regeneration guidance. Executable hash plus executable/archive size and UTC modification time detect ordinary updates; file stamps are not cryptographic authenticity checks. Restart host after regeneration. All metadata-only batches also need no game connection.
 
 ### Objects, gods, technology, terrain and water catalogs
 
@@ -221,7 +221,7 @@ dotnet src\AomMcp\bin\Release\net10.0-windows\AomMcp.dll --generate generated
 Generator:
 
 1. Regenerates typed tools from installed executable's embedded native help.
-2. Uses CryBar to decode installed `UIDefaultEditor.bar`; harvests XML commands/attributes and shipped editor hotkeys. Generated proprietary resources stay ignored by Git.
+2. Uses the linked CryBar library to decode installed `UIDefaultEditor.bar`; harvests XML commands/attributes and shipped editor hotkeys. Generated proprietary resources stay ignored by Git.
 3. Decodes gameplay `proto`, `major_gods`, `minor_gods`, `techtree`, every current archive-listed godpower file, terrain types and water bodies from `Data.bar`; writes shared build/archive-tagged `generated/game_catalog.json`. No game calls required for these catalogs; obsolete power exports are not ingested.
 4. Reads running image, resolves named registration references, recovers dispatcher/context/editor fields through narrow compiler patterns, and verifies context/thread/editor state.
 5. Writes `generated/candidates/<sha256>.json`, **without automatic activation or engine calls**.

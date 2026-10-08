@@ -1,6 +1,6 @@
 # Complete Age of Mythology Retold editor MCP tool reference
 
-**Current full: 922 tools = 70 helpers + 434 native commands + 418 shipped editor actions. Default core: 72 = 63 core helpers + nine essential native commands.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Twelve world editing helpers (core): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
+**Current full: 923 tools = 71 helpers + 434 native commands + 418 shipped editor actions. Default core: 73 = 64 core helpers + nine essential native commands.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Twelve world editing helpers (core): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
 
 Authoritative source: production `aom-retold-editor` `0.1.0` `tools/list` with `--toolset full`, protocol `2025-11-25`. Executable SHA-256: `dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff`.
 
@@ -501,6 +501,7 @@ Read-only, available in core/full; searches cached full-catalog tool names and d
 - [`editor_openWaterBrowserGui`](#editor_openwaterbrowsergui)
 - [`editor_openWaterEditorGui`](#editor_openwatereditorgui)
 - [`editor_pantheon`](#editor_pantheon)
+- [`editor_generate_catalog`](#editor_generate_catalog)
 - [`editor_pause`](#editor_pause)
 - [`editor_place_formation`](#editor_place_formation)
 - [`editor_place_unit`](#editor_place_unit)
@@ -1540,6 +1541,36 @@ Get exact unit/building proto names by pantheon (e.g. greeks -> VillagerGreek, M
   "required": [
     "pantheon"
   ],
+  "additionalProperties": false
+}
+```
+
+### `editor_generate_catalog`
+
+Generate game-data catalogs (prototypes, gods, techs, god powers, terrain/water, mixes, footprints, editor UI XML) from installed game archives with bundled CryBar. Run once per install/game update or when a tool reports metadata missing/stale; catalog tools work immediately afterwards (new action_* UI tools need MCP restart). No game connection. Skips when fresh unless force=true.
+
+**MCP annotations:**
+
+```json
+{
+  "destructiveHint": false,
+  "idempotentHint": true,
+  "openWorldHint": false,
+  "readOnlyHint": false
+}
+```
+
+**Input schema:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "force": {
+      "type": "boolean"
+    }
+  },
+  "required": [],
   "additionalProperties": false
 }
 ```

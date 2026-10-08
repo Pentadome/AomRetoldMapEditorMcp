@@ -1,0 +1,3 @@
+[submodule "lib/CryBarEditor"]
+	path = lib/CryBarEditor
+	url = https://github.com/CryShana/CryBarEditor

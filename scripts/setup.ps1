@@ -4,7 +4,6 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $app = Join-Path $PSScriptRoot 'AomMcp.exe'
-$crybar = Join-Path $PSScriptRoot 'crybar\crybar.exe'
 $generated = Join-Path $PSScriptRoot 'generated'
 if ($env:OS -ne 'Windows_NT') { throw 'Package runs on Windows x64 only.' }
 if (!(Test-Path -LiteralPath $app -PathType Leaf)) { throw 'Run setup.ps1 from extracted release folder.' }
@@ -13,9 +12,6 @@ $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant
 $layout = Join-Path $PSScriptRoot "layouts\$hash.json"
 if (!(Test-Path -LiteralPath $layout -PathType Leaf)) {
     throw 'Unsupported game build. Obtain independently reviewed layout/release; never copy offsets from another build.'
-}
-if (!(Test-Path -LiteralPath $crybar -PathType Leaf)) {
-    throw 'Download CryBar from https://github.com/CryShana/CryBarEditor and place CLI at crybar\crybar.exe beside this script.'
 }
 & $app --exe $exe --generate $generated
 if ($LASTEXITCODE -ne 0) { throw 'Metadata generation failed.' }

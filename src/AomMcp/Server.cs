@@ -397,7 +397,7 @@ internal sealed partial class Server(
             ValidateValue(item, schema.GetProperty("items"), $"{path}[{index++}]");
     }
 
-    static bool ConnectionFree(string name, JsonElement args) => WorkflowNames.Contains(name) || name is "editor_toolset" or "editor_search_tools" or "editor_catalog" or "editor_capabilities" or "editor_export_recovery" or "editor_trigger_list" or "editor_trigger_player_parity" or "editor_trigger_edit" or "editor_players" or "editor_player_dependency_audit" or "editor_stage_ai" or "editor_pantheon" or "editor_dependencies"
+    static bool ConnectionFree(string name, JsonElement args) => WorkflowNames.Contains(name) || name is "editor_toolset" or "editor_search_tools" or "editor_catalog" or "editor_capabilities" or "editor_export_recovery" or "editor_trigger_list" or "editor_trigger_player_parity" or "editor_trigger_edit" or "editor_players" or "editor_player_dependency_audit" or "editor_stage_ai" or "editor_pantheon" or "editor_dependencies" or "editor_generate_catalog"
         || GameDataCatalog.ToolKinds.ContainsKey(name)
         || (name == "editor_terrain_catalog" && args.TryGetProperty("kind", out var catalogKind) && catalogKind.GetString() is "mixes" or "editModes")
         || (name is "editor_set_diplomacy" or "editor_player_settings" && (args.GetProperty("operation").GetString() is "preview" or "verify"))
@@ -505,6 +505,19 @@ internal sealed partial class Server(
         {
             ValidateSchema(args, Tools.First(t => t.Name == name).InputSchema);
             return (_gameData ??= new GameDataCatalog()).Query(exe, _layout.ExeSha256, kind, args);
+        }
+        if (name == "editor_generate_catalog")
+        {
+            Catalog.ValidateObject(args, ["force"]);
+            var output = Generator.DefaultOutput();
+            var force = args.TryGetProperty("force", out var f) && f.GetBoolean();
+            var hadUi = Directory.Exists(Path.Combine(output, "ui"));
+            if (!force && hadUi && GameDataCatalog.IsFresh(exe, _layout.ExeSha256))
+                return new { fresh = true, generated = false, output };
+            var result = Generator.GenerateMetadata(exe, output);
+            _gameData = null; // Next catalog call reloads regenerated metadata without restart.
+            return new { fresh = true, generated = true, result.Output, result.UiFiles, result.DataFiles, result.MixFiles, result.GodPowerFiles,
+                uiActionsNeedRestart = !hadUi };
         }
         if (name == "editor_pantheon")
         {
@@ -1126,7 +1139,7 @@ internal sealed partial class Server(
                 ["limit"] = new { type = "integer", minimum = 1, maximum = LiveUnits.MaxLimit },
             }, [], true);
         yield return Spec("editor_dependencies",
-            "Explain exact proto's static train/build links, positive Enable/CreateUnit/replacement tech effects/raw prerequisites, god starting units and shortest active/obtainable god-to-tech paths. Reuses cached shipped catalogs, no game. Abstract unit-type targets included; paths are potential, NOT evaluated prerequisites/exclusions or current-player trainability. Bounded relations: offset>=0, limit1..200/default50.",
+            "Explain exact proto's static train/build links, positive Enable/CreateUnit/replacement tech effects/raw prerequisites, god starting units and shortest active/obtainable god-to-tech paths. Reuses cached shipped catalogs, no game. Abstract unit-type targets included; paths are potential, NOT evaluated prerequisites/exclusions or current-player trainability. Bounded relations: offset>=0, limit1..200/default50. Needs catalog: editor_generate_catalog.",
             new Dictionary<string, object>
             {
                 ["proto"] = new { type = "string" },
@@ -1203,9 +1216,18 @@ internal sealed partial class Server(
         );
         yield return Spec(
             "editor_pantheon",
-            "Get exact unit/building proto names by pantheon (alias culture; e.g. greeks -> VillagerGreek, MilitaryAcademy). Case-insensitive singular/plural culture names. Generated from shipped culture/start/tech metadata, not guessed names or IDs. Potential union across gods/ages, not current-player trainability; unresolved techs reported. No game connection. Run --generate generated if missing/stale.",
+            "Get exact unit/building proto names by pantheon (alias culture; e.g. greeks -> VillagerGreek, MilitaryAcademy). Case-insensitive singular/plural culture names. Generated from shipped culture/start/tech metadata, not guessed names or IDs. Potential union across gods/ages, not current-player trainability; unresolved techs reported. No game connection. Missing/stale data: run editor_generate_catalog.",
             Props(("pantheon", "string"), ("culture", "string")),
             [],
+            true
+        );
+        yield return Spec(
+            "editor_generate_catalog",
+            "Generate game-data catalogs (prototypes, gods, techs, god powers, terrain/water, mixes, footprints, editor UI XML) from installed game archives with bundled CryBar. Run once per install/game update or when a tool reports metadata missing/stale; catalog tools work immediately afterwards (new action_* UI tools need MCP restart). No game connection. Skips when fresh unless force=true.",
+            Props(("force", "boolean")),
+            [],
+            false,
+            false,
             true
         );
         foreach (var (name, kind) in GameDataCatalog.ToolKinds)
@@ -1221,7 +1243,7 @@ internal sealed partial class Server(
                 _ => throw new InvalidOperationException("Unknown game catalog kind."),
             };
             yield return Spec(name, description
-                + " Read-only, no running game required. name=exact identifier; filter=name/label substring. offset>=0, limit=1..200 (default 50); includeDefinition=false by default. Missing/stale data: --generate generated, then restart MCP.",
+                + " Read-only, no running game required. name=exact identifier; filter=name/label substring. offset>=0, limit=1..200 (default 50); includeDefinition=false by default. Missing/stale data: run editor_generate_catalog.",
                 GameDataCatalog.Properties(kind), [], true);
         }
         // Changes OS foreground only (no editor/scene effect); repeat calls converge on the same state.

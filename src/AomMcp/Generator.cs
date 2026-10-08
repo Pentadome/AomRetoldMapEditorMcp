@@ -6,64 +6,33 @@ namespace AomMcp;
 /// <summary>Regenerates command catalogs and discovers review-only layouts using passive reads.</summary>
 internal static class Generator
 {
+    /// <summary>Counts of files written by <see cref="GenerateMetadata"/>.</summary>
+    internal sealed record MetadataResult(string Output, int UiFiles, int DataFiles, int MixFiles, int GodPowerFiles);
+
     /// <summary>Writes a catalog and attempts passive layout discovery without activating candidates.</summary>
     /// <param name="exe">Installed game executable path.</param>
     /// <param name="output">Directory for catalog, decoded UI, and candidate layout files.</param>
-    /// <param name="ui">Existing decoded editor XML directory, or null to attempt CryBar extraction.</param>
+    /// <param name="ui">Existing decoded editor XML directory, or null to decode it from the installed archive.</param>
     /// <param name="pid">Process to inspect, or null to require exactly one running game.</param>
     /// <remarks>Discovery failure still permits catalog output; guessed addresses are never emitted.</remarks>
     public static void Generate(string exe, string output, string? ui, int? pid)
     {
         Directory.CreateDirectory(output);
-        ui ??= ExportUi(exe, output);
-        var catalog = new Catalog(exe, ui);
-        File.WriteAllText(
-            Path.Combine(output, "catalog.json"),
-            JsonSerializer.Serialize(
-                new
-                {
-                    exeSha256 = Layout.Hash(exe),
-                    commands = catalog.Commands.Values,
-                    actions = catalog.Actions.Values,
-                    tools = catalog.Tools(),
-                    limitations = "Command metadata and UI action coverage regenerate from installed build. Native return is an acknowledgement, not semantic verification.",
-                },
-                Layout.Json
-            )
-        );
+        if (ui == null)
+        {
+            try
+            {
+                ui = ExportUi(exe, output);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Editor UI XML unavailable: " + e.Message + ". Supply --ui with decoded editor XML to generate menu/dialog action tools.");
+            }
+        }
+        var catalog = WriteCommandCatalog(exe, output, ui);
         try
         {
-            var data = Path.Combine(output, "data");
-            Directory.CreateDirectory(data);
-            var crybar = FindCryBar() ?? throw new FileNotFoundException("CryBar required for game catalogs.");
-            var archive = GameDataCatalog.Archive(exe);
-            // Exact shipped definition paths; resource nodes are in proto, not map CRC resources.xml.
-            var paths = new List<string>
-            {
-                "gameplay/proto.xml.XMB", "gameplay/techtree.xml.XMB",
-                "gameplay/major_gods.xml.XMB", "gameplay/minor_gods.xml.XMB",
-                "map_definitions/terrain_types.xml.XMB", "map_definitions/water_bodies.xml.XMB",
-            };
-            using var entries = JsonDocument.Parse(Run(crybar, ["bar", "list", archive, "--json"]));
-            var powers = entries.RootElement.EnumerateArray().Select(e => e.GetProperty("Path").GetString()!)
-                .Where(p => p.StartsWith("gameplay/god_powers/", StringComparison.Ordinal)
-                    && p.EndsWith(".godpowers.XMB", StringComparison.Ordinal)).ToArray();
-            if (powers.Length == 0)
-                throw new InvalidDataException("No shipped godpower definitions found.");
-            paths.AddRange(powers);
-            // Forest/cliff definitions and terrain mixes (paint palette names/order) for editor_terrain_catalog.
-            paths.Add("map_definitions/forest.xml.XMB");
-            paths.Add("map_definitions/cliff_types.xml.XMB");
-            var mixes = entries.RootElement.EnumerateArray().Select(e => e.GetProperty("Path").GetString()!)
-                .Where(p => p.StartsWith("map_definitions/mixes/", StringComparison.Ordinal) && p.EndsWith(".xml.XMB", StringComparison.Ordinal)).ToArray();
-            Directory.CreateDirectory(Path.Combine(data, "mixes"));
-            foreach (var mix in mixes)
-                _ = Run(crybar, ["bar", "export", archive, mix, "--decompress", "--convert", "-o",
-                    Path.Combine(data, "mixes", Path.GetFileName(mix)[..^4])]);
-            foreach (var path in paths)
-                _ = Run(crybar, ["bar", "export", archive, path, "--decompress", "--convert", "-o",
-                    Path.Combine(data, Path.GetFileName(path)[..^4])]); // Remove .XMB after decoding.
-            GameDataCatalog.Generate(exe, output, data, powers.Select(p => Path.GetFileName(p)[..^4]).ToArray());
+            _ = ExportGameData(exe, output);
         }
         catch (Exception e)
         {
@@ -93,92 +62,108 @@ internal static class Generator
         );
     }
 
-    static string? FindCryBar()
+    /// <summary>Decodes editor UI XML and gameplay/map definitions and writes all metadata catalogs; no game connection or layout discovery.</summary>
+    /// <param name="exe">Installed game executable path.</param>
+    /// <param name="output">Metadata directory (normally <see cref="DefaultOutput"/>).</param>
+    /// <exception cref="InvalidDataException">An archive or required definition could not be read.</exception>
+    internal static MetadataResult GenerateMetadata(string exe, string output)
+    {
+        Directory.CreateDirectory(output);
+        var ui = ExportUi(exe, output);
+        _ = WriteCommandCatalog(exe, output, ui);
+        var (data, mixes, powers) = ExportGameData(exe, output);
+        return new(output, Directory.GetFiles(ui, "*", SearchOption.AllDirectories).Length, data, mixes, powers);
+    }
+
+    /// <summary>Existing repository/runtime generated directory, else one beside the executable (release setup.ps1 convention).</summary>
+    internal static string DefaultOutput()
     {
         for (DirectoryInfo? d = new(AppContext.BaseDirectory); d != null; d = d.Parent)
         {
-            var p = Path.Combine(d.FullName, "crybar", "crybar.exe");
-            if (File.Exists(p))
-                return p;
+            var candidate = Path.Combine(d.FullName, "generated");
+            if (Directory.Exists(candidate))
+                return candidate;
         }
-        return null;
+        return Path.Combine(AppContext.BaseDirectory, "generated");
     }
 
-    static string? ExportUi(string exe, string output)
+    static Catalog WriteCommandCatalog(string exe, string output, string? ui)
     {
-        var crybar = FindCryBar();
-        if (crybar == null)
+        var catalog = new Catalog(exe, ui);
+        File.WriteAllText(
+            Path.Combine(output, "catalog.json"),
+            JsonSerializer.Serialize(
+                new
+                {
+                    exeSha256 = Layout.Hash(exe),
+                    commands = catalog.Commands.Values,
+                    actions = catalog.Actions.Values,
+                    tools = catalog.Tools(),
+                    limitations = "Command metadata and UI action coverage regenerate from installed build. Native return is an acknowledgement, not semantic verification.",
+                },
+                Layout.Json
+            )
+        );
+        return catalog;
+    }
+
+    static (int Data, int Mixes, int Powers) ExportGameData(string exe, string output)
+    {
+        var data = Path.Combine(output, "data");
+        Directory.CreateDirectory(data);
+        using var archive = new BarArchive(GameDataCatalog.Archive(exe));
+        // Exact shipped definition paths; resource nodes are in proto, not map CRC resources.xml.
+        var paths = new List<string>
         {
-            Console.WriteLine(
-                "CryBar not found. Supply --ui with decoded editor XML to generate menu/dialog action tools."
-            );
-            return null;
-        }
+            "gameplay/proto.xml.XMB", "gameplay/techtree.xml.XMB",
+            "gameplay/major_gods.xml.XMB", "gameplay/minor_gods.xml.XMB",
+            "map_definitions/terrain_types.xml.XMB", "map_definitions/water_bodies.xml.XMB",
+        };
+        var powers = archive.Paths
+            .Where(p => p.StartsWith("gameplay/god_powers/", StringComparison.Ordinal)
+                && p.EndsWith(".godpowers.XMB", StringComparison.Ordinal)).ToArray();
+        if (powers.Length == 0)
+            throw new InvalidDataException("No shipped godpower definitions found.");
+        paths.AddRange(powers);
+        // Forest/cliff definitions and terrain mixes (paint palette names/order) for editor_terrain_catalog.
+        paths.Add("map_definitions/forest.xml.XMB");
+        paths.Add("map_definitions/cliff_types.xml.XMB");
+        var mixes = archive.Paths
+            .Where(p => p.StartsWith("map_definitions/mixes/", StringComparison.Ordinal) && p.EndsWith(".xml.XMB", StringComparison.Ordinal)).ToArray();
+        foreach (var mix in mixes)
+            archive.ExportXml(mix, Path.Combine(data, "mixes", Path.GetFileName(mix)[..^4]));
+        foreach (var path in paths)
+            archive.ExportXml(path, Path.Combine(data, Path.GetFileName(path)[..^4])); // Remove .XMB after decoding.
+        GameDataCatalog.Generate(exe, output, data, powers.Select(p => Path.GetFileName(p)[..^4]).ToArray());
+        return (paths.Count, mixes.Length, powers.Length);
+    }
+
+    static string ExportUi(string exe, string output)
+    {
         // Installed editor UI archive and .xml.XMB suffixes come from game/ui, not a public SDK.
-        // CryBar CLI subcommands/options/JSON "Path" come from CryBar's bar list/export interface.
-        var archive = Path.Combine(
+        var file = Path.Combine(
             Path.GetDirectoryName(exe)!,
             "game",
             "ui",
             "UIDefaultEditor.bar"
         );
-        var entries = JsonDocument.Parse(Run(crybar, ["bar", "list", archive, "--json"]));
+        using var archive = new BarArchive(file);
         var directory = Path.Combine(output, "ui");
         Directory.CreateDirectory(directory);
-        foreach (var entry in entries.RootElement.EnumerateArray())
+        foreach (var path in archive.Paths)
         {
-            var path = entry.GetProperty("Path").GetString()!;
             if (
                 !path.EndsWith(".xml.XMB", StringComparison.OrdinalIgnoreCase)
                 && !path.EndsWith(".xml", StringComparison.OrdinalIgnoreCase)
             )
                 continue;
-            var basename = Path.GetFileName(path.Replace('\\', '/'));
-            // Drop four chars (".XMB") after --convert decodes binary XML into text XML.
+            var basename = Path.GetFileName(path);
+            // Drop four chars (".XMB") after decoding binary XML into text XML.
             if (basename.EndsWith(".XMB", StringComparison.OrdinalIgnoreCase))
                 basename = basename[..^4];
-            _ = Run(
-                crybar,
-                [
-                    "bar",
-                    "export",
-                    archive,
-                    path,
-                    "--decompress",
-                    "--convert",
-                    "-o",
-                    Path.Combine(directory, basename),
-                ]
-            );
+            archive.ExportXml(path, Path.Combine(directory, basename));
         }
-        entries.Dispose();
         return directory;
-    }
-
-    static string Run(string exe, string[] args)
-    {
-        var info = new ProcessStartInfo(exe)
-        {
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-        };
-        foreach (var arg in args)
-            info.ArgumentList.Add(arg);
-        using var p =
-            Process.Start(info) ?? throw new InvalidOperationException("Could not start CryBar.");
-        var stdout = p.StandardOutput.ReadToEndAsync();
-        var stderr = p.StandardError.ReadToEndAsync();
-        // Host policy: extraction subprocess gets 30 s; not a CryBar format requirement.
-        if (!p.WaitForExit(30000))
-        {
-            p.Kill(true);
-            throw new TimeoutException("CryBar timed out.");
-        }
-        if (p.ExitCode != 0)
-            throw new InvalidOperationException(stderr.GetAwaiter().GetResult());
-        return stdout.GetAwaiter().GetResult();
     }
 
     internal static Layout Discover(string exe, int? pid)

@@ -48,14 +48,14 @@ Download `AomRetoldMapEditorMcp-win-x64.zip` from [Releases](https://github.com/
 
 ## Optional: game-data catalogs
 
-Some tools look up game data, like exact unit names for a pantheon, gods, techs and terrain types. They need metadata generated from your own game files with [CryBar](https://github.com/CryShana/CryBarEditor). Without it, everything else still works. Setup steps are in [npm/README.md](npm/README.md#optional-game-data-catalogs).
+Some tools look up game data, like exact unit names for a pantheon, gods, techs and terrain types. They need metadata generated from your own game files. Ask the agent to run `editor_generate_catalog` (no game needed; uses the bundled [CryBar](https://github.com/CryShana/CryBarEditor) library). Without it, everything else still works.
 
 ## Good to know
 
 - **Offline editor only.** Never use it in multiplayer.
 - **Save your work first.** The agent can change and delete things. Edits aren't atomic, and a failed step isn't rolled back.
 - **Game updates** can break support until the project is updated for the new build. Unknown versions are refused instead of guessed.
-- The server starts with a smaller **core** tool set (72 tools). The agent can switch to the **full** set (900+ tools) when needed.
+- The server starts with a smaller **core** tool set (73 tools). The agent can switch to the **full** set (900+ tools) when needed.
 - Normal and alternative editor UIs are both supported. Best tested at 2560×1440 and 1920×1080.
 
 ## More docs
@@ -67,7 +67,7 @@ Some tools look up game data, like exact unit names for a pantheon, gods, techs 
 
 ## Credits
 
-Thanks to **CryShana** for [CryBar / CryBarEditor](https://github.com/CryShana/CryBarEditor), which is used to read the game's data archives.
+Thanks to **CryShana** for [CryBar / CryBarEditor](https://github.com/CryShana/CryBarEditor), whose library (git submodule `lib/CryBarEditor`, bundled in releases) reads the game's data archives.
 
 ## License
 

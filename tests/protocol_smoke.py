@@ -846,7 +846,7 @@ try:
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
     expected_core = (helper_names - workflow_names) | core_native
-    assert len(expected_core) == 72 and len(names) == 922
+    assert len(expected_core) == 73 and len(names) == 923
     world_tools = {'editor_terrain_info', 'editor_live_players', 'editor_edit_mode', 'editor_paint_world', 'editor_elevation',
                    'editor_transform_unit', 'editor_terrain_catalog', 'editor_camera_frame', 'editor_overview',
                    'editor_resource_balance', 'editor_mirror_units', 'editor_scatter'}
@@ -1001,7 +1001,7 @@ try:
                     if condition in ('fresh', 'touched_exe'):
                         assert not lookup['isError'] and lookup['structuredContent'] == roster, lookup
                     else:
-                        assert lookup['isError'] and '--generate' in lookup['content'][0]['text'], lookup
+                        assert lookup['isError'] and 'editor_generate_catalog' in lookup['content'][0]['text'], lookup
                         assert lookup['structuredContent']['code'] in ('METADATA_STALE', 'FILE_NOT_FOUND'), lookup
                         assert lookup['structuredContent']['retrySafe'] and lookup['structuredContent']['nativeDispatched'] is False, lookup
                     for catalog_name in game_catalogs:
@@ -1009,7 +1009,7 @@ try:
                         if condition in ('fresh', 'touched_exe'):
                             assert not lookup['isError'] and lookup['structuredContent']['entries'], lookup
                         else:
-                            assert lookup['isError'] and '--generate' in lookup['content'][0]['text'], lookup
+                            assert lookup['isError'] and 'editor_generate_catalog' in lookup['content'][0]['text'], lookup
                 finally:
                     assert p.stdin is not None and p.stderr is not None
                     p.stdin.close()

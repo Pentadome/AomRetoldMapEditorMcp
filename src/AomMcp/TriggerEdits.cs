@@ -466,7 +466,7 @@ internal static class TriggerEdits
             if (File.Exists(candidate)) { file = candidate; break; }
         }
         file ??= Path.Combine(AppContext.BaseDirectory, "game_catalog.json");
-        if (!File.Exists(file)) return ["Prototype catalog unavailable; names not validated."];
+        if (!File.Exists(file)) return ["Prototype catalog unavailable; names not validated. Run editor_generate_catalog."];
         using var document = JsonDocument.Parse(File.ReadAllText(file));
         var known = document.RootElement.GetProperty("catalogs").GetProperty("prototypes")
             .EnumerateArray().Select(p => p.GetProperty("name").GetString()!).ToHashSet(StringComparer.OrdinalIgnoreCase);

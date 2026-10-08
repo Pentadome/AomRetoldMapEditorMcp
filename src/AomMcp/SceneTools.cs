@@ -548,7 +548,7 @@ internal sealed partial class Server
     FootprintReport FootprintCore(Game game, FootprintItem[] items, bool includeExisting, double margin, double maxHeightDelta)
     {
         var catalog = TryFootprints(out var reason) ?? throw new WorkflowFailure("METADATA_UNAVAILABLE", "metadata",
-            "Footprint checks need shipped prototype obstruction radii: " + reason, false, false, "Run --generate generated and restart MCP. No game input.");
+            "Footprint checks need shipped prototype obstruction radii: " + reason, false, false, "Run editor_generate_catalog. No game input.");
         var view = EditorView.ReadView(game);
         var existing = includeExisting ? LiveUnits.Read(game) : [];
         var skippedExisting = 0;
@@ -717,7 +717,7 @@ internal sealed partial class Server
             "Read editor UI state: placement cursor active/proto/player, selection count, current edit mode (memory), detected UI kind (normal/alternative via pixel gates, plus profile hint), foreground, client size, camera target, and pixel-gated panels (minimap visible; normal UI: toolPanel/objectPalette bottom panels; alternative UI: object palette/tool bar). Captures one screenshot (focuses game). Read-only.",
             [], [], true);
         yield return Spec("editor_place_at_world",
-            "Place one object at WORLD X/Z (not pixels). Validates proto against shipped catalog (suggestions on typo), moves camera via minimap if target is not clearly clickable (moveCamera default true), projects terrain-height point to pixels avoiding UI panels and back-checks the ray, places with existing guarded placement, then observes exactly one new object and returns its full live unitId, actual position and positionError (tolerance default 4). Optional heading (degrees, 180 = editor default facing) rotates the new object afterwards in native 22.5° steps (verified). Does not save. Never retry on PLACEMENT_NOT_OBSERVED.",
+            "Place one object at WORLD X/Z (not pixels). Validates proto against shipped catalog (suggestions on typo), moves camera via minimap if target is not clearly clickable (moveCamera default true), projects terrain-height point to pixels avoiding UI panels and back-checks the ray, places with existing guarded placement, then observes exactly one new object and returns its full live unitId, actual position and positionError (tolerance default 4). Optional heading (degrees, 180 = editor default facing) rotates the new object afterwards in native 22.5° steps (verified). Does not save. Never retry on PLACEMENT_NOT_OBSERVED. Proto check skipped without catalog (editor_generate_catalog).",
             new Dictionary<string, object> { ["proto"] = new { type = "string" }, ["player"] = player, ["x"] = coord, ["z"] = coord,
                 ["moveCamera"] = new { type = "boolean" }, ["tolerance"] = new { type = "number", minimum = 0.5, maximum = 50 },
                 ["heading"] = new { type = "number", minimum = -3600, maximum = 3600 } },
@@ -752,7 +752,7 @@ internal sealed partial class Server
             required = LayoutItemRequired, additionalProperties = false,
         };
         yield return Spec("editor_check_footprints",
-            "Check planned objects (1..64 {proto,x,z}) before placing: unknown proto (with suggestions), outside map, overlap with other planned items and existing live objects (shipped obstruction radii, axis-aligned, margin default 0), and uneven ground (node height range > maxHeightDelta, default 2). includeExisting default true. Read-only; not the engine's full placement rules.",
+            "Check planned objects (1..64 {proto,x,z}) before placing: unknown proto (with suggestions), outside map, overlap with other planned items and existing live objects (shipped obstruction radii, axis-aligned, margin default 0), and uneven ground (node height range > maxHeightDelta, default 2). includeExisting default true. Read-only; not the engine's full placement rules. Needs catalog: editor_generate_catalog.",
             new Dictionary<string, object> { ["items"] = new { type = "array", minItems = 1, maxItems = SceneGeometry.MaxFootprintItems, items = footprintItem },
                 ["includeExisting"] = new { type = "boolean" }, ["margin"] = new { type = "number", minimum = 0, maximum = 100 },
                 ["maxHeightDelta"] = new { type = "number", minimum = 0, maximum = 1000 } },
@@ -777,7 +777,7 @@ internal sealed partial class Server
             required = FormationRequired, additionalProperties = false,
         };
         yield return Spec("editor_apply_layout",
-            "Declarative WORLD-unit placement of 1..32 objects: items [{proto,player,x,z}] or formation {proto,player,shape rows|ring,count,spacing (world units),x,z,columns,angleDegrees}. preview=true (default) returns plan + footprint check (connects read-only, no input). preview=false requires confirmPlacement=true; refuses on footprint issues unless allowIssues=true; then places each via editor_place_at_world logic (camera moves as needed), observing every new ID. Stops on first error, partial results; no retry/rollback/save.",
+            "Declarative WORLD-unit placement of 1..32 objects: items [{proto,player,x,z}] or formation {proto,player,shape rows|ring,count,spacing (world units),x,z,columns,angleDegrees}. preview=true (default) returns plan + footprint check (connects read-only, no input). preview=false requires confirmPlacement=true; refuses on footprint issues unless allowIssues=true; then places each via editor_place_at_world logic (camera moves as needed), observing every new ID. Stops on first error, partial results; no retry/rollback/save. Footprint check needs catalog: editor_generate_catalog.",
             new Dictionary<string, object> { ["items"] = new { type = "array", minItems = 1, maxItems = SceneGeometry.MaxLayoutItems, items = layoutItem },
                 ["formation"] = formation, ["preview"] = new { type = "boolean" }, ["confirmPlacement"] = new { type = "boolean" },
                 ["checkFootprints"] = new { type = "boolean" }, ["allowIssues"] = new { type = "boolean" },

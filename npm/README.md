@@ -39,12 +39,9 @@ The default path is `C:\Program Files (x86)\Steam\steamapps\common\Age of Mythol
 
 Tools that look up game data (unit names per pantheon, gods, techs, terrain, etc.) need metadata generated from your game files. Everything else works without it.
 
-1. Download [CryBar CLI](https://github.com/CryShana/CryBarEditor).
-2. Find the package's runtime folder and put `crybar.exe` and its files in `<runtime>\crybar\`:
-   ```powershell
-   npx -y aom-retold-editor-mcp@0.1.0 --runtime-dir
-   ```
-3. Run setup:
+Ask the agent to run the `editor_generate_catalog` tool. It needs no running game and uses the bundled [CryBar](https://github.com/CryShana/CryBarEditor) library.
+
+Or run setup:
    ```powershell
    npx -y aom-retold-editor-mcp@0.1.0 setup -GameExe 'C:\Program Files (x86)\Steam\steamapps\common\Age of Mythology Retold\AoMRT_s.exe'
    ```

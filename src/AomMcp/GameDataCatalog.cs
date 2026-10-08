@@ -41,7 +41,7 @@ internal sealed class GameDataCatalog
         }
         file ??= Path.Combine(AppContext.BaseDirectory, FileName); // Standalone packaged fallback.
         if (!File.Exists(file))
-            throw new FileNotFoundException("Game catalog metadata missing. Run --generate generated with CryBar installed.");
+            throw new FileNotFoundException("Game catalog metadata missing. Run editor_generate_catalog (or --generate generated).");
         using var document = JsonDocument.Parse(File.ReadAllText(file));
         _data = document.RootElement.Clone();
     }
@@ -49,6 +49,20 @@ internal sealed class GameDataCatalog
     // Installed archive path, shared by generator and lookup freshness checks.
     internal static string Archive(string exe) =>
         Path.Combine(Path.GetDirectoryName(exe)!, "game", "data", "Data.bar");
+
+    /// <summary>True when generated metadata exists and matches the installed executable/archive.</summary>
+    internal static bool IsFresh(string exe, string hash)
+    {
+        try
+        {
+            new GameDataCatalog().CheckFresh(exe, hash);
+            return true;
+        }
+        catch (Exception e) when (e is FileNotFoundException or WorkflowFailure or JsonException or KeyNotFoundException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
 
     void CheckFresh(string exe, string hash)
     {
@@ -62,7 +76,7 @@ internal sealed class GameDataCatalog
             || !archive.Exists || archive.Length != _data.GetProperty("archiveLength").GetInt64()
             || archive.LastWriteTimeUtc != _data.GetProperty("archiveWriteTimeUtc").GetDateTime())
             throw new WorkflowFailure("METADATA_STALE", "metadata", "Game catalog metadata stale (executable hash/length or Data.bar size/time changed).", false, false,
-                "Run --generate generated and restart MCP. Metadata read only; no game connection or native command occurred.");
+                "Run editor_generate_catalog (or --generate generated, then restart MCP). Metadata read only; no game connection or native command occurred.");
     }
 
     string Culture(string name)

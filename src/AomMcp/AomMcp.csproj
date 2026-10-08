@@ -14,6 +14,8 @@
     <PackageReference Include="ModelContextProtocol.Core" Version="2.2.0" />
     <PackageReference Include="Sdcb.SimdPaddleOCR" Version="1.4.2" />
     <PackageReference Include="Sdcb.SimdPaddleOCR.Models.ChineseV6Tiny" Version="1.0.0" />
+    <!-- BAR/XMB decoding for metadata generation; lib/CryBarEditor git submodule. -->
+    <ProjectReference Include="../../lib/CryBarEditor/CryBar/CryBar.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None
