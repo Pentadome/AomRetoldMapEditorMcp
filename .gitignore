@@ -24,3 +24,5 @@ crybar
 plans
 artifacts
 generated
+# Research screenshots: local evidence only (removed from tree, kept in history before 00f9fe1)
+research/*.png

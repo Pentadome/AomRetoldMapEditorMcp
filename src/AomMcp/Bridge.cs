@@ -85,7 +85,6 @@ internal sealed class Bridge : IDisposable
         if (payload.Length is 0 or >= PayloadCapacity)
             throw new ArgumentException("Command exceeds bridge limit.");
         game.Focus();
-        _ = game.Editor();
         // Packet nonce is a 32-bit DWORD (4 random bytes); x8 matches native %08lx formatting.
         // Local\\ scopes the mapping to this Windows session; PID + nonce identify one host request.
         var nonce = BitConverter.ToUInt32(RandomNumberGenerator.GetBytes(4));

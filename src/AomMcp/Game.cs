@@ -222,7 +222,7 @@ internal sealed class Game : IDisposable
         for (var i = 0; i < 25 && Win.GetForegroundWindow() != Window; i++)
             System.Threading.Thread.Sleep(20); // WM_ACTIVATE can arrive after SetForegroundWindow returns.
         if (Win.GetForegroundWindow() != Window)
-            throw new InvalidOperationException("Game could not receive focus; no input sent.");
+            throw new FocusRefusedException();
     }
 
     /// <summary>Focuses the editor and moves the pointer within its client rectangle.</summary>
@@ -246,3 +246,6 @@ internal sealed class Game : IDisposable
         Process.Dispose();
     }
 }
+
+/// <summary>Game window did not become foreground; thrown before any input or native dispatch.</summary>
+public sealed class FocusRefusedException() : InvalidOperationException("Game could not receive focus; no input sent.");

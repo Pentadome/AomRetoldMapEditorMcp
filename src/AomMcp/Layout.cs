@@ -62,11 +62,24 @@ public sealed record Layout
         WriteIndented = true,
     };
 
-    /// <summary>Computes a file's lowercase SHA-256 hash.</summary>
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (long Length, DateTime Written, string Hash)> Hashes =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Computes a file's lowercase SHA-256 hash, reusing it while length and write time are unchanged.</summary>
     /// <param name="path">Path to the file to hash.</param>
     /// <returns>Lowercase hexadecimal digest.</returns>
-    public static string Hash(string path) =>
-        Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path)));
+    public static string Hash(string path)
+    {
+        // Game exe is ~91 MB and connected on every tool call; rehash only when the file changes.
+        var file = new FileInfo(Path.GetFullPath(path));
+        if (Hashes.TryGetValue(file.FullName, out var cached) && cached.Length == file.Length
+            && cached.Written == file.LastWriteTimeUtc)
+            return cached.Hash;
+        using var stream = file.OpenRead();
+        var hash = Convert.ToHexStringLower(SHA256.HashData(stream));
+        Hashes[file.FullName] = (file.Length, file.LastWriteTimeUtc, hash);
+        return hash;
+    }
 
     /// <summary>Loads a layout and refuses mismatched hashes or incomplete guard metadata.</summary>
     /// <param name="path">Layout JSON file path.</param>

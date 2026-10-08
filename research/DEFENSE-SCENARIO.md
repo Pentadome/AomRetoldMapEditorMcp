@@ -42,3 +42,5 @@ Units spawn in spaced rows and receive aggressive attack-move orders toward Town
 - Trigger template expansion consumes percent-delimited text even inside snippets. Avoid modulo syntax here; use `i - 6 * (i / 6)` instead. Compound arithmetic victory predicate moved into integer variable for XS parser compatibility.
 - Keyboard uses scan codes; key and mouse button presses held briefly across frame polls and released in `finally`. Focus acquisition waits for asynchronous activation.
 - Base's first editor-placed object is scenario unit ID 0; controller depends on that identity. Replacing/deleting it requires updating controller target.
+
+Screenshot `.png` files named here were removed from the tree to keep clones small; read them from git history at commit `00f9fe1` (e.g. `git show 00f9fe1:research/<name>.png > <name>.png`).

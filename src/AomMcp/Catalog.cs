@@ -307,7 +307,12 @@ internal sealed partial class Catalog
         if (!double.IsFinite(value) || value < -float.MaxValue || value > float.MaxValue)
             throw new ArgumentException("Non-finite/out-of-range float.");
         // .NET "R" = round-trip float format; invariant decimal dot matches XS parsing, not OS locale.
-        return ((float)value).ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+        var single = (float)value;
+        var text = single.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+        // "R" switches to exponent form (1E-08, 1E+20); spell such values out as plain decimals instead.
+        return text.Contains('E')
+            ? ((double)single).ToString("0." + new string('#', 60), System.Globalization.CultureInfo.InvariantCulture)
+            : text;
     }
 
     /// <summary>Builds a command's MCP input schema with required types and confirmation flags.</summary>

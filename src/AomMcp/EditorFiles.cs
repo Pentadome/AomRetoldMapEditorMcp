@@ -236,7 +236,7 @@ internal static class EditorFiles
         catch (Exception e)
         {
             // Game.Focus throws before any input/native dispatch; empty host reservation is safe to remove.
-            if (e.Message.Contains("no input sent", StringComparison.OrdinalIgnoreCase) && new FileInfo(path).Length == 0)
+            if (e is FocusRefusedException && new FileInfo(path).Length == 0)
             {
                 File.Delete(path);
                 throw new WorkflowFailure("FOCUS_NOT_GRANTED", "focus", e.Message, false, false,
@@ -455,7 +455,7 @@ internal static class EditorFiles
             var focusPath = Path.Combine(temporary, "focus.trg");
             try
             {
-                Export(focusPath, false, (_, _) => throw new InvalidOperationException("Game could not receive focus; no input sent."), () => { });
+                Export(focusPath, false, (_, _) => throw new FocusRefusedException(), () => { });
                 throw new InvalidOperationException("Focus fixture did not refuse.");
             }
             catch (WorkflowFailure e) when (e.Code == "FOCUS_NOT_GRANTED")

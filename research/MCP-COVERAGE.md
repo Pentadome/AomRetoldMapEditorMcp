@@ -85,3 +85,5 @@ Generated means **exposed with schema**, not that each tool's result has been in
 Known builds use accepted hash-pinned layouts; unknown builds fail closed. New-build generator writes review-only candidates. Narrow compiler patterns may stop matching after updates; no promise of indefinite patch survival. Manually inspect/adapt generator/layout if needed rather than activating guessed addresses.
 
 Native dispatcher normal return means an acknowledgement only. Queued effects can happen later. Timeout may follow successful mutation; inspect before retry, never automatic retry. UI interaction requires focused/uncovered game and appropriate dialog/mode. Destructive-capable tools need client/operator approvals even when explicit action confirmations are present.
+
+Screenshot `.png` files named here were removed from the tree to keep clones small; read them from git history at commit `00f9fe1` (e.g. `git show 00f9fe1:research/<name>.png > <name>.png`).
