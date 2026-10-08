@@ -26,6 +26,7 @@ internal sealed partial class Server(
     readonly Layout _layout = Layout.Load(layoutPath, Layout.Hash(exe));
     readonly Bridge _bridge = new(bridgePath);
     GameDataCatalog? _gameData; // All gameplay/map catalogs share one lazy cache, never a game connection.
+    XsApi? _xsApi; // Shipped signature-only XS API; local install help read lazily.
     bool _disposed;
     volatile bool _fullTools = fullTools; // Publish selected immutable tool snapshot to concurrent list requests.
     // Shipped game/config/editor.con binds Ctrl+N/L/S to new/load/save; ALT+F4 is Windows close.
@@ -397,7 +398,7 @@ internal sealed partial class Server(
             ValidateValue(item, schema.GetProperty("items"), $"{path}[{index++}]");
     }
 
-    static bool ConnectionFree(string name, JsonElement args) => WorkflowNames.Contains(name) || name is "editor_toolset" or "editor_search_tools" or "editor_catalog" or "editor_capabilities" or "editor_export_recovery" or "editor_trigger_list" or "editor_trigger_player_parity" or "editor_trigger_edit" or "editor_players" or "editor_player_dependency_audit" or "editor_stage_ai" or "editor_pantheon" or "editor_dependencies" or "editor_generate_catalog"
+    static bool ConnectionFree(string name, JsonElement args) => WorkflowNames.Contains(name) || name is "editor_toolset" or "editor_search_tools" or "editor_catalog" or "editor_capabilities" or "editor_export_recovery" or "editor_trigger_list" or "editor_trigger_player_parity" or "editor_trigger_edit" or "editor_players" or "editor_player_dependency_audit" or "editor_stage_ai" or "editor_pantheon" or "editor_dependencies" or "editor_generate_catalog" or "editor_xs_api"
         || GameDataCatalog.ToolKinds.ContainsKey(name)
         || (name == "editor_terrain_catalog" && args.TryGetProperty("kind", out var catalogKind) && catalogKind.GetString() is "mixes" or "editModes")
         || (name is "editor_set_diplomacy" or "editor_player_settings" && (args.GetProperty("operation").GetString() is "preview" or "verify"))
@@ -505,6 +506,11 @@ internal sealed partial class Server(
         {
             ValidateSchema(args, Tools.First(t => t.Name == name).InputSchema);
             return (_gameData ??= new GameDataCatalog()).Query(exe, _layout.ExeSha256, kind, args);
+        }
+        if (name == "editor_xs_api")
+        {
+            Catalog.ValidateObject(args, ["name", "filter", "kind", "context", "library", "includeLocal", "offset", "limit"]);
+            return (_xsApi ??= XsApi.Load(exe)).Query(args);
         }
         if (name == "editor_generate_catalog")
         {
@@ -938,7 +944,7 @@ internal sealed partial class Server(
                 ["limit"] = new { type = "integer", minimum = 1, maximum = 200 },
             }, ["path", "templatePlayer", "targetPlayer"], true);
         yield return Spec("editor_trigger_edit",
-            "Preview-first patch/clone of reviewed TR v12 records in exported .trg. Single operation or edits array (1..64 distinct source triggers) applied in memory with one new output and grouped diff. expectedSha256/source triggerId/expectedName mandatory; clone needs unique newId/newName. Optional active/loop, removeEffects/removeConditions indices (at least one element of each kind remains), labels (printable ASCII, changes element Kind/display label), duplicates (byte-exact copies of original conditions/effects appended in order; max 32), replacements for reviewed single-value numeric Player/PlayerID/FromPlayerID/ToPlayerID/EventID/TechID/Count/Dist/Status/Value/Duration and string ProtoUnit/UnitType/Command/QVName/Op params with expected old value. Indexes use ORIGINAL numbering; duplicates are numbered after originals per kind (e.g. first effect duplicate = original effect count), so a replacement can retarget a copy before removals renumber the result. objectReplacements use complete expected/new objects tuples {unitId,player,proto}, selected by original kind/elementIndex or copyHandle. copyEffects (max 32) use handle/sourceTriggerId/expectedSourceName/effectIndex/beforeEffectIndex; source always immutable original export, insertion before original destination index (original count means end), equal positions preserve request order. Copies retain commands/expression extras/flags. preview=true default, no file or game change. preview=false requires new outputPath + confirmWrite=true; no scenario file edits. Refuses unknown references/group membership and validates original records remain byte-identical.",
+            "Preview-first patch/clone of reviewed TR v12 records in exported .trg. Single operation or edits array (1..64 distinct source triggers) applied in memory with one new output and grouped diff. expectedSha256/source triggerId/expectedName mandatory; clone needs unique newId/newName. Optional active/loop, removeEffects/removeConditions indices (at least one element of each kind remains), labels (printable ASCII, changes element Kind/display label), duplicates (byte-exact copies of original conditions/effects appended in order; max 32), replacements for reviewed single-value numeric Player/PlayerID/FromPlayerID/ToPlayerID/EventID/TechID/Count/Dist/Status/Value/Duration and string ProtoUnit/UnitType/Command/QVName/Op params with expected old value. Indexes use ORIGINAL numbering; duplicates are numbered after originals per kind (e.g. first effect duplicate = original effect count), so a replacement can retarget a copy before removals renumber the result. objectReplacements use complete expected/new objects tuples {unitId,player,proto}, selected by original kind/elementIndex or copyHandle. copyEffects (max 32) use handle/sourceTriggerId/expectedSourceName/effectIndex/beforeEffectIndex; source always immutable original export, insertion before original destination index (original count means end), equal positions preserve request order. Copies retain commands/expression extras/flags. preview=true default, no file or game change. preview=false requires new outputPath + confirmWrite=true; no scenario file edits. Refuses unknown references/group membership and validates original records remain byte-identical. Trigger XS syscalls: editor_xs_api context=trigger.",
             new Dictionary<string, object>
             {
                 ["operation"] = new { type = "string", @enum = TriggerEditOperations },
@@ -1228,6 +1234,14 @@ internal sealed partial class Server(
             [],
             false,
             false,
+            true
+        );
+        yield return Spec(
+            "editor_xs_api",
+            "Look up the XS scripting API for AI (.xs personalities), random map and trigger scripts: engine syscalls (signatures, defaults, which script kinds may call them) and shipped library functions/classes/globals/rules (rm/lib, rm/lib2, ai/core, ai/human_assist) with include path, file:line and a short summary. Official syscall help and source comments are added from the local install when present. name=exact (case-insensitive); filter=space-separated terms over names/summaries; kind=any|syscall|function|class|global|rule|aiPlanConstant; context=any|ai|randomMap|trigger; library=library id or syscall group (e.g. kbfuncs); includeLocal default true; offset>=0, limit 1..100 (default 20). Read-only, no game connection.",
+            Props(("name", "string"), ("filter", "string"), ("kind", "string"), ("context", "string"), ("library", "string"),
+                ("includeLocal", "boolean"), ("offset", "integer"), ("limit", "integer")),
+            [],
             true
         );
         foreach (var (name, kind) in GameDataCatalog.ToolKinds)

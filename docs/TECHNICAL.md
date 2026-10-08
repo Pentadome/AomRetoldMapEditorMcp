@@ -56,7 +56,7 @@ Example tag only: use a new, unpublished semver version for each release. Packag
 
 ## Tool surface
 
-Default **core exposes 73 tools**: 64 core helpers plus nine essential native commands. **Full exposes 923 tools**:
+Default **core exposes 74 tools**: 65 core helpers plus nine essential native commands. **Full exposes 924 tools**:
 
 - **434 `editor_*` command tools**: typed scalar/vector arguments from native help. Editor/UI/gadget functions, core editor operations, and additional functions referenced by shipped editor controls/hotkeys. Selected multiplayer/online prefixes excluded.
 - **418 `action_*` tools**: 116 XML command elements, 41 command attributes, 261 `editor.con` hotkey/context expressions. Original compound expressions preserved; `confirmDestructive: true` required.
@@ -125,6 +125,10 @@ Returns separate `units` and `buildings` arrays of exact prototype names, e.g. `
 Source: `Data.bar` major-god starting units, reachable active/obtainable tech effects, explicit prototype culture tags and Unit/Building classes—not reused artwork. Results are a potential union across gods/ages; prerequisites/exclusions, god-power scripts and scenario overrides are not fully evaluated. Not a current-player trainability query. Japanese data currently references two missing tech definitions, reported in `unresolvedTechs` rather than hidden.
 
 Run MCP tool `editor_generate_catalog` (or `--generate generated`) once to create ignored `generated/game_catalog.json`; builds copy it beside the host for standalone deployment. This shared cache replaces the earlier pantheon-only artifact. Missing/stale metadata refuses lookup with regeneration guidance. Executable hash plus executable/archive size and UTC modification time detect ordinary updates; file stamps are not cryptographic authenticity checks. Restart host after regeneration. All metadata-only batches also need no game connection.
+
+### XS scripting API
+
+`editor_xs_api` searches engine syscalls (from the game's shipped VS Code extension, `vscodeextensionretail/xs.vsix`) and the reusable shipped XS libraries (`random_maps/lib`, `random_maps/lib2`, `ai/core`, `ai/human_assist`): functions, class members/methods, globals and rules, with script contexts (AI, random map, trigger), include paths and file:line. The repository ships only signatures, names, types and default values in `xs/xs_api.json` plus this project's own one-line summaries in `xs/xs_summaries.json`; official syscall help text and source comments are read from the user's install at query time and never committed or packaged (`tests/package_smoke.ps1` checks this). After a game update, maintainers refresh with `AomMcp --exe <game> --build-xs-api xs/xs_api.json` and add summaries for new library entries.
 
 ### Objects, gods, technology, terrain and water catalogs
 

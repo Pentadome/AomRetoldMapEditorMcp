@@ -670,6 +670,20 @@ try:
         {'name': 'editor_catalog', 'arguments': {'filter': 'uiLoadTriggers'}},
     ]})
     assert not local_trigger_batch['isError'], local_trigger_batch
+    # Shipped XS API: signatures + own summaries only; includeLocal=false keeps it independent of the install.
+    xs_spec = next(t for t in tools if t['name'] == 'editor_xs_api')
+    assert xs_spec['annotations']['readOnlyHint'] and xs_spec['inputSchema']['required'] == []
+    xs = tool('editor_xs_api', {'name': 'kbUnitCount', 'includeLocal': False})
+    assert not xs['isError'] and xs['structuredContent']['total'] == 1, xs
+    entry = xs['structuredContent']['entries'][0]
+    assert entry['kind'] == 'syscall' and entry['signature'].startswith('int kbUnitCount(') and 'officialHelp' not in entry, entry
+    assert set(entry['contexts']) == {'ai', 'randomMap', 'trigger'}, entry
+    xs = tool('editor_xs_api', {'name': 'createSymmetricBoxConstraint', 'library': 'rm/lib2', 'includeLocal': False})
+    entry = xs['structuredContent']['entries'][0]
+    assert entry['include'] == 'lib2/rm_util.xs' and entry['summary'] and 'sourceComment' not in entry, entry
+    xs = tool('editor_xs_api', {'filter': 'forest', 'context': 'trigger', 'kind': 'function', 'includeLocal': False})
+    assert xs['structuredContent']['total'] == 0, xs  # Library functions are random-map/AI only.
+    assert tool('editor_xs_api', {'kind': 'bogus'})['isError']
     pantheon_spec = next(t for t in tools if t['name'] == 'editor_pantheon')
     assert pantheon_spec['annotations']['readOnlyHint'] and not pantheon_spec['annotations']['destructiveHint']
     # pantheon or its alias culture; one is required at call time.
@@ -846,7 +860,7 @@ try:
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
     expected_core = (helper_names - workflow_names) | core_native
-    assert len(expected_core) == 73 and len(names) == 923
+    assert len(expected_core) == 74 and len(names) == 924
     world_tools = {'editor_terrain_info', 'editor_live_players', 'editor_edit_mode', 'editor_paint_world', 'editor_elevation',
                    'editor_transform_unit', 'editor_terrain_catalog', 'editor_camera_frame', 'editor_overview',
                    'editor_resource_balance', 'editor_mirror_units', 'editor_scatter'}

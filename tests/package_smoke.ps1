@@ -18,6 +18,10 @@ try {
         if (!(Test-Path -LiteralPath (Join-Path $root $name) -PathType Leaf)) { throw "Missing package file: $name" }
     }
     if (!(Get-ChildItem -LiteralPath (Join-Path $root 'layouts') -Filter '*.json')) { throw 'Reviewed layouts missing.' }
+    # Shipped XS API must stay signature-only: official syscall help text is read from the user's install, never packaged.
+    $xsApi = Join-Path $root 'xs/xs_api.json'
+    if (!(Test-Path -LiteralPath $xsApi -PathType Leaf) -or !(Test-Path -LiteralPath (Join-Path $root 'xs/xs_summaries.json') -PathType Leaf)) { throw 'XS API files missing.' }
+    if ((Get-Content -LiteralPath $xsApi -Raw) -match '"help"\s*:') { throw 'XS API contains official help text.' }
     $config = Get-Content -LiteralPath (Join-Path $root 'AomMcp.runtimeconfig.json') -Raw | ConvertFrom-Json
     if (!$config.runtimeOptions.includedFrameworks -or $config.runtimeOptions.framework -or $config.runtimeOptions.frameworks) {
         throw 'Package must be self-contained, not require installed .NET runtime.'

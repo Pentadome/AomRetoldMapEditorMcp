@@ -9,7 +9,8 @@ var exe = @"C:\Program Files (x86)\Steam\steamapps\common\Age of Mythology Retol
 var bridge = Path.Combine(AppContext.BaseDirectory, "AomEditorBridge.dll");
 string? layoutPath = null,
     ui = null,
-    generate = null;
+    generate = null,
+    buildXsApi = null;
 int? pid = null;
 var selfTest = false;
 var localOnly = false;
@@ -37,6 +38,10 @@ for (var i = 0; i < args.Length; i++)
             break;
         case "--generate":
             generate = Path.GetFullPath(Value());
+            break;
+        case "--build-xs-api":
+            // Maintainer-only: refresh shipped signature-only xs/xs_api.json from an installed game.
+            buildXsApi = Path.GetFullPath(Value());
             break;
         case "--toolset":
             fullTools = Value() switch
@@ -123,6 +128,11 @@ if (selfTest)
     Console.WriteLine(
         $"Self-tests passed; {catalog.Commands.Count} command tools, {catalog.Actions.Count} UI actions. No game calls performed."
     );
+    return;
+}
+if (buildXsApi != null)
+{
+    XsApi.Build(exe, buildXsApi);
     return;
 }
 if (generate != null)

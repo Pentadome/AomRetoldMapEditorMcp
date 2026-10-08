@@ -1,6 +1,6 @@
 # Complete Age of Mythology Retold editor MCP tool reference
 
-**Current full: 923 tools = 71 helpers + 434 native commands + 418 shipped editor actions. Default core: 73 = 64 core helpers + nine essential native commands.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Twelve world editing helpers (core): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
+**Current full: 924 tools = 72 helpers + 434 native commands + 418 shipped editor actions. Default core: 74 = 65 core helpers + nine essential native commands.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Twelve world editing helpers (core): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
 
 Authoritative source: production `aom-retold-editor` `0.1.0` `tools/list` with `--toolset full`, protocol `2025-11-25`. Executable SHA-256: `dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff`.
 
@@ -502,6 +502,7 @@ Read-only, available in core/full; searches cached full-catalog tool names and d
 - [`editor_openWaterEditorGui`](#editor_openwatereditorgui)
 - [`editor_pantheon`](#editor_pantheon)
 - [`editor_generate_catalog`](#editor_generate_catalog)
+- [`editor_xs_api`](#editor_xs_api)
 - [`editor_pause`](#editor_pause)
 - [`editor_place_formation`](#editor_place_formation)
 - [`editor_place_unit`](#editor_place_unit)
@@ -1568,6 +1569,57 @@ Generate game-data catalogs (prototypes, gods, techs, god powers, terrain/water,
   "properties": {
     "force": {
       "type": "boolean"
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}
+```
+
+### `editor_xs_api`
+
+Look up the XS scripting API for AI (.xs personalities), random map and trigger scripts: engine syscalls (signatures, defaults, which script kinds may call them) and shipped library functions/classes/globals/rules (rm/lib, rm/lib2, ai/core, ai/human_assist) with include path, file:line and a short summary. Official syscall help and source comments are added from the local install when present. name=exact (case-insensitive); filter=space-separated terms over names/summaries; kind=any|syscall|function|class|global|rule|aiPlanConstant; context=any|ai|randomMap|trigger; library=library id or syscall group (e.g. kbfuncs); includeLocal default true; offset>=0, limit 1..100 (default 20). Read-only, no game connection.
+
+**MCP annotations:**
+
+```json
+{
+  "destructiveHint": false,
+  "idempotentHint": true,
+  "openWorldHint": false,
+  "readOnlyHint": true
+}
+```
+
+**Input schema:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "filter": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "context": {
+      "type": "string"
+    },
+    "library": {
+      "type": "string"
+    },
+    "includeLocal": {
+      "type": "boolean"
+    },
+    "offset": {
+      "type": "integer"
+    },
+    "limit": {
+      "type": "integer"
     }
   },
   "required": [],

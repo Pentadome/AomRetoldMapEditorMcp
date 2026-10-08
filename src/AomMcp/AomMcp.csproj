@@ -30,6 +30,8 @@
       CopyToOutputDirectory="PreserveNewest"
       Condition="'$(IncludeGameCatalog)' != 'false' and Exists('../../generated/game_catalog.json')"
     />
+    <!-- Signature-only XS API plus own-words library summaries (maintainer refresh via the build-xs-api option). -->
+    <None Include="../../xs/*.json" Link="xs/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../uilayouts/*.json" Link="uilayouts/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tests/fixtures/ocr-*.bgra" Link="fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../tests/fixtures/playtest-ui-evidence*.json" Link="fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
