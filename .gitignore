@@ -17,3 +17,10 @@ __pycache__/
 /npm/*.tgz
 /npm/package-lock.json
 /npm/LICENSE
+
+.tmp
+catalogs
+crybar
+plans
+artifacts
+generated
