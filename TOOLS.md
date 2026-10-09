@@ -1,6 +1,6 @@
 # Complete Age of Mythology Retold editor MCP tool reference
 
-**Current full: 925 tools = 73 helpers + 434 native commands + 418 shipped editor actions. Default core: 75 = 66 core helpers + nine essential native commands; `editor_call` reaches every other tool from core.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Twelve world editing helpers (core): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
+**Current full: 926 tools = 74 helpers + 434 native commands + 418 shipped editor actions. Default core: 76 = 67 core helpers + nine essential native commands; `editor_call` reaches every other tool from core.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Twelve world editing helpers (core): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
 
 Authoritative source: production `aom-retold-editor` `0.1.0` `tools/list` with `--toolset full`, protocol `2025-11-25`. Executable SHA-256: `dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff`.
 
@@ -517,6 +517,7 @@ Available in core/full. Calls any full-catalog tool by exact name without switch
 - [`editor_pantheon`](#editor_pantheon)
 - [`editor_generate_catalog`](#editor_generate_catalog)
 - [`editor_xs_api`](#editor_xs_api)
+- [`editor_dialogs`](#editor_dialogs)
 - [`editor_pause`](#editor_pause)
 - [`editor_place_formation`](#editor_place_formation)
 - [`editor_place_unit`](#editor_place_unit)
@@ -1562,7 +1563,9 @@ Get exact unit/building proto names by pantheon (e.g. greeks -> VillagerGreek, M
 
 ### `editor_generate_catalog`
 
-Generate game-data catalogs (prototypes, gods, techs, god powers, terrain/water, mixes, footprints, editor UI XML) from installed game archives with bundled CryBar. Run once per install/game update or when a tool reports metadata missing/stale; catalog tools work immediately afterwards (new action_* UI tools need MCP restart). No game connection. Skips when fresh unless force=true.
+Generate game-data catalogs (prototypes, gods, techs, god powers, terrain/water, mixes, footprints, normal+alternative editor UI XML and dialogs) from installed game archives with bundled CryBar. Run once per install/game update or when a tool reports metadata missing/stale; catalog tools work immediately afterwards (new action_* UI tools need MCP restart). No game connection. Skips when fresh unless force=true.
+
+**Required arguments:** None.
 
 **MCP annotations:**
 
@@ -1634,6 +1637,58 @@ Look up the XS scripting API for AI (.xs personalities), random map and trigger 
     },
     "limit": {
       "type": "integer"
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}
+```
+
+### `editor_dialogs`
+
+Understand editor dialogs, windows, panels and menus without screenshots: decoded normal and alternative editor UI XML. Without name: list windows (filter = space-separated terms over window names, titles, control labels/tooltips, menu paths and scripts; returns open names and matching controls). name = exact window or open name (e.g. PlayerEditDlg, DiplomacyDialog, trEditor, VictoryConditions): its controls in order with type, English label/tooltip, value kind/config binding, source size1024 rect (not client pixels), and the native commands each button/menu/radio item runs, as {tool, arguments} calls ready for editor_call. openNames: gadgetReal names with live status and close name per UI (link self/live/xml/name); openedBy: menus/buttons that open it. Value fields without scripts are read by engine dialog code on Apply (no command). ui=both|normal|alternative; offset/limit page windows or controls (1..200). No game connection; missing/stale data: editor_generate_catalog.
+
+**Required arguments:** None.
+
+**MCP annotations:**
+
+```json
+{
+  "destructiveHint": false,
+  "idempotentHint": true,
+  "openWorldHint": false,
+  "readOnlyHint": true
+}
+```
+
+**Input schema:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "ui": {
+      "type": "string",
+      "enum": [
+        "both",
+        "normal",
+        "alternative"
+      ]
+    },
+    "name": {
+      "type": "string"
+    },
+    "filter": {
+      "type": "string"
+    },
+    "offset": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200
     }
   },
   "required": [],

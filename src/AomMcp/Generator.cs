@@ -7,7 +7,7 @@ namespace AomMcp;
 internal static class Generator
 {
     /// <summary>Counts of files written by <see cref="GenerateMetadata"/>.</summary>
-    internal sealed record MetadataResult(string Output, int UiFiles, int DataFiles, int MixFiles, int GodPowerFiles);
+    internal sealed record MetadataResult(string Output, int UiFiles, int DataFiles, int MixFiles, int GodPowerFiles, int DialogWindows);
 
     /// <summary>Writes a catalog and attempts passive layout discovery without activating candidates.</summary>
     /// <param name="exe">Installed game executable path.</param>
@@ -40,6 +40,19 @@ internal static class Generator
         }
         try
         {
+            var directories = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (ui != null)
+                directories["normal"] = ui;
+            var (_, archive, directory) = DialogCatalog.Interfaces.Single(i => i.Ui == "alternative");
+            directories["alternative"] = ExportUi(exe, output, archive, directory);
+            Console.WriteLine($"Dialog catalog: {DialogCatalog.Generate(exe, output, catalog.Commands, directories)} editor windows.");
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine("Dialog catalog unavailable: " + e.Message);
+        }
+        try
+        {
             var layout = Discover(exe, pid);
             var candidates = Path.Combine(output, "candidates");
             Directory.CreateDirectory(candidates);
@@ -69,10 +82,12 @@ internal static class Generator
     internal static MetadataResult GenerateMetadata(string exe, string output)
     {
         Directory.CreateDirectory(output);
-        var ui = ExportUi(exe, output);
-        _ = WriteCommandCatalog(exe, output, ui);
+        var directories = DialogCatalog.Interfaces.ToDictionary(i => i.Ui, i => ExportUi(exe, output, i.Archive, i.Directory), StringComparer.Ordinal);
+        var ui = directories["normal"];
+        var catalog = WriteCommandCatalog(exe, output, ui);
         var (data, mixes, powers) = ExportGameData(exe, output);
-        return new(output, Directory.GetFiles(ui, "*", SearchOption.AllDirectories).Length, data, mixes, powers);
+        var dialogs = DialogCatalog.Generate(exe, output, catalog.Commands, directories);
+        return new(output, directories.Values.Sum(d => Directory.GetFiles(d, "*", SearchOption.AllDirectories).Length), data, mixes, powers, dialogs);
     }
 
     /// <summary>Existing repository/runtime generated directory, else one beside the executable (release setup.ps1 convention).</summary>
@@ -138,17 +153,12 @@ internal static class Generator
         return (paths.Count, mixes.Length, powers.Length);
     }
 
-    static string ExportUi(string exe, string output)
+    // Normal editor UI by default; DialogCatalog.Interfaces names the alternative archive/directory.
+    static string ExportUi(string exe, string output, string archiveName = "UIDefaultEditor.bar", string directoryName = "ui")
     {
-        // Installed editor UI archive and .xml.XMB suffixes come from game/ui, not a public SDK.
-        var file = Path.Combine(
-            Path.GetDirectoryName(exe)!,
-            "game",
-            "ui",
-            "UIDefaultEditor.bar"
-        );
-        using var archive = new BarArchive(file);
-        var directory = Path.Combine(output, "ui");
+        // Installed editor UI archives and .xml.XMB suffixes come from game/ui, not a public SDK.
+        using var archive = new BarArchive(DialogCatalog.ArchivePath(exe, archiveName));
+        var directory = Path.Combine(output, directoryName);
         Directory.CreateDirectory(directory);
         foreach (var path in archive.Paths)
         {

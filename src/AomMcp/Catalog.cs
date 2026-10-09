@@ -447,7 +447,7 @@ internal sealed partial class Catalog
     // Live sessions (normal and alternative UI, 2560x1440, build 100.19.17020.0): gadgetReal(name), screenshot,
     // gadgetUnreal(name), screenshot, pixel diff against a pre-sweep baseline. Menu paths come from decoded
     // ui_editor_menu.xml <submenu> scripts. Names are game identifiers, not proof for other builds.
-    static readonly (string Name, string Opens)[] VerifiedGadgets =
+    internal static readonly (string Name, string Opens)[] VerifiedGadgets =
     [
         ("NewScenarioGadget", "File > New; its Generate/Create button replaces the scenario"),
         ("PlayerEditDlg", "Scenario > Player Data"),
@@ -489,13 +489,13 @@ internal sealed partial class Catalog
         ("NewScenarioDialog", "same New Scenario window"),
     ];
 
-    static readonly (string Name, string Opens)[] NormalOnlyGadgets =
+    internal static readonly (string Name, string Opens)[] NormalOnlyGadgets =
     [
         ("MapElevationGadget", "World > Map Elevation"),
         ("CombatCommands", "Objects > Formation Commands button grid"),
     ];
 
-    static readonly (string Name, string Opens)[] AlternativeOnlyGadgets =
+    internal static readonly (string Name, string Opens)[] AlternativeOnlyGadgets =
     [
         ("PlayerDiplomacyDialog", "Diplomacy grid"),
         ("AniMode", "animation/cinematics tool bar in place of the terrain tool bar"),
@@ -508,19 +508,26 @@ internal sealed partial class Catalog
         ("Add-dialog", "new script name popup"),
     ];
 
-    static readonly string[] NoVisibleEffectGadgets =
+    internal static readonly string[] NoVisibleEffectGadgets =
     [
         "HelpDialog", "waterColorDialog", "animgadget", "camEdit-position-window", "soundgadget", "SPCNoteDlg",
         "ScenarioSummaryDialog", "CameraStartDlg", "MapElevationDialog",
     ];
 
-    static readonly string[] AlternativeNoVisibleEffectGadgets =
+    internal static readonly string[] AlternativeNoVisibleEffectGadgets =
     [
         "MapSettings", "MapSizeSection", "BrushSelectorPanel", "PaintTerrainTool", "MoreCamTools", "Stats",
         "TGEditor-Groups", "TGEditor-Triggers",
     ];
 
-    static readonly string[] ShownByDefaultGadgets = ["EditorMenu", "ToolBar", "TerraMode"];
+    internal static readonly string[] ShownByDefaultGadgets = ["EditorMenu", "ToolBar", "TerraMode"];
+
+    // Alternative UI: these opened windows ignored gadgetUnreal(open name); the listed inner XML name closed them.
+    internal static readonly Dictionary<string, string> AlternativeCloseNames = new(StringComparer.Ordinal)
+    {
+        ["DiplomacyDialog"] = "PlayerDiplomacyDialog",
+        ["ATriggerGadget"] = "trEditor",
+    };
 
     static readonly HashSet<string> GadgetNoteNames = new(
         VerifiedGadgets.Concat(NormalOnlyGadgets).Concat(AlternativeOnlyGadgets).Select(g => g.Name)

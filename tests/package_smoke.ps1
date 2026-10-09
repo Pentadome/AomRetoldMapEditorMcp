@@ -27,7 +27,7 @@ try {
         throw 'Package must be self-contained, not require installed .NET runtime.'
     }
     if (Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object {
-        $_.Name -eq 'game_catalog.json' -or $_.Extension -in @('.bar', '.XMB', '.mythscn') -or
+        $_.Name -in @('game_catalog.json', 'dialogs.json') -or $_.Extension -in @('.bar', '.XMB', '.mythscn') -or
         $_.FullName -match '[\\/](generated|crybar|research|bin|obj)[\\/]'
     }) { throw 'Package contains game/generated/research files.' }
     foreach ($name in @('AomMcp.exe', 'AomEditorBridge.dll')) {
@@ -56,7 +56,7 @@ try {
         $entries = & "$env:SystemRoot\System32\tar.exe" -tf $NpmPackage
         if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect npm tarball.' }
         if ($entries | Where-Object {
-            $_ -match '\.(bar|xmb|mythscn)$|game_catalog\.json$|/(generated|crybar|research|test|scripts|node_modules)/'
+            $_ -match '\.(bar|xmb|mythscn)$|(game_catalog|dialogs)\.json$|/(generated|crybar|research|test|scripts|node_modules)/'
         }) { throw 'npm tarball contains game/generated/development files.' }
         $npmRoot = Join-Path $root 'npm-install'
         & npm.cmd install --offline --ignore-scripts --no-audit --no-fund --package-lock=false --prefix $npmRoot $NpmPackage

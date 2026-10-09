@@ -765,6 +765,43 @@ try:
         {'name': 'editor_catalog', 'arguments': {'filter': 'uiSetProtoCursor'}}]})
     assert not lookup_batch['isError'] and lookup_batch['structuredContent']['completed'] == 2, lookup_batch
     assert lookup_batch['structuredContent']['steps'][0]['structuredContent'] == roster
+    # Editor dialog catalog: decoded normal+alternative UI XML, metadata only.
+    dialogs_spec = next(t for t in tools if t['name'] == 'editor_dialogs')
+    assert dialogs_spec['annotations']['readOnlyHint'] and not dialogs_spec['annotations']['destructiveHint']
+    assert dialogs_spec['inputSchema']['required'] == [] and dialogs_spec['inputSchema']['properties']['limit']['maximum'] == 200
+    assert dialogs_spec['inputSchema']['properties']['ui']['enum'] == ['both', 'normal', 'alternative']
+    listing = tool('editor_dialogs', {'limit': 2})
+    assert not listing['isError'] and listing['structuredContent']['total'] > 100 and listing['structuredContent']['nextOffset'] == 2, listing
+    assert not listing['structuredContent']['warnings'], listing
+    normal_only = tool('editor_dialogs', {'ui': 'normal', 'limit': 200})['structuredContent']
+    assert {e['ui'] for e in normal_only['entries']} == {'normal'} and normal_only['total'] < listing['structuredContent']['total']
+    dialog_diplomacy = tool('editor_dialogs', {'name': 'diplomacydialog', 'ui': 'alternative', 'limit': 3})['structuredContent']
+    window, = dialog_diplomacy['windows']
+    assert window['window'] == 'PlayerDiplomacyDialog' and window['title'] == 'Diplomacy' and len(window['controls']) == 3, window
+    wrapper = next(n for n in window['openNames'] if n['name'] == 'DiplomacyDialog')
+    assert wrapper == {'name': 'DiplomacyDialog', 'target': 'PlayerDiplomacyDialog', 'link': 'live', 'status': 'opens', 'close': 'PlayerDiplomacyDialog'}, wrapper
+    assert window['nextOffset'] == 3 and window['controlsTotal'] > 100
+    both = tool('editor_dialogs', {'name': 'PlayerEditDlg', 'limit': 200})['structuredContent']['windows']
+    assert [w['ui'] for w in both] == ['normal', 'alternative'] and all(w['window'] == 'PlayerEdit' for w in both), both
+    trigger = tool('editor_dialogs', {'name': 'trEditor', 'ui': 'alternative', 'limit': 200})['structuredContent']['windows'][0]
+    load = next(c for c in trigger['controls'] if c['name'] == 'trEdit-LoadAllTriggers')
+    assert load['label'] == 'Load all triggers' and load['scripts'][0]['calls'][0] == {
+        'command': 'uiImportTriggers', 'tool': 'editor_uiImportTriggers', 'arguments': {}}, load
+    assert next(n for n in trigger['openNames'] if n['name'] == 'ATriggerGadget')['close'] == 'trEditor'
+    menu = tool('editor_dialogs', {'name': 'EditorMenu', 'ui': 'normal'})['structuredContent']['windows'][0]['menu']
+    victory = next(m for m in menu if m['path'] == 'Scenario > Victory Conditions')
+    assert victory['script']['calls'][0]['arguments'] == {'name': 'VictoryConditionsGadget'}, victory
+    found = tool('editor_dialogs', {'filter': 'victory conditions'})['structuredContent']['entries']
+    assert {('normal', 'VictoryConditions'), ('alternative', 'VictoryConditions')} <= {(e['ui'], e['window']) for e in found}, found
+    assert tool('editor_dialogs', {'filter': 'AOM_NO_SUCH_DIALOG_TERM'})['structuredContent']['total'] == 0
+    assert tool('editor_dialogs', {'name': 'PlayerEditDlg', 'offset': 100000})['structuredContent']['windows'][0]['controls'] == []
+    for args in [{'name': 'AOM_NO_SUCH_WINDOW'}, {'ui': 'bogus'}, {'limit': 0}, {'limit': 201}, {'offset': -1},
+                 {'filter': 42}, {'unexpected': True}]:
+        assert tool('editor_dialogs', args)['isError'], args
+    dialog_batch = tool('editor_batch', {'steps': [
+        {'name': 'editor_dialogs', 'arguments': {'name': 'VictoryConditionsGadget', 'ui': 'normal'}},
+        {'name': 'editor_pantheon', 'arguments': {'pantheon': 'Greeks'}}]})
+    assert not dialog_batch['isError'] and dialog_batch['structuredContent']['completed'] == 2, dialog_batch
     game_catalogs = ['editor_prototypes', 'editor_gods', 'editor_technologies',
                      'editor_god_powers', 'editor_terrain_types', 'editor_water_types']
     assert set(game_catalogs) <= set(names)
@@ -914,7 +951,7 @@ try:
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
     expected_core = (helper_names - workflow_names) | core_native
-    assert len(expected_core) == 75 and len(names) == 925
+    assert len(expected_core) == 76 and len(names) == 926
     world_tools = {'editor_terrain_info', 'editor_live_players', 'editor_edit_mode', 'editor_paint_world', 'editor_elevation',
                    'editor_transform_unit', 'editor_terrain_catalog', 'editor_camera_frame', 'editor_overview',
                    'editor_resource_balance', 'editor_mirror_units', 'editor_scatter'}
@@ -1045,6 +1082,8 @@ try:
             shutil.copytree(app.parent, deploy)
             metadata = deploy / 'game_catalog.json'
             original = json.loads(metadata.read_text())
+            dialog_metadata = deploy / 'dialogs.json'
+            dialog_original = json.loads(dialog_metadata.read_text())
             for condition in ['fresh', 'touched_exe', 'wrong_hash', 'changed_exe', 'changed_archive', 'missing']:
                 altered = dict(original)
                 if condition == 'touched_exe':
@@ -1056,10 +1095,19 @@ try:
                     altered['exeLength'] = -1  # Impossible size fixture, no executable writes.
                 if condition == 'changed_archive':
                     altered['archiveLength'] = -1  # Impossible size; do not touch real Data.bar.
+                dialog_altered = json.loads(json.dumps(dialog_original))
+                if condition == 'wrong_hash':
+                    dialog_altered['exeSha256'] = '0' * 64
+                if condition == 'changed_exe':
+                    dialog_altered['exeLength'] = -1
+                if condition == 'changed_archive':
+                    dialog_altered['archives'][-1]['length'] = -1  # Alternative UI archive; real file untouched.
                 if condition == 'missing':
                     metadata.unlink()
+                    dialog_metadata.unlink()
                 else:
                     metadata.write_text(json.dumps(altered))
+                    dialog_metadata.write_text(json.dumps(dialog_altered))
                 p = subprocess.Popen(['dotnet', str(deploy / app.name), '--pid', '2147483647'],
                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                      text=True, cwd=root, creationflags=subprocess.CREATE_NO_WINDOW)
@@ -1074,6 +1122,12 @@ try:
                         assert lookup['isError'] and 'editor_generate_catalog' in lookup['content'][0]['text'], lookup
                         assert lookup['structuredContent']['code'] in ('METADATA_STALE', 'FILE_NOT_FOUND'), lookup
                         assert lookup['structuredContent']['retrySafe'] and lookup['structuredContent']['nativeDispatched'] is False, lookup
+                    lookup = tool('editor_dialogs', {'name': 'DiplomacyDialog', 'ui': 'alternative', 'limit': 3})
+                    if condition in ('fresh', 'touched_exe'):
+                        assert not lookup['isError'] and lookup['structuredContent']['windows'] == dialog_diplomacy['windows'], lookup
+                    else:
+                        assert lookup['isError'] and 'editor_generate_catalog' in lookup['content'][0]['text'], lookup
+                        assert lookup['structuredContent']['code'] in ('METADATA_STALE', 'FILE_NOT_FOUND'), lookup
                     for catalog_name in game_catalogs:
                         lookup = tool(catalog_name, {'limit': 1})
                         if condition in ('fresh', 'touched_exe'):

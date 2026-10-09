@@ -48,7 +48,7 @@ Download `AomRetoldMapEditorMcp-win-x64.zip` from [Releases](https://github.com/
 
 ## Optional: game-data catalogs
 
-Some tools look up game data, like exact unit names for a pantheon, gods, techs and terrain types. They need metadata generated from your own game files. Ask the agent to run `editor_generate_catalog` (uses the bundled [CryBar](https://github.com/CryShana/CryBarEditor) library).
+Some tools look up game data, like exact unit names for a pantheon, gods, techs and terrain types, or what every editor dialog contains and which commands its buttons run (`editor_dialogs`). They need metadata generated from your own game files. Ask the agent to run `editor_generate_catalog` (uses the bundled [CryBar](https://github.com/CryShana/CryBarEditor) library).
 
 For writing AI, random map and trigger scripts, `editor_xs_api` looks up engine functions and the game's shipped script libraries. The project ships only their signatures and its own short summaries; the game's official help text is read from your install.
 
@@ -57,7 +57,7 @@ For writing AI, random map and trigger scripts, `editor_xs_api` looks up engine 
 - **Offline editor only.** Never use it in multiplayer.
 - **Save your work first.** The agent can change and delete things. Edits aren't atomic, and a failed step isn't rolled back.
 - **Game updates** can break support until the project is updated for the new build. Unknown versions are refused instead of guessed.
-- The server starts with a smaller **core** tool set (75 tools). From core the agent can still find and call any of the 900+ **full** tools through `editor_search_tools` and `editor_call`, or switch to the full set when needed.
+- The server starts with a smaller **core** tool set (76 tools). From core the agent can still find and call any of the 900+ **full** tools through `editor_search_tools` and `editor_call`, or switch to the full set when needed.
 - Normal and alternative editor UIs are both supported. Best tested at 2560×1440 and 1920×1080.
 
 ## More docs

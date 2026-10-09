@@ -83,6 +83,7 @@ if (ui == null)
 if (selfTest)
 {
     Catalog.SelfTest();
+    DialogCatalog.SelfTest();
     Ui.SelfTest();
     Server.OverviewSelfTest();
     ScreenProbe.SelfTest();

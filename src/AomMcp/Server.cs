@@ -27,6 +27,7 @@ internal sealed partial class Server(
     readonly Bridge _bridge = new(bridgePath);
     GameDataCatalog? _gameData; // All gameplay/map catalogs share one lazy cache, never a game connection.
     XsApi? _xsApi; // Shipped signature-only XS API; local install help read lazily.
+    DialogCatalog? _dialogs; // Decoded normal/alternative editor UI windows; metadata only.
     bool _disposed;
     volatile bool _fullTools = fullTools; // Publish selected immutable tool snapshot to concurrent list requests.
     // Shipped game/config/editor.con binds Ctrl+N/L/S to new/load/save; ALT+F4 is Windows close.
@@ -441,7 +442,7 @@ internal sealed partial class Server(
 
     static bool ConnectionFree(string name, JsonElement args) => name == CallToolName
         ? CallTarget(args) is var (target, targetArgs) && ConnectionFree(target, targetArgs)
-        : WorkflowNames.Contains(name) || name is "editor_toolset" or "editor_search_tools" or "editor_catalog" or "editor_capabilities" or "editor_export_recovery" or "editor_trigger_list" or "editor_trigger_player_parity" or "editor_trigger_edit" or "editor_players" or "editor_player_dependency_audit" or "editor_stage_ai" or "editor_pantheon" or "editor_dependencies" or "editor_generate_catalog" or "editor_xs_api"
+        : WorkflowNames.Contains(name) || name is "editor_toolset" or "editor_search_tools" or "editor_catalog" or "editor_capabilities" or "editor_export_recovery" or "editor_trigger_list" or "editor_trigger_player_parity" or "editor_trigger_edit" or "editor_players" or "editor_player_dependency_audit" or "editor_stage_ai" or "editor_pantheon" or "editor_dependencies" or "editor_generate_catalog" or "editor_xs_api" or "editor_dialogs"
         || GameDataCatalog.ToolKinds.ContainsKey(name)
         || (name == "editor_terrain_catalog" && args.TryGetProperty("kind", out var catalogKind) && catalogKind.GetString() is "mixes" or "editModes")
         || (name is "editor_set_diplomacy" or "editor_player_settings" && (args.GetProperty("operation").GetString() is "preview" or "verify"))
@@ -577,16 +578,19 @@ internal sealed partial class Server(
             return (_gameData ??= new GameDataCatalog()).Query(exe, _layout.ExeSha256, kind, args);
         if (name == "editor_xs_api")
             return (_xsApi ??= XsApi.Load(exe)).Query(args);
+        if (name == "editor_dialogs")
+            return (_dialogs ??= DialogCatalog.Load()).Query(exe, _layout.ExeSha256, args);
         if (name == "editor_generate_catalog")
         {
             var output = Generator.DefaultOutput();
             var force = args.TryGetProperty("force", out var f) && f.GetBoolean();
             var hadUi = Directory.Exists(Path.Combine(output, "ui"));
-            if (!force && hadUi && GameDataCatalog.IsFresh(exe, _layout.ExeSha256))
+            if (!force && hadUi && GameDataCatalog.IsFresh(exe, _layout.ExeSha256) && DialogCatalog.IsFresh(exe, _layout.ExeSha256))
                 return new { fresh = true, generated = false, output };
             var result = Generator.GenerateMetadata(exe, output);
             _gameData = null; // Next catalog call reloads regenerated metadata without restart.
-            return new { fresh = true, generated = true, result.Output, result.UiFiles, result.DataFiles, result.MixFiles, result.GodPowerFiles,
+            _dialogs = null;
+            return new { fresh = true, generated = true, result.Output, result.UiFiles, result.DataFiles, result.MixFiles, result.GodPowerFiles, result.DialogWindows,
                 uiActionsNeedRestart = !hadUi };
         }
         if (name == "editor_pantheon")
@@ -1265,7 +1269,7 @@ internal sealed partial class Server(
         );
         yield return Spec(
             "editor_generate_catalog",
-            "Generate game-data catalogs (prototypes, gods, techs, god powers, terrain/water, mixes, footprints, editor UI XML) from installed game archives with bundled CryBar. Run once per install/game update or when a tool reports metadata missing/stale; catalog tools work immediately afterwards (new action_* UI tools need MCP restart). No game connection. Skips when fresh unless force=true.",
+            "Generate game-data catalogs (prototypes, gods, techs, god powers, terrain/water, mixes, footprints, normal+alternative editor UI XML and dialogs) from installed game archives with bundled CryBar. Run once per install/game update or when a tool reports metadata missing/stale; catalog tools work immediately afterwards (new action_* UI tools need MCP restart). No game connection. Skips when fresh unless force=true.",
             Props(("force", "boolean")),
             [],
             false,
@@ -1277,6 +1281,20 @@ internal sealed partial class Server(
             "Look up the XS scripting API for AI (.xs personalities), random map and trigger scripts: engine syscalls (signatures, defaults, which script kinds may call them) and shipped library functions/classes/globals/rules (rm/lib, rm/lib2, ai/core, ai/human_assist) with include path, file:line and a short summary. Official syscall help and source comments are added from the local install when present. name=exact (case-insensitive); filter=space-separated terms over names/summaries; kind=any|syscall|function|class|global|rule|aiPlanConstant; context=any|ai|randomMap|trigger; library=library id or syscall group (e.g. kbfuncs); includeLocal default true; offset>=0, limit 1..100 (default 20). Read-only, no game connection.",
             Props(("name", "string"), ("filter", "string"), ("kind", "string"), ("context", "string"), ("library", "string"),
                 ("includeLocal", "boolean"), ("offset", "integer"), ("limit", "integer")),
+            [],
+            true
+        );
+        yield return Spec(
+            "editor_dialogs",
+            "Understand editor dialogs, windows, panels and menus without screenshots: decoded normal and alternative editor UI XML. Without name: list windows (filter = space-separated terms over window names, titles, control labels/tooltips, menu paths and scripts; returns open names and matching controls). name = exact window or open name (e.g. PlayerEditDlg, DiplomacyDialog, trEditor, VictoryConditions): its controls in order with type, English label/tooltip, value kind/config binding, source size1024 rect (not client pixels), and the native commands each button/menu/radio item runs, as {tool, arguments} calls ready for editor_call. openNames: gadgetReal names with live status and close name per UI (link self/live/xml/name); openedBy: menus/buttons that open it. Value fields without scripts are read by engine dialog code on Apply (no command). ui=both|normal|alternative; offset/limit page windows or controls (1..200). No game connection; missing/stale data: editor_generate_catalog.",
+            new Dictionary<string, object>
+            {
+                ["ui"] = new { type = "string", @enum = DialogCatalog.UiValues },
+                ["name"] = new { type = "string" },
+                ["filter"] = new { type = "string" },
+                ["offset"] = new { type = "integer", minimum = 0 },
+                ["limit"] = new { type = "integer", minimum = 1, maximum = DialogCatalog.MaxLimit },
+            },
             [],
             true
         );
