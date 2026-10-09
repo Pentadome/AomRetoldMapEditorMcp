@@ -44,3 +44,13 @@ No automatic mutation retries or rollback. Four persistent host segments were us
 - Scene mutations remain operator-authorized only. These tests do not authorize future destructive checks on an AFK scene.
 
 Fresh analyzer/warnings-as-errors/XML rebuild and stdlib local protocol checks remain required after fixes; LSP silence alone is not proof of clean code.
+
+## Gadget visibility sweep
+
+Normal UI, 2560×1440, build 100.19.17020.0, operator-authorized, blank scenario, nothing selected. For each name: `editor_call` → `editor_gadgetReal(name)`, screenshot, `editor_gadgetUnreal(name)`, screenshot; pixel diff against the pre-sweep baseline (`AGameMinimap`: `gadgetToggle` twice). No scenario data changed; final `editor_ui_state` had edit mode None, nothing selected.
+
+- 40 names opened populated windows and returned exactly to baseline after `gadgetUnreal`: the 25 normal-UI menu scripts in `ui_editor_menu.xml` (Scenario, World, Objects, Triggers, Cinematics, View) plus `BrushSettingsDialog`, `BrushMaskDialog`, `BrushFunctionsWaterTool`, `WorldLightingDialog`, `CameraStatesGadget`, `NewScenarioGadget`/`NewScenarioDialog`, and executable-only names `ATriggerGadget`, `ATrigGroupEditor`, `ACameraTrackGadget`, `TriggerEchoWindow`, `xsDebugger`, `GroupingSettingsDialog` (Save Prefab), `StringIdDialog`, `PlayerEditMinorGodDlg` (bare popup, unlocalized title). Full list with menu paths: `editor_gadgetReal` description.
+- `PlayerDataDialog` opened an empty shell. No visible effect alone: `HelpDialog`, `PlayerDiplomacyDialog`, `waterColorDialog`, `animgadget`, `camEdit-position-window`, `soundgadget`, `SPCNoteDlg`, `ScenarioSummaryDialog`, `CameraStartDlg`, `MapElevationDialog`.
+- `uiCloseDialog()` acknowledged but did not close `PlayerEditDlg`; `gadgetUnreal("PlayerEditDlg")` did. Every acknowledgement reported `nativeReturned: true`, including the ineffective close: screenshots are the evidence.
+- Camera target moved once between sweeps (143,176 → 135,102); repeating 13 camera/map/trigger gadgets one at a time with camera reads did not reproduce it, so cause is unattributed (likely edge-scroll while the game had focus).
+- Alternative-UI-only names (`UIEditor.bar` XML) and `EditorMenu`/`ToolBar`/Letterbox bars were not exercised.

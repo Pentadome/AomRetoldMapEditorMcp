@@ -437,10 +437,93 @@ internal sealed partial class Catalog
         var note = $" {effect} the named UI gadget (dialog, panel, menu or window); real = visible, un-real = hidden.";
         if (name.EndsWith("IfNotMP", StringComparison.Ordinal))
             note += " IfNotMP variant: name indicates it acts only outside multiplayer.";
-        if (gadgets.Length != 0)
-            note += " Gadget names used by shipped editor actions: " + string.Join(", ", gadgets) + ".";
+        note += name == "gadgetUnreal" ? GadgetCloseNote : GadgetOpenNote;
+        var listed = gadgets.Where(g => !GadgetNoteNames.Contains(g)).ToArray();
+        if (listed.Length != 0)
+            note += " Other gadget names used by shipped editor actions: " + string.Join(", ", listed) + ".";
         return note;
     }
+
+    // Live session (normal UI 2560x1440, build 100.19.17020.0): gadgetReal(name) then gadgetUnreal(name),
+    // screenshot after each. Menu paths come from decoded ui_editor_menu.xml <submenu> scripts; alternative-UI
+    // names from UIEditor.bar XML, not live-tested. Names are game identifiers, not proof for other builds.
+    static readonly (string Name, string Opens)[] VerifiedGadgets =
+    [
+        ("NewScenarioGadget", "File > New; its Generate button replaces the scenario"),
+        ("PlayerEditDlg", "Scenario > Player Data"),
+        ("FakePlayerEditDlg", "Scenario > Fake Player Data"),
+        ("AScenarioSummaryGadget", "Scenario > Scenario Summary"),
+        ("PlaytestDialog", "Scenario > Playtest Scenario settings"),
+        ("VictoryConditionsGadget", "Scenario > Victory Conditions"),
+        ("ObjectiveEditor", "Scenario > Objectives"),
+        ("ChapterEditor", "Scenario > Chapters"),
+        ("ForbiddenUnitsTechsDlg", "Scenario > Forbidden Units/Techs"),
+        ("DiplomacyDialog", "Scenario > Diplomacy"),
+        ("AMapSizeDialog", "World > Map Size"),
+        ("MapElevationGadget", "World > Map Elevation"),
+        ("GodPowersGadget", "World > Invoke God Power"),
+        ("DistanceCheckerGadget", "World > Distance Checker"),
+        ("WorldLightingDialog", "World > Lighting"),
+        ("BrushSettingsDialog", "Terrain > Brush Settings"),
+        ("BrushMaskDialog", "paint mask checklist"),
+        ("BrushFunctionsWaterTool", "Water Tool panel"),
+        ("ObjectInfoPanel", "Objects > Object Info"),
+        ("UnitRepDlg", "Objects > Replace Unit"),
+        ("AdvancedTransformSettingsGadget", "Objects > Advanced Transformation Tool"),
+        ("CombatCommands", "Objects > Formation Commands button grid"),
+        ("AnimationEditorGadget", "Objects > Animation Viewer"),
+        ("GarrisonEditorGadget", "Objects > Garrison Editor"),
+        ("RelicEditorGadget", "Objects > Relic Editor"),
+        ("ATriggerGadget", "Trigger Editor"),
+        ("ATrigGroupEditor", "Trigger Group Editor"),
+        ("ATriggerArmyGadget", "Triggers > Army Editor"),
+        ("ScriptManager", "Triggers > XS Scripts"),
+        ("TriggerEchoWindow", "Trigger Echo Output"),
+        ("xsDebugger", "full-screen XS Debugger"),
+        ("ACameraTrackGadget", "Camera Track Editor"),
+        ("CameraStatesGadget", "Cinematics > Camera States"),
+        ("PitchEditorGadget", "Cinematics > Pitch Editor"),
+        ("CameraStartDialog", "View > Camera Start Settings"),
+        ("AGameMinimap", "View > Toggle Minimap; visible by default, gadgetUnreal hides it"),
+        ("GroupingSettingsDialog", "Save Prefab"),
+        ("StringIdDialog", "Set StringID popup"),
+        ("PlayerEditMinorGodDlg", "bare Age Settings popup without player context; use Player Data's button"),
+        ("NewScenarioDialog", "same New Scenario window"),
+    ];
+
+    static readonly string[] NoVisibleEffectGadgets =
+    [
+        "HelpDialog", "PlayerDiplomacyDialog", "waterColorDialog", "animgadget", "camEdit-position-window",
+        "soundgadget", "SPCNoteDlg", "ScenarioSummaryDialog", "CameraStartDlg", "MapElevationDialog",
+    ];
+
+    static readonly string[] ShownByDefaultGadgets = ["EditorMenu", "ToolBar"];
+
+    static readonly string[] AlternativeUiGadgets =
+    [
+        "AniMode", "TerraMode", "MapSettings", "MapSizeSection", "ShapesDLG", "BrushSelectorPanel", "PaintTerrainTool",
+        "PaintWaterToolPalette", "BrushFunctionsAdjustElevation", "BrushFunctionsDeleteObjects", "MoreCamTools",
+        "ScreenshotDialog", "Name-Dialog", "Add-dialog", "Stats", "TGEditor-Groups", "TGEditor-Triggers",
+    ];
+
+    static readonly HashSet<string> GadgetNoteNames = new(
+        VerifiedGadgets.Select(g => g.Name).Concat(NoVisibleEffectGadgets).Concat(ShownByDefaultGadgets)
+            .Concat(AlternativeUiGadgets).Append("PlayerDataDialog").Append("Letterbox-topbar").Append("Letterbox-bottombar"),
+        StringComparer.Ordinal);
+
+    static readonly string GadgetOpenNote =
+        " Live-verified (normal UI, build 100.19.17020.0) to open populated windows, each closed again by gadgetUnreal with the same name: "
+        + string.Join("; ", VerifiedGadgets.Select(g => $"{g.Name} ({g.Opens})"))
+        + ". Use these menu names, not inner XML panel names: PlayerDataDialog opens an EMPTY shell (use PlayerEditDlg). No visible effect when opened alone: "
+        + string.Join(", ", NoVisibleEffectGadgets)
+        + ". Shown by default (gadgetUnreal hides them): " + string.Join(", ", ShownByDefaultGadgets)
+        + ". Cinematics > Toggle Letterbox Bars runs gadgetToggle on Letterbox-topbar and Letterbox-bottombar (untested)"
+        + ". Alternative-UI XML also calls (untested): " + string.Join(", ", AlternativeUiGadgets)
+        + ". Close with gadgetUnreal(same name); uiCloseDialog did not close PlayerEditDlg. The acknowledgement is not proof; check with a screenshot.";
+
+    const string GadgetCloseNote =
+        " Closes a window opened by gadgetReal when given the same name (live-verified for every window listed in gadgetReal's description, normal UI);"
+        + " uiCloseDialog did not close PlayerEditDlg. EditorMenu, ToolBar and AGameMinimap are visible by default; un-realing hides them.";
 
     /// <summary>Checks escaping and confirmation classification without calling the game.</summary>
     public static void SelfTest()
@@ -465,6 +548,9 @@ internal sealed partial class Catalog
         // Synthetic gadget name; search relies on open/close wording and listed names in descriptions.
         if (!GadgetVisibilityNote("gadgetReal", ["FixtureDialog"]).Contains("Shows/opens", StringComparison.Ordinal)
             || !GadgetVisibilityNote("gadgetUnreal", ["FixtureDialog"]).Contains("FixtureDialog", StringComparison.Ordinal)
+            || !GadgetVisibilityNote("gadgetReal", []).Contains("PlayerEditDlg (Scenario > Player Data)", StringComparison.Ordinal)
+            || !GadgetVisibilityNote("gadgetReal", []).Contains("EMPTY shell", StringComparison.Ordinal)
+            || GadgetVisibilityNote("gadgetReal", ["PlayerEditDlg"]).Contains("shipped editor actions", StringComparison.Ordinal)
             || GadgetVisibilityNote("uiScenarioLoad", ["FixtureDialog"]).Length != 0)
             throw new InvalidOperationException("Gadget description fixture failed.");
         // Synthetic native-help fixture; no game/file operation. Import must not bypass helper confirmation.

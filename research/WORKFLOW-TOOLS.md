@@ -31,7 +31,7 @@ Start with `editor_capabilities`; failures return structured `code`/`phase`/`nat
 
 Live evidence (isolated scene, build 100.19.17020.0, alternative UI): diplomacy apply P1→P2 enemy→neutral verified by checkpoint, restored neutral→enemy (two clicks) verified; disabled-clone trigger apply round-trip verified and re-exported (2 inactive triggers). Later campaign tests verified P6 food 999999→999998→999999, P7 Heroic→Classical→Heroic with automatically reset/restored heroic god ID, and P6 AI path reselected via INSTALLPATH file browser. Typing P2 AI Name was acknowledged but saved path stayed `chairon`. **Not verified:** XS compilation/runtime, attack waves, AI behaviour, persistence across scenario reload.
 
-Diplomacy geometry (half-scale 1280×720 screenshot): cell(p,t)=(283+50t, 108+round(27.5p)), click at double; colours ally (0,255,0), enemy (255,0,0), neutral (238,238,238). `PlayerDataDialog` is absent from shipped XML; `gadgetReal("PlayerDataDialog")` opened an unrelated XS dialog.
+Diplomacy geometry (half-scale 1280×720 screenshot): cell(p,t)=(283+50t, 108+round(27.5p)), click at double; colours ally (0,255,0), enemy (255,0,0), neutral (238,238,238). `PlayerDataDialog` is an empty, childless shell in normal-UI `ui_editor_menu.xml` (absent from alternative XML); `gadgetReal("PlayerDataDialog")` opens an empty "Player Data" window. The real dialog is `PlayerEditDlg` (Scenario > Player Data menu script). An earlier session saw an XS window instead; the later sweep showed `xsDebugger` is a separate gadget. See [live gadget sweep](LIVE-MUTATIONS.md#gadget-visibility-sweep).
 
 ## Trigger workflow
 
