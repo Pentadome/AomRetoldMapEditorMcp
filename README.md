@@ -48,7 +48,7 @@ Download `AomRetoldMapEditorMcp-win-x64.zip` from [Releases](https://github.com/
 
 ## Optional: game-data catalogs
 
-Some tools look up game data, like exact unit names for a pantheon, gods, techs and terrain types. They need metadata generated from your own game files. Ask the agent to run `editor_generate_catalog` (no game needed; uses the bundled [CryBar](https://github.com/CryShana/CryBarEditor) library). Without it, everything else still works.
+Some tools look up game data, like exact unit names for a pantheon, gods, techs and terrain types. They need metadata generated from your own game files. Ask the agent to run `editor_generate_catalog` (uses the bundled [CryBar](https://github.com/CryShana/CryBarEditor) library).
 
 For writing AI, random map and trigger scripts, `editor_xs_api` looks up engine functions and the game's shipped script libraries. The project ships only their signatures and its own short summaries; the game's official help text is read from your install.
 
