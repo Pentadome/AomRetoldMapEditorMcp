@@ -75,4 +75,4 @@ Thanks to **CryShana** for [CryBar / CryBarEditor](https://github.com/CryShana/C
 
 [MIT](LICENSE). Game assets, CryBar and third-party components keep their own licenses. This license doesn't imply any Microsoft endorsement.
 
-This project was quickly "vibe-coded" using ChatGPT 6.1-sol.
+This project was quickly "vibe-coded" using ChatGPT 6.1-sol and then Claude Opus 5.5.
