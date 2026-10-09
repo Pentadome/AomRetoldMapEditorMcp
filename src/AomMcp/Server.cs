@@ -54,6 +54,7 @@ internal sealed partial class Server(
     static readonly string[] TriggerReplacementRequired = ["kind", "elementIndex", "parameter", "expected", "value"];
     static readonly string[] FormationShapes = ["rows", "ring"]; // Host geometry vocabulary.
     static readonly string[] ToolSets = ["core", "full"]; // Host surface vocabulary, not game permissions.
+    const string CallToolName = "editor_call"; // Core proxy reaching full-catalog tools without a surface switch.
     // Host search bounds, not game/protocol limits.
     const int ToolSearchMaxQueryLength = 256;
     const int ToolSearchMaxLimit = 50;
@@ -95,7 +96,7 @@ internal sealed partial class Server(
             {
                 // Host identity/release version; not the MCP protocol version (negotiated by SDK).
                 ServerInfo = new() { Name = "aom-retold-editor", Version = "0.1.0" },
-                ServerInstructions = $"Initial tool set: {(_fullTools ? "full" : "core")}. Use editor_search_tools to find tools by name/description across the full catalog without switching modes. Use editor_toolset to inspect/switch core/full mid-session. Only currently listed tools are callable; refresh tools/list after tools/list_changed. Controls local offline scenario editor. Commands report native return, not semantic verification. Use screenshots/state to verify effects. Unknown game builds fail closed; regenerate layout/catalog after patches. Data-loss actions need explicit confirmation. Do not retry mutations after unknown-outcome timeouts.",
+                ServerInstructions = $"Initial tool set: {(_fullTools ? "full" : "core")}. Use editor_search_tools to find tools by name/description across the full catalog without switching modes; call any of them (native commands, action_* UI actions, workflow helpers) through editor_call with the target's arguments, using includeSchema=true for its schema. Use editor_toolset to inspect/switch core/full mid-session. Only currently listed tools are callable; refresh tools/list after tools/list_changed. Controls local offline scenario editor. Commands report native return, not semantic verification. Use screenshots/state to verify effects. Unknown game builds fail closed; regenerate layout/catalog after patches. Data-loss actions need explicit confirmation. Do not retry mutations after unknown-outcome timeouts.",
                 Capabilities = new() { Tools = new() { ListChanged = true } },
                 Handlers = new()
                 {
@@ -174,6 +175,7 @@ internal sealed partial class Server(
         var terms = query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         var offset = Int(args, "offset", 0);
         var limit = Int(args, "limit", ToolSearchDefaultLimit);
+        var includeSchema = args.TryGetProperty("includeSchema", out var schemaFlag) && schemaFlag.GetBoolean();
         var full = _fullTools;
         int Rank(Tool tool) => tool.Name.Equals(query, StringComparison.OrdinalIgnoreCase) ? 0
             : tool.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ? 1
@@ -182,12 +184,24 @@ internal sealed partial class Server(
                 t.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
                 || (t.Description ?? "").Contains(term, StringComparison.OrdinalIgnoreCase)))
             .OrderBy(Rank).ThenBy(t => t.Name, StringComparer.Ordinal).ToArray();
-        var tools = matches.Skip(offset).Take(limit).Select(t => new
+        var tools = matches.Skip(offset).Take(limit).Select(t =>
         {
-            name = t.Name,
-            description = t.Description ?? "",
-            available = full || CoreIndex.ContainsKey(t.Name),
-            requiredToolset = CoreIndex.ContainsKey(t.Name) ? "core" : "full",
+            var available = full || CoreIndex.ContainsKey(t.Name);
+            var entry = new Dictionary<string, object>
+            {
+                ["name"] = t.Name,
+                ["description"] = t.Description ?? "",
+                ["available"] = available,
+                ["requiredToolset"] = CoreIndex.ContainsKey(t.Name) ? "core" : "full",
+                // Control tools must be called directly; everything else is reachable from either set.
+                ["callVia"] = available || t.Name is "editor_toolset" or "editor_batch" or CallToolName ? "direct" : CallToolName,
+            };
+            if (includeSchema)
+            {
+                entry["inputSchema"] = t.InputSchema;
+                entry["annotations"] = JsonSerializer.SerializeToElement(t.Annotations, McpJsonUtilities.DefaultOptions);
+            }
+            return entry;
         }).ToArray();
         return new
         {
@@ -199,7 +213,7 @@ internal sealed partial class Server(
             nextOffset = offset < matches.Length && tools.Length < matches.Length - offset
                 ? (int?)(offset + tools.Length) : null,
             tools,
-            guidance = "Metadata only; available means exposed in the current set, not runtime readiness. Hidden results require standalone editor_toolset mode=full, then refresh tools/list without an old cursor. Search changes nothing and does not execute matches.",
+            guidance = $"Metadata only; available means exposed in the current set, not runtime readiness. Call hidden results (callVia={CallToolName}) as {CallToolName} {{name, arguments}}; includeSchema=true returns their inputSchema/annotations. Alternatively switch with standalone editor_toolset mode=full, then refresh tools/list without an old cursor. Search changes nothing and does not execute matches.",
         };
     }
 
@@ -213,6 +227,13 @@ internal sealed partial class Server(
                 args = Empty;
             if (name == "editor_batch")
                 return Batch(args);
+            if (name == CallToolName)
+            {
+                // Preflight validates the target against its full-catalog schema; result is the target's own.
+                if (!preflighted) Preflight(name, args);
+                (name, args) = CallTarget(args);
+                preflighted = true;
+            }
             if (!preflighted) Preflight(name, args);
             passedPreflight = true;
             var value = Invoke(name, args, batchGame);
@@ -236,7 +257,7 @@ internal sealed partial class Server(
         {
             var noInput = e is FocusRefusedException;
             // Read-only annotated helpers never dispatch native commands or write files, so their failures are inspections.
-            var readOnly = ToolIndex.GetValueOrDefault(name)?.Annotations?.ReadOnlyHint == true;
+            var readOnly = FullIndex.GetValueOrDefault(name)?.Annotations?.ReadOnlyHint == true;
             var safeInspection = passedPreflight && (noInput || readOnly || WorkflowSafeInspection(name, args) || name is "editor_search_tools" or "editor_trigger_list" or "editor_players" or "editor_player_dependency_audit"
                 || (name is "editor_set_diplomacy" or "editor_player_settings") && args.GetProperty("operation").GetString() != "apply"
                 || (name is "editor_trigger_edit" or "editor_stage_ai")
@@ -402,19 +423,53 @@ internal sealed partial class Server(
             ValidateValue(item, schema.GetProperty("items"), $"{path}[{index++}]");
     }
 
-    static bool ConnectionFree(string name, JsonElement args) => WorkflowNames.Contains(name) || name is "editor_toolset" or "editor_search_tools" or "editor_catalog" or "editor_capabilities" or "editor_export_recovery" or "editor_trigger_list" or "editor_trigger_player_parity" or "editor_trigger_edit" or "editor_players" or "editor_player_dependency_audit" or "editor_stage_ai" or "editor_pantheon" or "editor_dependencies" or "editor_generate_catalog" or "editor_xs_api"
+    /// <summary>Unwraps an editor_call target; surface/batch control tools must be called directly.</summary>
+    static (string Name, JsonElement Args) CallTarget(JsonElement args)
+    {
+        Catalog.ValidateObject(args, ["name", "arguments"]);
+        if (!args.TryGetProperty("name", out var n) || n.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(n.GetString()))
+            throw new ArgumentException("Missing required argument 'name' (exact tool name from editor_search_tools).");
+        var name = n.GetString()!;
+        if (name is CallToolName or "editor_batch" or "editor_toolset")
+            throw new ArgumentException($"{name} cannot be called through {CallToolName}; call it directly.");
+        if (!args.TryGetProperty("arguments", out var a) || a.ValueKind == JsonValueKind.Null)
+            return (name, Empty);
+        if (a.ValueKind != JsonValueKind.Object)
+            throw new ArgumentException("Invalid value for 'arguments': expected object.");
+        return (name, a);
+    }
+
+    static bool ConnectionFree(string name, JsonElement args) => name == CallToolName
+        ? CallTarget(args) is var (target, targetArgs) && ConnectionFree(target, targetArgs)
+        : WorkflowNames.Contains(name) || name is "editor_toolset" or "editor_search_tools" or "editor_catalog" or "editor_capabilities" or "editor_export_recovery" or "editor_trigger_list" or "editor_trigger_player_parity" or "editor_trigger_edit" or "editor_players" or "editor_player_dependency_audit" or "editor_stage_ai" or "editor_pantheon" or "editor_dependencies" or "editor_generate_catalog" or "editor_xs_api"
         || GameDataCatalog.ToolKinds.ContainsKey(name)
         || (name == "editor_terrain_catalog" && args.TryGetProperty("kind", out var catalogKind) && catalogKind.GetString() is "mixes" or "editModes")
         || (name is "editor_set_diplomacy" or "editor_player_settings" && (args.GetProperty("operation").GetString() is "preview" or "verify"))
         || (name == "editor_triggers" && args.GetProperty("operation").GetString() is "inspect" or "validate" or "patch")
         || (name == "editor_place_formation" && Formations.Preview(args));
 
-    void Preflight(string name, JsonElement args)
+    // anyToolset: editor_call targets resolve against the full catalog regardless of the exposed set.
+    void Preflight(string name, JsonElement args, bool anyToolset = false)
     {
+        if (name == CallToolName)
+        {
+            var (target, targetArgs) = CallTarget(args);
+            try
+            {
+                Preflight(target, targetArgs, anyToolset: true);
+            }
+            catch (ArgumentException e)
+            {
+                throw new ArgumentException($"{target}: {e.Message}", e); // Name the target, not editor_call's own arguments.
+            }
+            return;
+        }
         if (name.StartsWith("editor_", StringComparison.Ordinal) && Catalog.RemovedCommand(name[7..]))
             throw new ArgumentException("Native loadScenario tool removed after game crash. Use editor Load Scenario UI.");
-        var spec = ToolIndex.GetValueOrDefault(name)
-            ?? throw new ArgumentException($"Unknown or unexposed tool: {name}. Use editor_toolset mode=full or --toolset full for expanded surface.");
+        var spec = (anyToolset ? FullIndex : ToolIndex).GetValueOrDefault(name)
+            ?? throw new ArgumentException(anyToolset
+                ? $"Unknown tool: {name}. Find exact names with editor_search_tools."
+                : $"Unknown or unexposed tool: {name}. Call it via {CallToolName}, or use editor_toolset mode=full or --toolset full for expanded surface.");
         ValidateSchema(args, spec.InputSchema);
         if (name == "editor_search_tools")
         {
@@ -494,7 +549,7 @@ internal sealed partial class Server(
                 scenarioEditing = "Never edit .mythscn directly. Use game editor, game-writer checkpoints and normal Load Scenario UI; native loadScenario disabled after crash.",
                 aiScripts = "Computer-player .xs personality must be under INSTALLPATH\\game\\ai (or its subdirectory). Active-profile Games\\Age of Mythology Retold\\<id>\\ai did NOT work. Triggers belong in active-profile trigger directory; use filename stems for uiLoadTriggers/uiSaveTriggers.",
                 exportRecovery = "On unknown export outcome, use editor_export_recovery inspect on reported staging path. Recover only to a new file with expectedSha256; no second native dispatch.",
-                workflowTools = new { requiredToolset = "full", names = WorkflowNames.Order().ToArray(), savedIdentity = "Checkpoint IDs only; never assume live/runtime identity.",
+                workflowTools = new { requiredToolset = "full", callVia = CallToolName, names = WorkflowNames.Order().ToArray(), savedIdentity = "Checkpoint IDs only; never assume live/runtime identity.",
                     scenarioDiff = "Partial semantic decoding plus ordered raw section hashes; all assertions before paging, no universal unchanged claim.",
                     aiInstallation = "Receipt-owned aom_mcp namespace only; preview first, source/old/receipt hashes, exclusive staging/backups/receipts. No binding/compile/runtime proof.",
                     startupOrders = "Explicit saved pools, reviewed task effects, preserve jobs, bounded deterministic minimum-distance XZ assignments; new TR only, no live apply.",
@@ -832,7 +887,7 @@ internal sealed partial class Server(
         yield return new
         {
             name = "editor_toolset",
-            description = "Get or switch current core/full tool set mid-session; omit mode to inspect. Default core exposes core helpers plus essential history/selection/camera/file commands; full additionally exposes workflow helpers and all generated native/action tools. No game connection. Always available in both sets. Changes notify tools/list_changed; client must refresh tools/list. Standalone only, not allowed in batches. Surface selection is not a permissions sandbox; all editor guards/confirmations remain.",
+            description = "Get or switch current core/full tool set mid-session; omit mode to inspect. Default core exposes core helpers plus essential history/selection/camera/file commands; full additionally exposes workflow helpers and all generated native/action tools. Hidden tools are also callable from core through editor_call without switching. No game connection. Always available in both sets. Changes notify tools/list_changed; client must refresh tools/list. Standalone only, not allowed in batches. Surface selection is not a permissions sandbox; all editor guards/confirmations remain.",
             inputSchema = new
             {
                 type = "object",
@@ -843,13 +898,21 @@ internal sealed partial class Server(
             annotations = new { readOnlyHint = false, destructiveHint = false, idempotentHint = true, openWorldHint = false },
         };
         yield return Spec("editor_search_tools",
-            "Find tools by name or description across the full host catalog, even in core mode. Case-insensitive whitespace-separated terms must all match; exact/name matches rank first, then descriptions, with stable name ordering. Returns compact names/descriptions, current availability and required toolset, not schemas. query must be nonblank, max 256 characters; offset>=0, limit=1..50 (default 10). Read-only, no game connection, mode switch or match execution. Hidden tools still require standalone editor_toolset mode=full and fresh tools/list.",
+            "Find tools by name or description across the full host catalog, even in core mode. Case-insensitive whitespace-separated terms must all match; exact/name matches rank first, then descriptions, with stable name ordering. Returns compact names/descriptions, current availability, required toolset and callVia (direct, or editor_call for tools hidden in the current set). includeSchema=true adds each result's inputSchema and annotations (use a small limit). query must be nonblank, max 256 characters; offset>=0, limit=1..50 (default 10). Read-only, no game connection, mode switch or match execution.",
             new Dictionary<string, object>
             {
                 ["query"] = new { type = "string", minLength = 1, maxLength = ToolSearchMaxQueryLength },
                 ["offset"] = new { type = "integer", minimum = 0 },
                 ["limit"] = new { type = "integer", minimum = 1, maximum = ToolSearchMaxLimit },
+                ["includeSchema"] = new { type = "boolean", @default = false },
             }, ["query"], true);
+        yield return Spec(CallToolName,
+            "Call any tool in the full catalog by exact name without switching tool sets, so core mode reaches every native editor command, action_* shipped UI action and workflow helper. Find names with editor_search_tools (includeSchema=true for the target's inputSchema/annotations). arguments are validated against the target's schema before anything runs, and every target guard and confirmation (confirmDestructive/confirmWrite/confirmPlacement, removed-command refusal) still applies; the result and error codes are the target's own. Not for editor_batch, editor_toolset or editor_call itself; allowed as an editor_batch step. Annotations here are worst-case; the target's own annotations describe the actual call.",
+            new Dictionary<string, object>
+            {
+                ["name"] = new { type = "string", minLength = 1 },
+                ["arguments"] = new { type = "object" },
+            }, ["name"]);
         yield return Spec(
             "editor_batch",
             "Run 1..32 existing tool calls sequentially in one connection. Schema/native-confirmation preflight; every step retains guards. Optional delayMs before a step for queued UI effects. Stops on first error; earlier effects remain (NOT atomic), no retries. Put screenshot last; inspect native acknowledgements independently. Steps are static: a step's output (e.g. observed unitId, projected pixel) cannot be referenced by later steps; split into separate calls when arguments depend on earlier results.",

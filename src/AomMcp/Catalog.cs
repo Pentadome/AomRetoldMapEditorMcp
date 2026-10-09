@@ -458,7 +458,8 @@ internal sealed partial class Catalog
             catch (ArgumentException) { }
         }
         if (!Confirmation("saveScenario") || !Confirmation("uiLoadTriggers") || !Confirmation("uiSaveTriggers")
-            || Confirmation("uiSetProtoCursor"))
+            || !Confirmation("uiCoverTerrainWithWater") || !Confirmation("uiDeleteSelectedUnit")
+            || Confirmation("uiSetProtoCursor") || Confirmation("uiDeleteUnits"))
             throw new InvalidOperationException("Confirmation classification test failed.");
         RemovedCommandSelfTest();
         // Synthetic gadget name; search relies on open/close wording and listed names in descriptions.
@@ -551,7 +552,8 @@ internal sealed partial class Catalog
     private static partial Regex HotkeyBindingRegex();
     // Host confirmation policy: names observed in native help/editor controls imply data loss or exit.
     // Live uiLoadTriggers replaces the whole set; uiSaveTriggers overwrites its profile-relative output.
-    [GeneratedRegex("(saveScenario|LoadTriggers|SaveTriggers|NewScenario|NewMap|Quit|Exit|Restart|ResetMap|ResizeMap|DeleteAll)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    // Native help: uiCoverTerrainWithWater flattens/paints the entire map; uiDeleteSelectedUnit deletes the selection.
+    [GeneratedRegex("(saveScenario|LoadTriggers|SaveTriggers|NewScenario|NewMap|Quit|Exit|Restart|ResetMap|ResizeMap|DeleteAll|DeleteSelectedUnit|CoverTerrainWithWater)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DestructiveCommandRegex();
     [GeneratedRegex("[^A-Za-z0-9_]")]
     private static partial Regex InvalidActionNameCharacterRegex();

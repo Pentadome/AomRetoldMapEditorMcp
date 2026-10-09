@@ -57,7 +57,7 @@ For writing AI, random map and trigger scripts, `editor_xs_api` looks up engine 
 - **Offline editor only.** Never use it in multiplayer.
 - **Save your work first.** The agent can change and delete things. Edits aren't atomic, and a failed step isn't rolled back.
 - **Game updates** can break support until the project is updated for the new build. Unknown versions are refused instead of guessed.
-- The server starts with a smaller **core** tool set (74 tools). The agent can switch to the **full** set (900+ tools) when needed.
+- The server starts with a smaller **core** tool set (75 tools). From core the agent can still find and call any of the 900+ **full** tools through `editor_search_tools` and `editor_call`, or switch to the full set when needed.
 - Normal and alternative editor UIs are both supported. Best tested at 2560×1440 and 1920×1080.
 
 ## More docs

@@ -1,10 +1,10 @@
 # Complete Age of Mythology Retold editor MCP tool reference
 
-**Current full: 924 tools = 72 helpers + 434 native commands + 418 shipped editor actions. Default core: 74 = 65 core helpers + nine essential native commands.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Twelve world editing helpers (core): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
+**Current full: 925 tools = 73 helpers + 434 native commands + 418 shipped editor actions. Default core: 75 = 66 core helpers + nine essential native commands; `editor_call` reaches every other tool from core.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Twelve world editing helpers (core): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
 
 Authoritative source: production `aom-retold-editor` `0.1.0` `tools/list` with `--toolset full`, protocol `2025-11-25`. Executable SHA-256: `dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff`.
 
-The catalog below is a historical generated reference from an earlier 28-helper snapshot; it does **not** list newer helpers or their latest schemas. Query live `tools/list` or narrow `editor_catalog` for authoritative signatures. Current additions: `editor_search_tools`, `editor_trigger_player_parity`, `editor_ui_read`, `editor_player_settings`; existing `editor_trigger_edit` adds batched edits/labels/values/condition removal; `editor_set_diplomacy` adds matrix changes, `editor_players` richer checkpoint fields, `editor_screenshot` region/scale. See [workflow limits](research/WORKFLOW-TOOLS.md). `editor_toolset` switches core/full mid-session; actual changes emit `notifications/tools/list_changed`. Clients must refresh tools/list without old cursor. The 40 core helpers are in both sets; seven new [session workflow helpers](research/SESSION-WORKFLOWS.md), most native commands and every shipped action require full mode. Playtest has one reviewed English alternative-UI 2560×1440 Player1/Standard profile; authorized public start/inspect/token-bound Quit passed. Other UI states and runtime memory telemetry remain unsupported. XS probes/supplied transcripts do not establish compiler/runtime proof. Mode operations are standalone-only. Hidden direct calls/batch steps refuse before game connection; core is not a permissions sandbox. Native/action exposure does **not** establish semantic/live validation of every command. Native acknowledgements are not getter values or proof of effects. See [README.md](README.md), [workflow limits](research/WORKFLOW-TOOLS.md) and [live evidence](research/LIVE-MUTATIONS.md).
+The catalog below is a historical generated reference from an earlier 28-helper snapshot; it does **not** list newer helpers or their latest schemas. Query live `tools/list` or narrow `editor_catalog` for authoritative signatures. Current additions: `editor_search_tools`, `editor_call`, `editor_trigger_player_parity`, `editor_ui_read`, `editor_player_settings`; existing `editor_trigger_edit` adds batched edits/labels/values/condition removal; `editor_set_diplomacy` adds matrix changes, `editor_players` richer checkpoint fields, `editor_screenshot` region/scale. See [workflow limits](research/WORKFLOW-TOOLS.md). `editor_toolset` switches core/full mid-session; actual changes emit `notifications/tools/list_changed`. Clients must refresh tools/list without old cursor. The 40 core helpers are in both sets; seven new [session workflow helpers](research/SESSION-WORKFLOWS.md), most native commands and every shipped action require full mode. Playtest has one reviewed English alternative-UI 2560×1440 Player1/Standard profile; authorized public start/inspect/token-bound Quit passed. Other UI states and runtime memory telemetry remain unsupported. XS probes/supplied transcripts do not establish compiler/runtime proof. Mode operations are standalone-only. Hidden direct calls/batch steps refuse before game connection; core is not a permissions sandbox. Native/action exposure does **not** establish semantic/live validation of every command. Native acknowledgements are not getter values or proof of effects. See [README.md](README.md), [workflow limits](research/WORKFLOW-TOOLS.md) and [live evidence](research/LIVE-MUTATIONS.md).
 
 ## Current helper: `editor_search_tools`
 
@@ -13,11 +13,25 @@ Read-only, available in core/full; searches cached full-catalog tool names and d
 - Required `query`: nonblank string, 1..256 characters; trimmed and split on whitespace. All terms must match a name or description, case-insensitively; no regex/fuzzy search.
 - Optional `offset`: integer >=0, default0. Optional `limit`: integer1..50, default10. No matches or offset past end returns an empty page.
 - Ranking: exact name, whole-query name substring, all terms in name, then description/mixed matches; ordinal name tie-break.
-- Output: `toolset`, `query`, `total`, `offset`, `limit`, nullable `nextOffset`, `guidance`, `tools` entries `{name, description, available, requiredToolset}`. No input schemas or script bodies. `requiredToolset` is minimum core/full surface; `available` means exposed now, not runtime readiness.
-- Hidden matches require standalone `editor_toolset mode=full`, then fresh `tools/list` without an old cursor. Search itself leaves hidden direct/batch calls blocked. Metadata-only search batches need no game connection.
+- Optional `includeSchema`: boolean, default false. When true, each entry also carries the tool's exact `inputSchema` and `annotations` from `tools/list`; keep `limit` small.
+- Output: `toolset`, `query`, `total`, `offset`, `limit`, nullable `nextOffset`, `guidance`, `tools` entries `{name, description, available, requiredToolset, callVia}`. `requiredToolset` is minimum core/full surface; `available` means exposed now, not runtime readiness. `callVia` is `direct` for exposed tools (and the control tools `editor_call`/`editor_batch`/`editor_toolset`), otherwise `editor_call`.
+- Hidden matches are callable now through `editor_call`, or directly after standalone `editor_toolset mode=full` and a fresh `tools/list` without an old cursor. Search itself leaves hidden direct/batch calls blocked. Metadata-only search batches need no game connection.
 
 ```json
 {"name":"editor_search_tools","arguments":{"query":"camera","limit":5}}
+```
+
+## Current helper: `editor_call`
+
+Available in core/full. Calls any full-catalog tool by exact name without switching tool sets, so core reaches every native command, `action_*` UI action and full-only workflow helper without adding their definitions to `tools/list`.
+
+- Required `name`: exact tool name (from `editor_search_tools`). Optional `arguments`: object passed to the target; omitted or null means `{}`. No other properties.
+- The target is preflighted against its own full-catalog schema before anything runs: unknown/extra/mistyped arguments, missing required fields, missing `confirmDestructive`/`confirmWrite`/`confirmPlacement`, and the removed native `loadScenario` all refuse with `INVALID_ARGUMENT`, `nativeDispatched:false`, messages prefixed with the target name.
+- Refuses `editor_call`, `editor_batch` and `editor_toolset` as targets; call those directly. Allowed as an `editor_batch` step (whole-batch preflight covers the target); connection-free targets stay connection-free.
+- Result, error codes and `safeInspection` classification are the target's own. `editor_call`'s own annotations are worst-case (destructive); read the target's annotations via `includeSchema`.
+
+```json
+{"name":"editor_call","arguments":{"name":"editor_gadgetReal","arguments":{"name":"BrushSettingsDialog"}}}
 ```
 
 ## Safety and conventions
@@ -5701,13 +5715,13 @@ copies the brush selection to the clipboard. Native void; reports dispatcher ret
 
 flattens terrain and paints water over the entire map. Native void; reports dispatcher return only, not a captured value or independently verified effect. Editor mode required.
 
-**Required arguments:** `waterHeight`, `depth`, `name`
+**Required arguments:** `waterHeight`, `depth`, `name`, `confirmDestructive`
 
 **MCP annotations:**
 
 ```json
 {
-  "destructiveHint": false,
+  "destructiveHint": true,
   "idempotentHint": false,
   "openWorldHint": false,
   "readOnlyHint": false
@@ -5728,12 +5742,17 @@ flattens terrain and paints water over the entire map. Native void; reports disp
     },
     "name": {
       "type": "string"
+    },
+    "confirmDestructive": {
+      "type": "boolean",
+      "const": true
     }
   },
   "required": [
     "waterHeight",
     "depth",
-    "name"
+    "name",
+    "confirmDestructive"
   ],
   "additionalProperties": false
 }
@@ -6042,13 +6061,13 @@ TODO. Native void; reports dispatcher return only, not a captured value or indep
 
 deletes selected unit. Native void; reports dispatcher return only, not a captured value or independently verified effect. Editor mode required.
 
-**Required arguments:** `ignoreConfirmation`
+**Required arguments:** `ignoreConfirmation`, `confirmDestructive`
 
 **MCP annotations:**
 
 ```json
 {
-  "destructiveHint": false,
+  "destructiveHint": true,
   "idempotentHint": false,
   "openWorldHint": false,
   "readOnlyHint": false
@@ -6063,10 +6082,15 @@ deletes selected unit. Native void; reports dispatcher return only, not a captur
   "properties": {
     "ignoreConfirmation": {
       "type": "boolean"
+    },
+    "confirmDestructive": {
+      "type": "boolean",
+      "const": true
     }
   },
   "required": [
-    "ignoreConfirmation"
+    "ignoreConfirmation",
+    "confirmDestructive"
   ],
   "additionalProperties": false
 }

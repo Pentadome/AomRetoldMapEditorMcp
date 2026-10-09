@@ -194,9 +194,13 @@ def assert_tool_search(full_specs, expected_core, mode):
             return priority, spec['name']
 
         matches.sort(key=rank)
+        def available(name):
+            return mode == 'full' or name in expected_core
+
         expected = [{'name': spec['name'], 'description': spec['description'],
-                     'available': mode == 'full' or spec['name'] in expected_core,
-                     'requiredToolset': 'core' if spec['name'] in expected_core else 'full'}
+                     'available': available(spec['name']),
+                     'requiredToolset': 'core' if spec['name'] in expected_core else 'full',
+                     'callVia': 'direct' if available(spec['name']) or spec['name'] in CALL_CONTROL else 'editor_call'}
                     for spec in matches[offset:offset + limit]]
         assert set(result) == {'toolset', 'query', 'total', 'offset', 'limit', 'nextOffset', 'tools', 'guidance'}, result
         assert result['toolset'] == mode and result['query'] == normalized, result
@@ -205,6 +209,7 @@ def assert_tool_search(full_specs, expected_core, mode):
         next_offset = offset + len(expected) if offset + len(expected) < len(matches) else None
         assert result['nextOffset'] == next_offset, result
         assert 'editor_toolset mode=full' in result['guidance'] and 'tools/list' in result['guidance']
+        assert 'editor_call' in result['guidance'] and 'includeSchema' in result['guidance']
         return result
 
     action = next(name for name in sorted(full_specs) if name.startswith('action_'))
@@ -233,6 +238,12 @@ def assert_tool_search(full_specs, expected_core, mode):
     assert len(collected) == len(set(collected)) and set(collected) == set(full_specs), collected
     assert 'editor_loadScenario' not in collected
     assert all(t['name'] != 'editor_loadScenario' for t in check('loadScenario')['tools'])
+    # includeSchema returns exactly the advertised full-catalog schema/annotations.
+    for name in ('editor_gadgetReal', action, 'editor_place_unit'):
+        detailed = tool('editor_search_tools', {'query': name, 'limit': 1, 'includeSchema': True})['structuredContent']['tools'][0]
+        assert detailed['name'] == name, detailed
+        assert detailed['inputSchema'] == full_specs[name]['inputSchema'], detailed
+        assert detailed['annotations'] == full_specs[name]['annotations'], detailed
 
 
 def assert_search_validation():
@@ -299,6 +310,49 @@ def assert_search_isolation(full_specs, expected_core, mode):
     assert request('tools/list') == listing, 'Search changed tool list'
     assert tool('editor_toolset')['structuredContent'] == status, 'Search changed toolset'
     assert len(notifications) == before, 'Search emitted list_changed'
+
+
+CALL_CONTROL = {'editor_call', 'editor_batch', 'editor_toolset'}
+
+
+def assert_call_proxy(full_specs):
+    # editor_call reaches any full-catalog tool from either set; target schema/confirmations preflight first.
+    spec = full_specs['editor_call']
+    assert spec['inputSchema']['required'] == ['name'] and set(spec['inputSchema']['properties']) == {'name', 'arguments'}, spec
+    assert spec['annotations']['destructiveHint'] and not spec['annotations']['readOnlyHint'], spec
+    action = next(name for name in sorted(full_specs) if name.startswith('action_'))
+    refusals = [
+        ({'name': 'editor_gadgetReal'}, "editor_gadgetReal: Missing required argument 'name'"),
+        ({'name': 'editor_gadgetReal', 'arguments': {'nmae': 'x'}}, 'editor_gadgetReal: Unknown argument nmae'),
+        ({'name': 'editor_no_such_tool'}, 'Unknown tool: editor_no_such_tool'),
+        ({'name': 'editor_loadScenario', 'arguments': {'scenarioName': 'x', 'confirmDestructive': True}}, 'Native loadScenario tool removed'),
+        ({'name': 'editor_uiNewScenario'}, 'confirmDestructive'),
+        ({'name': 'editor_uiCoverTerrainWithWater', 'arguments': {'waterHeight': 1, 'depth': 1, 'name': 'x'}}, 'confirmDestructive'),
+        ({'name': 'editor_uiDeleteSelectedUnit', 'arguments': {'ignoreConfirmation': True}}, 'confirmDestructive'),
+        ({'name': action}, 'confirmDestructive'),
+        ({'name': 'editor_status', 'extra': True}, 'Unknown argument extra'),
+        ({'name': 'editor_status', 'arguments': [1]}, "'arguments': expected object"),
+        ({}, "Missing required argument 'name'"),
+        *(({'name': control}, 'call it directly') for control in sorted(CALL_CONTROL)),
+    ]
+    for arguments, message in refusals:
+        # A refused later step must stop the whole batch before the earlier game-backed step connects.
+        for refused in (tool('editor_call', arguments), tool('editor_batch', {'steps': [
+                {'name': 'editor_status'}, {'name': 'editor_call', 'arguments': arguments}]})):
+            assert refused['isError'] and message in str(refused), (arguments, refused)
+            assert 'Process with an Id' not in str(refused), refused
+            assert refused['structuredContent']['code'] == 'INVALID_ARGUMENT', refused
+            assert refused['structuredContent']['nativeDispatched'] is False, refused
+    # Valid hidden native target passes preflight and fails only at the impossible-PID connection.
+    reached = tool('editor_call', {'name': 'editor_gadgetReal', 'arguments': {'name': 'BrushSettingsDialog'}})
+    assert reached['isError'] and 'Process with an Id' in str(reached), reached
+    # Connection-free targets stay connection-free, standalone and as batch steps.
+    direct = tool('editor_search_tools', {'query': 'gadgetReal'})
+    proxied = tool('editor_call', {'name': 'editor_search_tools', 'arguments': {'query': 'gadgetReal'}})
+    assert not proxied['isError'] and proxied['structuredContent'] == direct['structuredContent'], proxied
+    batch = tool('editor_batch', {'steps': [{'name': 'editor_call', 'arguments': {
+        'name': 'editor_search_tools', 'arguments': {'query': 'gadgetReal'}}}]})
+    assert not batch['isError'] and batch['structuredContent']['steps'][0]['structuredContent'] == direct['structuredContent'], batch
 
 
 def assert_removed_loader():
@@ -860,7 +914,7 @@ try:
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
     expected_core = (helper_names - workflow_names) | core_native
-    assert len(expected_core) == 74 and len(names) == 924
+    assert len(expected_core) == 75 and len(names) == 925
     world_tools = {'editor_terrain_info', 'editor_live_players', 'editor_edit_mode', 'editor_paint_world', 'editor_elevation',
                    'editor_transform_unit', 'editor_terrain_catalog', 'editor_camera_frame', 'editor_overview',
                    'editor_resource_balance', 'editor_mirror_units', 'editor_scatter'}
@@ -935,7 +989,9 @@ try:
                         {'name': 'editor_search_tools', 'arguments': {'query': hidden}},
                         {'name': 'editor_status'}, {'name': hidden}]})):
                     assert refused['isError'] and 'unexposed tool' in str(refused), refused
-                    assert '--toolset full' in str(refused) and 'Process with an Id' not in str(refused), refused
+                    assert '--toolset full' in str(refused) and 'editor_call' in str(refused), refused
+                    assert 'Process with an Id' not in str(refused), refused
+            assert_call_proxy(full_specs)
             refused = tool('editor_saveScenario', {'fname': 'do-not-save'})
             assert refused['isError'] and 'confirmDestructive' in str(refused), refused
             before = len(notifications)
