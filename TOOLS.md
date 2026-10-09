@@ -2906,7 +2906,7 @@ turns gadget flashing on/off. Native void; reports dispatcher return only, not a
 
 ### `editor_gadgetReal`
 
-makes real the named gadget. Native void; reports dispatcher return only, not a captured value or independently verified effect. Editor mode required.
+makes real the named gadget. Shows/opens the named UI gadget (dialog, panel, menu or window); real = visible, un-real = hidden. Gadget names used by shipped editor actions: AMapSizeDialog, AScenarioSummaryGadget, BrushFunctionsWaterTool, BrushMaskDialog, BrushSettingsDialog, CameraStatesGadget, EditorMenu, GroupingSettingsDialog, HelpDialog, Letterbox-bottombar, Letterbox-topbar, MapElevationGadget, NewScenarioGadget, PitchEditorGadget, PlayerDiplomacyDialog, PlaytestDialog, ToolBar, WorldLightingDialog, animgadget, camEdit-position-window, soundgadget, waterColorDialog. Native void; reports dispatcher return only, not a captured value or independently verified effect. Editor mode required.
 
 **Required arguments:** `name`
 
@@ -2940,7 +2940,7 @@ makes real the named gadget. Native void; reports dispatcher return only, not a 
 
 ### `editor_gadgetRealIfNotMP`
 
-makes real the named gadget. Native void; reports dispatcher return only, not a captured value or independently verified effect. Editor mode required.
+makes real the named gadget. Shows/opens the named UI gadget (dialog, panel, menu or window); real = visible, un-real = hidden. IfNotMP variant: name indicates it acts only outside multiplayer. Gadget names used by shipped editor actions: AMapSizeDialog, AScenarioSummaryGadget, BrushFunctionsWaterTool, BrushMaskDialog, BrushSettingsDialog, CameraStatesGadget, EditorMenu, GroupingSettingsDialog, HelpDialog, Letterbox-bottombar, Letterbox-topbar, MapElevationGadget, NewScenarioGadget, PitchEditorGadget, PlayerDiplomacyDialog, PlaytestDialog, ToolBar, WorldLightingDialog, animgadget, camEdit-position-window, soundgadget, waterColorDialog. Native void; reports dispatcher return only, not a captured value or independently verified effect. Editor mode required.
 
 **Required arguments:** `name`
 
@@ -3144,7 +3144,7 @@ scrolls the gadget up one unit Native bool; reports dispatcher return only, not 
 
 ### `editor_gadgetToggle`
 
-toggles the reality of the named gadget. Native void; reports dispatcher return only, not a captured value or independently verified effect. Editor mode required.
+toggles the reality of the named gadget. Shows or hides (toggles open/closed) the named UI gadget (dialog, panel, menu or window); real = visible, un-real = hidden. Gadget names used by shipped editor actions: AMapSizeDialog, AScenarioSummaryGadget, BrushFunctionsWaterTool, BrushMaskDialog, BrushSettingsDialog, CameraStatesGadget, EditorMenu, GroupingSettingsDialog, HelpDialog, Letterbox-bottombar, Letterbox-topbar, MapElevationGadget, NewScenarioGadget, PitchEditorGadget, PlayerDiplomacyDialog, PlaytestDialog, ToolBar, WorldLightingDialog, animgadget, camEdit-position-window, soundgadget, waterColorDialog. Native void; reports dispatcher return only, not a captured value or independently verified effect. Editor mode required.
 
 **Required arguments:** `name`
 
@@ -3178,7 +3178,7 @@ toggles the reality of the named gadget. Native void; reports dispatcher return 
 
 ### `editor_gadgetToggleIfNotMP`
 
-toggles the reality of the named gadget. Native void; reports dispatcher return only, not a captured value or independently verified effect. Editor mode required.
+toggles the reality of the named gadget. Shows or hides (toggles open/closed) the named UI gadget (dialog, panel, menu or window); real = visible, un-real = hidden. IfNotMP variant: name indicates it acts only outside multiplayer. Gadget names used by shipped editor actions: AMapSizeDialog, AScenarioSummaryGadget, BrushFunctionsWaterTool, BrushMaskDialog, BrushSettingsDialog, CameraStatesGadget, EditorMenu, GroupingSettingsDialog, HelpDialog, Letterbox-bottombar, Letterbox-topbar, MapElevationGadget, NewScenarioGadget, PitchEditorGadget, PlayerDiplomacyDialog, PlaytestDialog, ToolBar, WorldLightingDialog, animgadget, camEdit-position-window, soundgadget, waterColorDialog. Native void; reports dispatcher return only, not a captured value or independently verified effect. Editor mode required.
 
 **Required arguments:** `name`
 
@@ -3212,7 +3212,7 @@ toggles the reality of the named gadget. Native void; reports dispatcher return 
 
 ### `editor_gadgetUnreal`
 
-makes un-real the named gadget. Native void; reports dispatcher return only, not a captured value or independently verified effect. Editor mode required.
+makes un-real the named gadget. Hides/closes the named UI gadget (dialog, panel, menu or window); real = visible, un-real = hidden. Gadget names used by shipped editor actions: AMapSizeDialog, AScenarioSummaryGadget, BrushFunctionsWaterTool, BrushMaskDialog, BrushSettingsDialog, CameraStatesGadget, EditorMenu, GroupingSettingsDialog, HelpDialog, Letterbox-bottombar, Letterbox-topbar, MapElevationGadget, NewScenarioGadget, PitchEditorGadget, PlayerDiplomacyDialog, PlaytestDialog, ToolBar, WorldLightingDialog, animgadget, camEdit-position-window, soundgadget, waterColorDialog. Native void; reports dispatcher return only, not a captured value or independently verified effect. Editor mode required.
 
 **Required arguments:** `name`
 
@@ -16320,7 +16320,7 @@ Issues a town bell for the selected unit(s). Native void; reports dispatcher ret
 
 ### `action_BrushFunctionsCopyPasteHeight`
 
-Shipped editor UI action: BrushFunctionsCopyPasteHeight. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: BrushFunctionsCopyPasteHeight. Source ui_editor_menu.xml. Executes its original command expression `uiToggleTerrainPasteMode(2)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16355,7 +16355,7 @@ Shipped editor UI action: BrushFunctionsCopyPasteHeight. Source ui_editor_menu.x
 
 ### `action_BrushFunctionsCopyPasteTexture`
 
-Shipped editor UI action: BrushFunctionsCopyPasteTexture. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: BrushFunctionsCopyPasteTexture. Source ui_editor_menu.xml. Executes its original command expression `uiToggleTerrainPasteMode(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16390,7 +16390,7 @@ Shipped editor UI action: BrushFunctionsCopyPasteTexture. Source ui_editor_menu.
 
 ### `action_BrushFunctionsCopyPasteWater`
 
-Shipped editor UI action: BrushFunctionsCopyPasteWater. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: BrushFunctionsCopyPasteWater. Source ui_editor_menu.xml. Executes its original command expression `uiToggleTerrainPasteMode(3)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16425,7 +16425,7 @@ Shipped editor UI action: BrushFunctionsCopyPasteWater. Source ui_editor_menu.xm
 
 ### `action_BrushFunctionsPlaceGateBtn`
 
-Shipped editor UI action: BrushFunctionsPlaceGateBtn. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: BrushFunctionsPlaceGateBtn. Source ui_editor_menu.xml. Executes its original command expression `uiTransformSelectedUnit("WallGate", false, -1, true)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16460,7 +16460,7 @@ Shipped editor UI action: BrushFunctionsPlaceGateBtn. Source ui_editor_menu.xml.
 
 ### `action_BrushFunctionsPlacePlaceWallBtn`
 
-Shipped editor UI action: BrushFunctionsPlacePlaceWallBtn. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: BrushFunctionsPlacePlaceWallBtn. Source ui_editor_menu.xml. Executes its original command expression `editMode("PlaceWall") uiSetProtoCursor("WallConnector", true)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16495,7 +16495,7 @@ Shipped editor UI action: BrushFunctionsPlacePlaceWallBtn. Source ui_editor_menu
 
 ### `action_BrushFunctionsTerrainBrushMask`
 
-Shipped editor UI action: BrushFunctionsTerrainBrushMask. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: BrushFunctionsTerrainBrushMask. Source ui_editor_menu.xml. Executes its original command expression `gadgetToggle("BrushMaskDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16530,7 +16530,7 @@ Shipped editor UI action: BrushFunctionsTerrainBrushMask. Source ui_editor_menu.
 
 ### `action_BrushFunctionsTerrainEdit`
 
-Shipped editor UI action: BrushFunctionsTerrainEdit. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: BrushFunctionsTerrainEdit. Source ui_editor_menu.xml. Executes its original command expression `openTerrainTextureBrowserGui();openTerrainTextureEditor();`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16565,7 +16565,7 @@ Shipped editor UI action: BrushFunctionsTerrainEdit. Source ui_editor_menu.xml. 
 
 ### `action_BrushFunctionsWaterEdit`
 
-Shipped editor UI action: BrushFunctionsWaterEdit. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: BrushFunctionsWaterEdit. Source ui_editor_menu.xml. Executes its original command expression `openWaterBrowserGui();openWaterEditorGui();`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16600,7 +16600,7 @@ Shipped editor UI action: BrushFunctionsWaterEdit. Source ui_editor_menu.xml. Ex
 
 ### `action_BrushSettingsButton`
 
-Shipped editor UI action: BrushSettingsButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: BrushSettingsButton. Source ui_editor_menu.xml. Executes its original command expression `gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16635,7 +16635,7 @@ Shipped editor UI action: BrushSettingsButton. Source ui_editor_menu.xml. Execut
 
 ### `action_BrushSettingsCloseButton`
 
-Shipped editor UI action: BrushSettingsCloseButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: BrushSettingsCloseButton. Source ui_editor_menu.xml. Executes its original command expression `gadgetUnReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16670,7 +16670,7 @@ Shipped editor UI action: BrushSettingsCloseButton. Source ui_editor_menu.xml. E
 
 ### `action_CameraStartButton`
 
-Shipped editor UI action: CameraStartButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: CameraStartButton. Source ui_editor_menu.xml. Executes its original command expression `cameraStart`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16705,7 +16705,7 @@ Shipped editor UI action: CameraStartButton. Source ui_editor_menu.xml. Execute 
 
 ### `action_CinematicsButton`
 
-Shipped editor UI action: CinematicsButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: CinematicsButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("CameraTracks")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16740,7 +16740,7 @@ Shipped editor UI action: CinematicsButton. Source ui_editor_menu.xml. Execute i
 
 ### `action_CliffPaintButton`
 
-Shipped editor UI action: CliffPaintButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: CliffPaintButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("PaintCliff") gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16775,7 +16775,7 @@ Shipped editor UI action: CliffPaintButton. Source ui_editor_menu.xml. Execute i
 
 ### `action_CombatCommands_AggressiveBtn`
 
-Shipped editor UI action: CombatCommands-AggressiveBtn. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: CombatCommands-AggressiveBtn. Source ui_editor_menu.xml. Executes its original command expression `unitSetStance(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16810,7 +16810,7 @@ Shipped editor UI action: CombatCommands-AggressiveBtn. Source ui_editor_menu.xm
 
 ### `action_CombatCommands_AttackMoveBtn`
 
-Shipped editor UI action: CombatCommands-AttackMoveBtn. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: CombatCommands-AttackMoveBtn. Source ui_editor_menu.xml. Executes its original command expression `editMode("attackMove")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16845,7 +16845,7 @@ Shipped editor UI action: CombatCommands-AttackMoveBtn. Source ui_editor_menu.xm
 
 ### `action_CombatCommands_BellBtn`
 
-Shipped editor UI action: CombatCommands-BellBtn. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: CombatCommands-BellBtn. Source ui_editor_menu.xml. Executes its original command expression `unitTownBell`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16880,7 +16880,7 @@ Shipped editor UI action: CombatCommands-BellBtn. Source ui_editor_menu.xml. Exe
 
 ### `action_CombatCommands_BoxFormationBtn`
 
-Shipped editor UI action: CombatCommands-BoxFormationBtn. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: CombatCommands-BoxFormationBtn. Source ui_editor_menu.xml. Executes its original command expression `setSquadMode("Box")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16915,7 +16915,7 @@ Shipped editor UI action: CombatCommands-BoxFormationBtn. Source ui_editor_menu.
 
 ### `action_CombatCommands_DefensiveBtn`
 
-Shipped editor UI action: CombatCommands-DefensiveBtn. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: CombatCommands-DefensiveBtn. Source ui_editor_menu.xml. Executes its original command expression `unitSetStance(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16950,7 +16950,7 @@ Shipped editor UI action: CombatCommands-DefensiveBtn. Source ui_editor_menu.xml
 
 ### `action_CombatCommands_LineFormationBtn`
 
-Shipped editor UI action: CombatCommands-LineFormationBtn. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: CombatCommands-LineFormationBtn. Source ui_editor_menu.xml. Executes its original command expression `setSquadMode("Line")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -16985,7 +16985,7 @@ Shipped editor UI action: CombatCommands-LineFormationBtn. Source ui_editor_menu
 
 ### `action_CombatCommands_NoAttackBtn`
 
-Shipped editor UI action: CombatCommands-NoAttackBtn. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: CombatCommands-NoAttackBtn. Source ui_editor_menu.xml. Executes its original command expression `unitSetStance(2)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17020,7 +17020,7 @@ Shipped editor UI action: CombatCommands-NoAttackBtn. Source ui_editor_menu.xml.
 
 ### `action_CombatCommands_PatrolBtn`
 
-Shipped editor UI action: CombatCommands-PatrolBtn. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: CombatCommands-PatrolBtn. Source ui_editor_menu.xml. Executes its original command expression `editMode("patrol")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17055,7 +17055,7 @@ Shipped editor UI action: CombatCommands-PatrolBtn. Source ui_editor_menu.xml. E
 
 ### `action_CombatCommands_SpreadFormationBtn`
 
-Shipped editor UI action: CombatCommands-SpreadFormationBtn. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: CombatCommands-SpreadFormationBtn. Source ui_editor_menu.xml. Executes its original command expression `setSquadMode("Spread")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17090,7 +17090,7 @@ Shipped editor UI action: CombatCommands-SpreadFormationBtn. Source ui_editor_me
 
 ### `action_CombatCommands_StandGroundBtn`
 
-Shipped editor UI action: CombatCommands-StandGroundBtn. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: CombatCommands-StandGroundBtn. Source ui_editor_menu.xml. Executes its original command expression `unitSetStance(3)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17125,7 +17125,7 @@ Shipped editor UI action: CombatCommands-StandGroundBtn. Source ui_editor_menu.x
 
 ### `action_CombatCommands_StopBtn`
 
-Shipped editor UI action: CombatCommands-StopBtn. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: CombatCommands-StopBtn. Source ui_editor_menu.xml. Executes its original command expression `uiStopSelectedUnits`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17160,7 +17160,7 @@ Shipped editor UI action: CombatCommands-StopBtn. Source ui_editor_menu.xml. Exe
 
 ### `action_CombatCommands_WorkBtn`
 
-Shipped editor UI action: CombatCommands-WorkBtn. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: CombatCommands-WorkBtn. Source ui_editor_menu.xml. Executes its original command expression `unitReturnToWork`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17195,7 +17195,7 @@ Shipped editor UI action: CombatCommands-WorkBtn. Source ui_editor_menu.xml. Exe
 
 ### `action_DeleteUnitButton`
 
-Shipped editor UI action: DeleteUnitButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: DeleteUnitButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("deleteunits")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17230,7 +17230,7 @@ Shipped editor UI action: DeleteUnitButton. Source ui_editor_menu.xml. Execute i
 
 ### `action_DiplomacySettingsCloseButton`
 
-Shipped editor UI action: DiplomacySettingsCloseButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: DiplomacySettingsCloseButton. Source ui_editor_menu.xml. Executes its original command expression `gadgetUnreal("PlayerDiplomacyDialog");`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17265,7 +17265,7 @@ Shipped editor UI action: DiplomacySettingsCloseButton. Source ui_editor_menu.xm
 
 ### `action_EditWaterButton`
 
-Shipped editor UI action: EditWaterButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: EditWaterButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("editWater")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17300,7 +17300,7 @@ Shipped editor UI action: EditWaterButton. Source ui_editor_menu.xml. Execute it
 
 ### `action_ForestButton`
 
-Shipped editor UI action: ForestButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ForestButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("paintforest") gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17335,7 +17335,7 @@ Shipped editor UI action: ForestButton. Source ui_editor_menu.xml. Execute its o
 
 ### `action_GroupingSettingsCancelButton`
 
-Shipped editor UI action: GroupingSettingsCancelButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: GroupingSettingsCancelButton. Source ui_editor_menu.xml. Executes its original command expression `gadgetUnReal("GroupingSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17370,7 +17370,7 @@ Shipped editor UI action: GroupingSettingsCancelButton. Source ui_editor_menu.xm
 
 ### `action_GroupingSettingsDialog_OKButton`
 
-Shipped editor UI action: GroupingSettingsDialog-OKButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: GroupingSettingsDialog-OKButton. Source ui_editor_menu.xml. Executes its original command expression `gadgetUnReal("GroupingSettingsDialog") uiExportGrouping`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17405,7 +17405,7 @@ Shipped editor UI action: GroupingSettingsDialog-OKButton. Source ui_editor_menu
 
 ### `action_LandButton`
 
-Shipped editor UI action: LandButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: LandButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("PaintLand") gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17440,7 +17440,7 @@ Shipped editor UI action: LandButton. Source ui_editor_menu.xml. Execute its ori
 
 ### `action_LetterBoxBars`
 
-Shipped editor UI action: LetterBoxBars. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: LetterBoxBars. Source ui_editor_menu.xml. Executes its original command expression `gadgetToggle("Letterbox-topbar") gadgetToggle("Letterbox-bottombar")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17475,7 +17475,7 @@ Shipped editor UI action: LetterBoxBars. Source ui_editor_menu.xml. Execute its 
 
 ### `action_LightingButton`
 
-Shipped editor UI action: LightingButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: LightingButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("None") gadgetReal("WorldLightingDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17510,7 +17510,7 @@ Shipped editor UI action: LightingButton. Source ui_editor_menu.xml. Execute its
 
 ### `action_LoadButton`
 
-Shipped editor UI action: LoadButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: LoadButton. Source ui_editor_menu.xml. Executes its original command expression `uiScenarioLoad`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17545,7 +17545,7 @@ Shipped editor UI action: LoadButton. Source ui_editor_menu.xml. Execute its ori
 
 ### `action_MapElevationCloseButton`
 
-Shipped editor UI action: MapElevationCloseButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: MapElevationCloseButton. Source ui_editor_menu.xml. Executes its original command expression `gadgetUnReal("MapElevationGadget")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17580,7 +17580,7 @@ Shipped editor UI action: MapElevationCloseButton. Source ui_editor_menu.xml. Ex
 
 ### `action_MixButton`
 
-Shipped editor UI action: MixButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: MixButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("paintmix") gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17615,7 +17615,7 @@ Shipped editor UI action: MixButton. Source ui_editor_menu.xml. Execute its orig
 
 ### `action_MoveUnitButton`
 
-Shipped editor UI action: MoveUnitButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: MoveUnitButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("moveunit")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17650,7 +17650,7 @@ Shipped editor UI action: MoveUnitButton. Source ui_editor_menu.xml. Execute its
 
 ### `action_NewButton`
 
-Shipped editor UI action: NewButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: NewButton. Source ui_editor_menu.xml. Executes its original command expression `gadgetReal("NewScenarioGadget")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17685,7 +17685,7 @@ Shipped editor UI action: NewButton. Source ui_editor_menu.xml. Execute its orig
 
 ### `action_NewScenarioCloseButton`
 
-Shipped editor UI action: NewScenarioCloseButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: NewScenarioCloseButton. Source ui_editor_menu.xml. Executes its original command expression `gadgetUnReal("NewScenarioGadget")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17720,7 +17720,7 @@ Shipped editor UI action: NewScenarioCloseButton. Source ui_editor_menu.xml. Exe
 
 ### `action_OceanButton`
 
-Shipped editor UI action: OceanButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: OceanButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("paintWater") gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17755,7 +17755,7 @@ Shipped editor UI action: OceanButton. Source ui_editor_menu.xml. Execute its or
 
 ### `action_PaintTerrainButton`
 
-Shipped editor UI action: PaintTerrainButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: PaintTerrainButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("Paint") gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17790,7 +17790,7 @@ Shipped editor UI action: PaintTerrainButton. Source ui_editor_menu.xml. Execute
 
 ### `action_PlaceUnitButton`
 
-Shipped editor UI action: PlaceUnitButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: PlaceUnitButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("PlaceUnit")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17825,7 +17825,7 @@ Shipped editor UI action: PlaceUnitButton. Source ui_editor_menu.xml. Execute it
 
 ### `action_PlaytestScenarioCancelButton`
 
-Shipped editor UI action: PlaytestScenarioCancelButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: PlaytestScenarioCancelButton. Source ui_editor_menu.xml. Executes its original command expression `gadgetUnReal("PlaytestDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17860,7 +17860,7 @@ Shipped editor UI action: PlaytestScenarioCancelButton. Source ui_editor_menu.xm
 
 ### `action_PlaytestScenarioNOWButton`
 
-Shipped editor UI action: PlaytestScenarioNOWButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: PlaytestScenarioNOWButton. Source ui_editor_menu.xml. Executes its original command expression `uiStartScenarioTest`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17895,7 +17895,7 @@ Shipped editor UI action: PlaytestScenarioNOWButton. Source ui_editor_menu.xml. 
 
 ### `action_PlaytestScenarioOKButton`
 
-Shipped editor UI action: PlaytestScenarioOKButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: PlaytestScenarioOKButton. Source ui_editor_menu.xml. Executes its original command expression `gadgetUnReal("PlaytestDialog") uiStartScenarioTest`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17930,7 +17930,7 @@ Shipped editor UI action: PlaytestScenarioOKButton. Source ui_editor_menu.xml. E
 
 ### `action_RaiseLowerButton`
 
-Shipped editor UI action: RaiseLowerButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: RaiseLowerButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("elevation") gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -17965,7 +17965,7 @@ Shipped editor UI action: RaiseLowerButton. Source ui_editor_menu.xml. Execute i
 
 ### `action_RedoButton`
 
-Shipped editor UI action: RedoButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: RedoButton. Source ui_editor_menu.xml. Executes its original command expression `redo`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18000,7 +18000,7 @@ Shipped editor UI action: RedoButton. Source ui_editor_menu.xml. Execute its ori
 
 ### `action_RoughenButton`
 
-Shipped editor UI action: RoughenButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: RoughenButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("roughen") gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18035,7 +18035,7 @@ Shipped editor UI action: RoughenButton. Source ui_editor_menu.xml. Execute its 
 
 ### `action_SampleElevationButton`
 
-Shipped editor UI action: SampleElevationButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: SampleElevationButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("elevationsample")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18070,7 +18070,7 @@ Shipped editor UI action: SampleElevationButton. Source ui_editor_menu.xml. Exec
 
 ### `action_SaveButton`
 
-Shipped editor UI action: SaveButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: SaveButton. Source ui_editor_menu.xml. Executes its original command expression `uiSaveScenarioPrompt`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18105,7 +18105,7 @@ Shipped editor UI action: SaveButton. Source ui_editor_menu.xml. Execute its ori
 
 ### `action_SaveButton_2`
 
-Shipped editor UI action: SaveButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: SaveButton. Source ui_editor_menu.xml. Executes its original command expression `uiSaveScenarioPrompt(true)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18140,7 +18140,7 @@ Shipped editor UI action: SaveButton. Source ui_editor_menu.xml. Execute its ori
 
 ### `action_ScenarioSummaryCloseButton`
 
-Shipped editor UI action: ScenarioSummaryCloseButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ScenarioSummaryCloseButton. Source ui_editor_menu.xml. Executes its original command expression `gadgetUnReal("AScenarioSummaryGadget")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18175,7 +18175,7 @@ Shipped editor UI action: ScenarioSummaryCloseButton. Source ui_editor_menu.xml.
 
 ### `action_SmoothButton`
 
-Shipped editor UI action: SmoothButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: SmoothButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("smooth") gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18210,7 +18210,7 @@ Shipped editor UI action: SmoothButton. Source ui_editor_menu.xml. Execute its o
 
 ### `action_TerrainCopyButton`
 
-Shipped editor UI action: TerrainCopyButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: TerrainCopyButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("Copy")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18245,7 +18245,7 @@ Shipped editor UI action: TerrainCopyButton. Source ui_editor_menu.xml. Execute 
 
 ### `action_TerrainPasteButton`
 
-Shipped editor UI action: TerrainPasteButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: TerrainPasteButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("TerrainPaste")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18280,7 +18280,7 @@ Shipped editor UI action: TerrainPasteButton. Source ui_editor_menu.xml. Execute
 
 ### `action_TriggersButton`
 
-Shipped editor UI action: TriggersButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: TriggersButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("Triggers")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18315,7 +18315,7 @@ Shipped editor UI action: TriggersButton. Source ui_editor_menu.xml. Execute its
 
 ### `action_UndoButton`
 
-Shipped editor UI action: UndoButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: UndoButton. Source ui_editor_menu.xml. Executes its original command expression `undo`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18350,7 +18350,7 @@ Shipped editor UI action: UndoButton. Source ui_editor_menu.xml. Execute its ori
 
 ### `action_UnitCopyButton`
 
-Shipped editor UI action: UnitCopyButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: UnitCopyButton. Source ui_editor_menu.xml. Executes its original command expression `uiCopyToClipboard`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18385,7 +18385,7 @@ Shipped editor UI action: UnitCopyButton. Source ui_editor_menu.xml. Execute its
 
 ### `action_UnitPasteButton`
 
-Shipped editor UI action: UnitPasteButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: UnitPasteButton. Source ui_editor_menu.xml. Executes its original command expression `editMode("UnitPaste")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18420,7 +18420,7 @@ Shipped editor UI action: UnitPasteButton. Source ui_editor_menu.xml. Execute it
 
 ### `action_WorldLightingCloseButton`
 
-Shipped editor UI action: WorldLightingCloseButton. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: WorldLightingCloseButton. Source ui_editor_menu.xml. Executes its original command expression `gadgetUnReal("WorldLightingDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18455,7 +18455,7 @@ Shipped editor UI action: WorldLightingCloseButton. Source ui_editor_menu.xml. E
 
 ### `action_camEdit_Track_copybtn`
 
-Shipped editor UI action: camEdit-Track-copybtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-Track-copybtn. Source ui_camera_editor.xml. Executes its original command expression `trackCopy`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18490,7 +18490,7 @@ Shipped editor UI action: camEdit-Track-copybtn. Source ui_camera_editor.xml. Ex
 
 ### `action_camEdit_Track_delbtn`
 
-Shipped editor UI action: camEdit-Track-delbtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-Track-delbtn. Source ui_camera_editor.xml. Executes its original command expression `trackRemove`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18525,7 +18525,7 @@ Shipped editor UI action: camEdit-Track-delbtn. Source ui_camera_editor.xml. Exe
 
 ### `action_camEdit_Track_downbtn`
 
-Shipped editor UI action: camEdit-Track-downbtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-Track-downbtn. Source ui_camera_editor.xml. Executes its original command expression `trackMove(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18560,7 +18560,7 @@ Shipped editor UI action: camEdit-Track-downbtn. Source ui_camera_editor.xml. Ex
 
 ### `action_camEdit_Track_downbtn_2`
 
-Shipped editor UI action: camEdit-Track_downbtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-Track_downbtn. Source ui_camera_editor.xml. Executes its original command expression `trackWaypointMove(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18595,7 +18595,7 @@ Shipped editor UI action: camEdit-Track_downbtn. Source ui_camera_editor.xml. Ex
 
 ### `action_camEdit_Track_insbtn`
 
-Shipped editor UI action: camEdit-Track-insbtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-Track-insbtn. Source ui_camera_editor.xml. Executes its original command expression `trackInsert`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18630,7 +18630,7 @@ Shipped editor UI action: camEdit-Track-insbtn. Source ui_camera_editor.xml. Exe
 
 ### `action_camEdit_Track_loadbtn`
 
-Shipped editor UI action: camEdit-Track-loadbtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-Track-loadbtn. Source ui_camera_editor.xml. Executes its original command expression `trackLoad`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18665,7 +18665,7 @@ Shipped editor UI action: camEdit-Track-loadbtn. Source ui_camera_editor.xml. Ex
 
 ### `action_camEdit_Track_preview`
 
-Shipped editor UI action: camEdit-Track-preview. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-Track-preview. Source ui_camera_editor.xml. Executes its original command expression `trackToggleShow`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18700,7 +18700,7 @@ Shipped editor UI action: camEdit-Track-preview. Source ui_camera_editor.xml. Ex
 
 ### `action_camEdit_Track_savebtn`
 
-Shipped editor UI action: camEdit-Track-savebtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-Track-savebtn. Source ui_camera_editor.xml. Executes its original command expression `trackSaveDialog`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18735,7 +18735,7 @@ Shipped editor UI action: camEdit-Track-savebtn. Source ui_camera_editor.xml. Ex
 
 ### `action_camEdit_Track_upbtn`
 
-Shipped editor UI action: camEdit-Track-upbtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-Track-upbtn. Source ui_camera_editor.xml. Executes its original command expression `trackMove(-1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18770,7 +18770,7 @@ Shipped editor UI action: camEdit-Track-upbtn. Source ui_camera_editor.xml. Exec
 
 ### `action_camEdit_Track_upbtn_2`
 
-Shipped editor UI action: camEdit-Track_upbtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-Track_upbtn. Source ui_camera_editor.xml. Executes its original command expression `trackWaypointMove(-1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18805,7 +18805,7 @@ Shipped editor UI action: camEdit-Track_upbtn. Source ui_camera_editor.xml. Exec
 
 ### `action_camEdit_addbtn`
 
-Shipped editor UI action: camEdit-addbtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-addbtn. Source ui_camera_editor.xml. Executes its original command expression `trackAddWaypoint`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18840,7 +18840,7 @@ Shipped editor UI action: camEdit-addbtn. Source ui_camera_editor.xml. Execute i
 
 ### `action_camEdit_applybtn`
 
-Shipped editor UI action: camEdit-applybtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-applybtn. Source ui_camera_editor.xml. Executes its original command expression `trackEditWaypoint`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18875,7 +18875,7 @@ Shipped editor UI action: camEdit-applybtn. Source ui_camera_editor.xml. Execute
 
 ### `action_camEdit_backbtn`
 
-Shipped editor UI action: camEdit-backbtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-backbtn. Source ui_camera_editor.xml. Executes its original command expression `trackStepBackward`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18910,7 +18910,7 @@ Shipped editor UI action: camEdit-backbtn. Source ui_camera_editor.xml. Execute 
 
 ### `action_camEdit_camRotation`
 
-Shipped editor UI action: camEdit-camRotation. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-camRotation. Source ui_camera_editor.xml. Executes its original command expression `cameraRotate`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18945,7 +18945,7 @@ Shipped editor UI action: camEdit-camRotation. Source ui_camera_editor.xml. Exec
 
 ### `action_camEdit_camStates`
 
-Shipped editor UI action: camEdit-camStates. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-camStates. Source ui_camera_editor.xml. Executes its original command expression `gadgetReal("CameraStatesGadget")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -18980,7 +18980,7 @@ Shipped editor UI action: camEdit-camStates. Source ui_camera_editor.xml. Execut
 
 ### `action_camEdit_delbtn`
 
-Shipped editor UI action: camEdit-delbtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-delbtn. Source ui_camera_editor.xml. Executes its original command expression `trackRemoveWaypoint`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19015,7 +19015,7 @@ Shipped editor UI action: camEdit-delbtn. Source ui_camera_editor.xml. Execute i
 
 ### `action_camEdit_freeCam`
 
-Shipped editor UI action: camEdit-freeCam. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-freeCam. Source ui_camera_editor.xml. Executes its original command expression `setFreeCam()`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19050,7 +19050,7 @@ Shipped editor UI action: camEdit-freeCam. Source ui_camera_editor.xml. Execute 
 
 ### `action_camEdit_fwdbtn`
 
-Shipped editor UI action: camEdit-fwdbtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-fwdbtn. Source ui_camera_editor.xml. Executes its original command expression `trackStepForward`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19085,7 +19085,7 @@ Shipped editor UI action: camEdit-fwdbtn. Source ui_camera_editor.xml. Execute i
 
 ### `action_camEdit_newbtn`
 
-Shipped editor UI action: camEdit-newbtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-newbtn. Source ui_camera_editor.xml. Executes its original command expression `trackClear`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19120,7 +19120,7 @@ Shipped editor UI action: camEdit-newbtn. Source ui_camera_editor.xml. Execute i
 
 ### `action_camEdit_pausebtn`
 
-Shipped editor UI action: camEdit-pausebtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-pausebtn. Source ui_camera_editor.xml. Executes its original command expression `trackPause`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19155,7 +19155,7 @@ Shipped editor UI action: camEdit-pausebtn. Source ui_camera_editor.xml. Execute
 
 ### `action_camEdit_playbtn`
 
-Shipped editor UI action: camEdit-playbtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-playbtn. Source ui_camera_editor.xml. Executes its original command expression `trackPlay(10.0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19190,7 +19190,7 @@ Shipped editor UI action: camEdit-playbtn. Source ui_camera_editor.xml. Execute 
 
 ### `action_camEdit_precise_waypoint`
 
-Shipped editor UI action: camEdit-precise-waypoint. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-precise-waypoint. Source ui_camera_editor.xml. Executes its original command expression `gadgetToggle("camEdit-position-window")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19225,7 +19225,7 @@ Shipped editor UI action: camEdit-precise-waypoint. Source ui_camera_editor.xml.
 
 ### `action_camEdit_reset`
 
-Shipped editor UI action: camEdit-reset. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-reset. Source ui_camera_editor.xml. Executes its original command expression `cameraPitchReset cameraRotationReset cameraZoomReset fov(40)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19260,7 +19260,7 @@ Shipped editor UI action: camEdit-reset. Source ui_camera_editor.xml. Execute it
 
 ### `action_camEdit_resetFov`
 
-Shipped editor UI action: camEdit-resetFov. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-resetFov. Source ui_camera_editor.xml. Executes its original command expression `fov(40)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19295,7 +19295,7 @@ Shipped editor UI action: camEdit-resetFov. Source ui_camera_editor.xml. Execute
 
 ### `action_camEdit_resetPitch`
 
-Shipped editor UI action: camEdit-resetPitch. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-resetPitch. Source ui_camera_editor.xml. Executes its original command expression `cameraPitchReset`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19330,7 +19330,7 @@ Shipped editor UI action: camEdit-resetPitch. Source ui_camera_editor.xml. Execu
 
 ### `action_camEdit_resetRot`
 
-Shipped editor UI action: camEdit-resetRot. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-resetRot. Source ui_camera_editor.xml. Executes its original command expression `cameraRotationReset`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19365,7 +19365,7 @@ Shipped editor UI action: camEdit-resetRot. Source ui_camera_editor.xml. Execute
 
 ### `action_camEdit_resetZoom`
 
-Shipped editor UI action: camEdit-resetZoom. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-resetZoom. Source ui_camera_editor.xml. Executes its original command expression `cameraZoomReset`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19400,7 +19400,7 @@ Shipped editor UI action: camEdit-resetZoom. Source ui_camera_editor.xml. Execut
 
 ### `action_camEdit_stopbtn`
 
-Shipped editor UI action: camEdit-stopbtn. Source ui_camera_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: camEdit-stopbtn. Source ui_camera_editor.xml. Executes its original command expression `trackStop`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19435,7 +19435,7 @@ Shipped editor UI action: camEdit-stopbtn. Source ui_camera_editor.xml. Execute 
 
 ### `action_cameraStates_FreeCam`
 
-Shipped editor UI action: cameraStates-FreeCam. Source ui_camera_states.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: cameraStates-FreeCam. Source ui_camera_states.xml. Executes its original command expression `setFreeCam()`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19470,7 +19470,7 @@ Shipped editor UI action: cameraStates-FreeCam. Source ui_camera_states.xml. Exe
 
 ### `action_cameraStates_ResetView`
 
-Shipped editor UI action: cameraStates-ResetView. Source ui_camera_states.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: cameraStates-ResetView. Source ui_camera_states.xml. Executes its original command expression `cameraRotationReset() cameraZoomReset()`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19505,7 +19505,7 @@ Shipped editor UI action: cameraStates-ResetView. Source ui_camera_states.xml. E
 
 ### `action_cameraStates_Rotate`
 
-Shipped editor UI action: cameraStates-Rotate. Source ui_camera_states.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: cameraStates-Rotate. Source ui_camera_states.xml. Executes its original command expression `cameraRotate()`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19540,7 +19540,7 @@ Shipped editor UI action: cameraStates-Rotate. Source ui_camera_states.xml. Exec
 
 ### `action_key_LocSelect_esc`
 
-Shipped editor UI action: Hotkey esc; context LocSelect. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context LocSelect. Source editor.con. Executes its original command expression `editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19575,7 +19575,7 @@ Shipped editor UI action: Hotkey esc; context LocSelect. Source editor.con. Exec
 
 ### `action_key_LocSelect_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context LocSelect. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context LocSelect. Source editor.con. Executes its original command expression `uiSelectLocation()`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19610,7 +19610,7 @@ Shipped editor UI action: Hotkey mouse1down; context LocSelect. Source editor.co
 
 ### `action_key_LocSelect_mouse2up`
 
-Shipped editor UI action: Hotkey mouse2up; context LocSelect. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse2up; context LocSelect. Source editor.con. Executes its original command expression `editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19645,7 +19645,7 @@ Shipped editor UI action: Hotkey mouse2up; context LocSelect. Source editor.con.
 
 ### `action_key_TerrainPaste_esc`
 
-Shipped editor UI action: Hotkey esc; context TerrainPaste. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context TerrainPaste. Source editor.con. Executes its original command expression `editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19680,7 +19680,7 @@ Shipped editor UI action: Hotkey esc; context TerrainPaste. Source editor.con. E
 
 ### `action_key_TerrainPaste_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context TerrainPaste. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context TerrainPaste. Source editor.con. Executes its original command expression `uiPasteFromClipboard`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19715,7 +19715,7 @@ Shipped editor UI action: Hotkey mouse1up; context TerrainPaste. Source editor.c
 
 ### `action_key_TerrainPaste_mouse2up`
 
-Shipped editor UI action: Hotkey mouse2up; context TerrainPaste. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse2up; context TerrainPaste. Source editor.con. Executes its original command expression `editMode("copy")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19750,7 +19750,7 @@ Shipped editor UI action: Hotkey mouse2up; context TerrainPaste. Source editor.c
 
 ### `action_key_UnitPaste_esc`
 
-Shipped editor UI action: Hotkey esc; context UnitPaste. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context UnitPaste. Source editor.con. Executes its original command expression `editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19785,7 +19785,7 @@ Shipped editor UI action: Hotkey esc; context UnitPaste. Source editor.con. Exec
 
 ### `action_key_UnitPaste_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context UnitPaste. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context UnitPaste. Source editor.con. Executes its original command expression `uiPasteFromClipboard`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19820,7 +19820,7 @@ Shipped editor UI action: Hotkey mouse1up; context UnitPaste. Source editor.con.
 
 ### `action_key_UnitPaste_mousez`
 
-Shipped editor UI action: Hotkey mousez; context UnitPaste. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mousez; context UnitPaste. Source editor.con. Executes its original command expression `uiRotateClipboard`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19855,7 +19855,7 @@ Shipped editor UI action: Hotkey mousez; context UnitPaste. Source editor.con. E
 
 ### `action_key_camtrack_esc`
 
-Shipped editor UI action: Hotkey esc; context camtrack. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context camtrack. Source editor.con. Executes its original command expression `editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19890,7 +19890,7 @@ Shipped editor UI action: Hotkey esc; context camtrack. Source editor.con. Execu
 
 ### `action_key_convertunits_esc`
 
-Shipped editor UI action: Hotkey esc; context convertunits. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context convertunits. Source editor.con. Executes its original command expression `editMode("none") gadgetUnreal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19925,7 +19925,7 @@ Shipped editor UI action: Hotkey esc; context convertunits. Source editor.con. E
 
 ### `action_key_convertunits_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context convertunits. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context convertunits. Source editor.con. Executes its original command expression `uiConvertUnits(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19960,7 +19960,7 @@ Shipped editor UI action: Hotkey mouse1down; context convertunits. Source editor
 
 ### `action_key_convertunits_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context convertunits. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context convertunits. Source editor.con. Executes its original command expression `uiConvertUnits(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -19995,7 +19995,7 @@ Shipped editor UI action: Hotkey mouse1up; context convertunits. Source editor.c
 
 ### `action_key_copy_control_v`
 
-Shipped editor UI action: Hotkey control-v; context copy. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-v; context copy. Source editor.con. Executes its original command expression `editMode("TerrainPaste")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20030,7 +20030,7 @@ Shipped editor UI action: Hotkey control-v; context copy. Source editor.con. Exe
 
 ### `action_key_copy_esc`
 
-Shipped editor UI action: Hotkey esc; context copy. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context copy. Source editor.con. Executes its original command expression `editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20065,7 +20065,7 @@ Shipped editor UI action: Hotkey esc; context copy. Source editor.con. Execute i
 
 ### `action_key_copy_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context copy. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context copy. Source editor.con. Executes its original command expression `uiTerrainSelection(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20100,7 +20100,7 @@ Shipped editor UI action: Hotkey mouse1down; context copy. Source editor.con. Ex
 
 ### `action_key_copy_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context copy. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context copy. Source editor.con. Executes its original command expression `uiTerrainSelection(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20135,7 +20135,7 @@ Shipped editor UI action: Hotkey mouse1up; context copy. Source editor.con. Exec
 
 ### `action_key_definegrouping_control_v`
 
-Shipped editor UI action: Hotkey control-v; context definegrouping. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-v; context definegrouping. Source editor.con. Executes its original command expression `editMode("fullpaste")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20170,7 +20170,7 @@ Shipped editor UI action: Hotkey control-v; context definegrouping. Source edito
 
 ### `action_key_definegrouping_esc`
 
-Shipped editor UI action: Hotkey esc; context definegrouping. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context definegrouping. Source editor.con. Executes its original command expression `editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20205,7 +20205,7 @@ Shipped editor UI action: Hotkey esc; context definegrouping. Source editor.con.
 
 ### `action_key_definegrouping_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context definegrouping. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context definegrouping. Source editor.con. Executes its original command expression `uiTerrainSelection(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20240,7 +20240,7 @@ Shipped editor UI action: Hotkey mouse1down; context definegrouping. Source edit
 
 ### `action_key_definegrouping_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context definegrouping. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context definegrouping. Source editor.con. Executes its original command expression `uiTerrainSelection(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20275,7 +20275,7 @@ Shipped editor UI action: Hotkey mouse1up; context definegrouping. Source editor
 
 ### `action_key_deleteunits_esc`
 
-Shipped editor UI action: Hotkey esc; context deleteunits. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context deleteunits. Source editor.con. Executes its original command expression `editMode("none") gadgetUnreal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20310,7 +20310,7 @@ Shipped editor UI action: Hotkey esc; context deleteunits. Source editor.con. Ex
 
 ### `action_key_deleteunits_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context deleteunits. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context deleteunits. Source editor.con. Executes its original command expression `uiDeleteUnits(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20345,7 +20345,7 @@ Shipped editor UI action: Hotkey mouse1down; context deleteunits. Source editor.
 
 ### `action_key_deleteunits_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context deleteunits. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context deleteunits. Source editor.con. Executes its original command expression `uiDeleteUnits(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20380,7 +20380,7 @@ Shipped editor UI action: Hotkey mouse1up; context deleteunits. Source editor.co
 
 ### `action_key_detailHelp__`
 
-Shipped editor UI action: Hotkey .; context detailHelp. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey .; context detailHelp. Source editor.con. Executes its original command expression `gadgetToggle("HelpDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20415,7 +20415,7 @@ Shipped editor UI action: Hotkey .; context detailHelp. Source editor.con. Execu
 
 ### `action_key_editor_0`
 
-Shipped editor UI action: Hotkey 0; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey 0; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSize(10)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20450,7 +20450,7 @@ Shipped editor UI action: Hotkey 0; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_1`
 
-Shipped editor UI action: Hotkey 1; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey 1; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSize(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20485,7 +20485,7 @@ Shipped editor UI action: Hotkey 1; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_2`
 
-Shipped editor UI action: Hotkey 2; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey 2; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSize(2)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20520,7 +20520,7 @@ Shipped editor UI action: Hotkey 2; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_3`
 
-Shipped editor UI action: Hotkey 3; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey 3; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSize(3)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20555,7 +20555,7 @@ Shipped editor UI action: Hotkey 3; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_4`
 
-Shipped editor UI action: Hotkey 4; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey 4; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSize(4)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20590,7 +20590,7 @@ Shipped editor UI action: Hotkey 4; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_5`
 
-Shipped editor UI action: Hotkey 5; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey 5; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSize(5)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20625,7 +20625,7 @@ Shipped editor UI action: Hotkey 5; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_6`
 
-Shipped editor UI action: Hotkey 6; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey 6; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSize(6)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20660,7 +20660,7 @@ Shipped editor UI action: Hotkey 6; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_7`
 
-Shipped editor UI action: Hotkey 7; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey 7; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSize(7)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20695,7 +20695,7 @@ Shipped editor UI action: Hotkey 7; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_8`
 
-Shipped editor UI action: Hotkey 8; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey 8; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSize(8)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20730,7 +20730,7 @@ Shipped editor UI action: Hotkey 8; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_9`
 
-Shipped editor UI action: Hotkey 9; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey 9; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSize(9)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20765,7 +20765,7 @@ Shipped editor UI action: Hotkey 9; context editor. Source editor.con. Execute i
 
 ### `action_key_editor__`
 
-Shipped editor UI action: Hotkey [; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey [; context editor. Source editor.con. Executes its original command expression `uiChangeBrushType("Circular")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20800,7 +20800,7 @@ Shipped editor UI action: Hotkey [; context editor. Source editor.con. Execute i
 
 ### `action_key_editor___2`
 
-Shipped editor UI action: Hotkey ]; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey ]; context editor. Source editor.con. Executes its original command expression `uiChangeBrushType("Rectangular")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20835,7 +20835,7 @@ Shipped editor UI action: Hotkey ]; context editor. Source editor.con. Execute i
 
 ### `action_key_editor__alt_shift_y`
 
-Shipped editor UI action: Hotkey +alt-shift-y; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-shift-y; context editor. Source editor.con. Executes its original command expression `sunDecreaseRotation`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20870,7 +20870,7 @@ Shipped editor UI action: Hotkey +alt-shift-y; context editor. Source editor.con
 
 ### `action_key_editor__alt_y`
 
-Shipped editor UI action: Hotkey +alt-y; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-y; context editor. Source editor.con. Executes its original command expression `sunIncreaseRotation`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20905,7 +20905,7 @@ Shipped editor UI action: Hotkey +alt-y; context editor. Source editor.con. Exec
 
 ### `action_key_editor__k`
 
-Shipped editor UI action: Hotkey +k; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +k; context editor. Source editor.con. Executes its original command expression `uiScaleUnitUp`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20940,7 +20940,7 @@ Shipped editor UI action: Hotkey +k; context editor. Source editor.con. Execute 
 
 ### `action_key_editor__shift_k`
 
-Shipped editor UI action: Hotkey +shift-k; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +shift-k; context editor. Source editor.con. Executes its original command expression `uiScaleUnitDown`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -20975,7 +20975,7 @@ Shipped editor UI action: Hotkey +shift-k; context editor. Source editor.con. Ex
 
 ### `action_key_editor__shift_space`
 
-Shipped editor UI action: Hotkey +shift-space; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +shift-space; context editor. Source editor.con. Executes its original command expression `uiScaleUnitDown`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21010,7 +21010,7 @@ Shipped editor UI action: Hotkey +shift-space; context editor. Source editor.con
 
 ### `action_key_editor__shift_y`
 
-Shipped editor UI action: Hotkey +shift-y; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +shift-y; context editor. Source editor.con. Executes its original command expression `sunDecreaseInclination`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21045,7 +21045,7 @@ Shipped editor UI action: Hotkey +shift-y; context editor. Source editor.con. Ex
 
 ### `action_key_editor__space`
 
-Shipped editor UI action: Hotkey +space; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +space; context editor. Source editor.con. Executes its original command expression `uiScaleUnitUp`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21080,7 +21080,7 @@ Shipped editor UI action: Hotkey +space; context editor. Source editor.con. Exec
 
 ### `action_key_editor__y`
 
-Shipped editor UI action: Hotkey +y; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +y; context editor. Source editor.con. Executes its original command expression `sunIncreaseInclination`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21115,7 +21115,7 @@ Shipped editor UI action: Hotkey +y; context editor. Source editor.con. Execute 
 
 ### `action_key_editor_alt_1`
 
-Shipped editor UI action: Hotkey alt-1; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey alt-1; context editor. Source editor.con. Executes its original command expression `uiChangeBrushType("Circular")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21150,7 +21150,7 @@ Shipped editor UI action: Hotkey alt-1; context editor. Source editor.con. Execu
 
 ### `action_key_editor_alt_2`
 
-Shipped editor UI action: Hotkey alt-2; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey alt-2; context editor. Source editor.con. Executes its original command expression `uiChangeBrushType("Rectangular")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21185,7 +21185,7 @@ Shipped editor UI action: Hotkey alt-2; context editor. Source editor.con. Execu
 
 ### `action_key_editor_alt_3`
 
-Shipped editor UI action: Hotkey alt-3; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey alt-3; context editor. Source editor.con. Executes its original command expression `uiChangeBrushType("HollowSquare")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21220,7 +21220,7 @@ Shipped editor UI action: Hotkey alt-3; context editor. Source editor.con. Execu
 
 ### `action_key_editor_alt_4`
 
-Shipped editor UI action: Hotkey alt-4; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey alt-4; context editor. Source editor.con. Executes its original command expression `uiChangeBrushType("Point")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21255,7 +21255,7 @@ Shipped editor UI action: Hotkey alt-4; context editor. Source editor.con. Execu
 
 ### `action_key_editor_alt_a`
 
-Shipped editor UI action: Hotkey alt-a; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey alt-a; context editor. Source editor.con. Executes its original command expression `gadgetToggle("animgadget")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21290,7 +21290,7 @@ Shipped editor UI action: Hotkey alt-a; context editor. Source editor.con. Execu
 
 ### `action_key_editor_alt_b`
 
-Shipped editor UI action: Hotkey alt-b; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey alt-b; context editor. Source editor.con. Executes its original command expression `cycleFogAndBlackMap()`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21325,7 +21325,7 @@ Shipped editor UI action: Hotkey alt-b; context editor. Source editor.con. Execu
 
 ### `action_key_editor_alt_c`
 
-Shipped editor UI action: Hotkey alt-c; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey alt-c; context editor. Source editor.con. Executes its original command expression `cameraRotate`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21360,7 +21360,7 @@ Shipped editor UI action: Hotkey alt-c; context editor. Source editor.con. Execu
 
 ### `action_key_editor_alt_mousez`
 
-Shipped editor UI action: Hotkey alt-mousez; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey alt-mousez; context editor. Source editor.con. Executes its original command expression `uiScrollBrushSize`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21395,7 +21395,7 @@ Shipped editor UI action: Hotkey alt-mousez; context editor. Source editor.con. 
 
 ### `action_key_editor_alt_r`
 
-Shipped editor UI action: Hotkey alt-r; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey alt-r; context editor. Source editor.con. Executes its original command expression `renderObstructionManager`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21430,7 +21430,7 @@ Shipped editor UI action: Hotkey alt-r; context editor. Source editor.con. Execu
 
 ### `action_key_editor_alt_u`
 
-Shipped editor UI action: Hotkey alt-u; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey alt-u; context editor. Source editor.con. Executes its original command expression `gadgetToggle("soundgadget")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21465,7 +21465,7 @@ Shipped editor UI action: Hotkey alt-u; context editor. Source editor.con. Execu
 
 ### `action_key_editor_alt_v`
 
-Shipped editor UI action: Hotkey alt-v; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey alt-v; context editor. Source editor.con. Executes its original command expression `cameraLimit`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21500,7 +21500,7 @@ Shipped editor UI action: Hotkey alt-v; context editor. Source editor.con. Execu
 
 ### `action_key_editor_b`
 
-Shipped editor UI action: Hotkey b; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey b; context editor. Source editor.con. Executes its original command expression `gadgetToggle("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21535,7 +21535,7 @@ Shipped editor UI action: Hotkey b; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_c`
 
-Shipped editor UI action: Hotkey c; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey c; context editor. Source editor.con. Executes its original command expression `editmode("paintCliff") gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21570,7 +21570,7 @@ Shipped editor UI action: Hotkey c; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_control_0`
 
-Shipped editor UI action: Hotkey control-0; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-0; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSizePercent(100)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21605,7 +21605,7 @@ Shipped editor UI action: Hotkey control-0; context editor. Source editor.con. E
 
 ### `action_key_editor_control_1`
 
-Shipped editor UI action: Hotkey control-1; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-1; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSizePercent(10)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21640,7 +21640,7 @@ Shipped editor UI action: Hotkey control-1; context editor. Source editor.con. E
 
 ### `action_key_editor_control_2`
 
-Shipped editor UI action: Hotkey control-2; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-2; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSizePercent(20)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21675,7 +21675,7 @@ Shipped editor UI action: Hotkey control-2; context editor. Source editor.con. E
 
 ### `action_key_editor_control_3`
 
-Shipped editor UI action: Hotkey control-3; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-3; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSizePercent(30)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21710,7 +21710,7 @@ Shipped editor UI action: Hotkey control-3; context editor. Source editor.con. E
 
 ### `action_key_editor_control_4`
 
-Shipped editor UI action: Hotkey control-4; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-4; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSizePercent(40)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21745,7 +21745,7 @@ Shipped editor UI action: Hotkey control-4; context editor. Source editor.con. E
 
 ### `action_key_editor_control_5`
 
-Shipped editor UI action: Hotkey control-5; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-5; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSizePercent(50)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21780,7 +21780,7 @@ Shipped editor UI action: Hotkey control-5; context editor. Source editor.con. E
 
 ### `action_key_editor_control_6`
 
-Shipped editor UI action: Hotkey control-6; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-6; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSizePercent(60)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21815,7 +21815,7 @@ Shipped editor UI action: Hotkey control-6; context editor. Source editor.con. E
 
 ### `action_key_editor_control_7`
 
-Shipped editor UI action: Hotkey control-7; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-7; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSizePercent(70)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21850,7 +21850,7 @@ Shipped editor UI action: Hotkey control-7; context editor. Source editor.con. E
 
 ### `action_key_editor_control_8`
 
-Shipped editor UI action: Hotkey control-8; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-8; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSizePercent(80)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21885,7 +21885,7 @@ Shipped editor UI action: Hotkey control-8; context editor. Source editor.con. E
 
 ### `action_key_editor_control_9`
 
-Shipped editor UI action: Hotkey control-9; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-9; context editor. Source editor.con. Executes its original command expression `uiChangeBrushSizePercent(90)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21920,7 +21920,7 @@ Shipped editor UI action: Hotkey control-9; context editor. Source editor.con. E
 
 ### `action_key_editor_control__`
 
-Shipped editor UI action: Hotkey control-,; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-,; context editor. Source editor.con. Executes its original command expression `uiUniformRaiseElevation()`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21955,7 +21955,7 @@ Shipped editor UI action: Hotkey control-,; context editor. Source editor.con. E
 
 ### `action_key_editor_control___2`
 
-Shipped editor UI action: Hotkey control-.; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-.; context editor. Source editor.con. Executes its original command expression `uiUniformLowerElevation()`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -21990,7 +21990,7 @@ Shipped editor UI action: Hotkey control-.; context editor. Source editor.con. E
 
 ### `action_key_editor_control_c`
 
-Shipped editor UI action: Hotkey control-c; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-c; context editor. Source editor.con. Executes its original command expression `uiCopyToClipboard`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22025,7 +22025,7 @@ Shipped editor UI action: Hotkey control-c; context editor. Source editor.con. E
 
 ### `action_key_editor_control_f`
 
-Shipped editor UI action: Hotkey control-f; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-f; context editor. Source editor.con. Executes its original command expression `editMode("paintforest")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22060,7 +22060,7 @@ Shipped editor UI action: Hotkey control-f; context editor. Source editor.con. E
 
 ### `action_key_editor_control_f1`
 
-Shipped editor UI action: Hotkey control-f1; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-f1; context editor. Source editor.con. Executes its original command expression `player(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22095,7 +22095,7 @@ Shipped editor UI action: Hotkey control-f1; context editor. Source editor.con. 
 
 ### `action_key_editor_control_f10`
 
-Shipped editor UI action: Hotkey control-f10; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-f10; context editor. Source editor.con. Executes its original command expression `player(10)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22130,7 +22130,7 @@ Shipped editor UI action: Hotkey control-f10; context editor. Source editor.con.
 
 ### `action_key_editor_control_f11`
 
-Shipped editor UI action: Hotkey control-f11; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-f11; context editor. Source editor.con. Executes its original command expression `player(11)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22165,7 +22165,7 @@ Shipped editor UI action: Hotkey control-f11; context editor. Source editor.con.
 
 ### `action_key_editor_control_f12`
 
-Shipped editor UI action: Hotkey control-f12; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-f12; context editor. Source editor.con. Executes its original command expression `player(12)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22200,7 +22200,7 @@ Shipped editor UI action: Hotkey control-f12; context editor. Source editor.con.
 
 ### `action_key_editor_control_f2`
 
-Shipped editor UI action: Hotkey control-f2; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-f2; context editor. Source editor.con. Executes its original command expression `player(2)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22235,7 +22235,7 @@ Shipped editor UI action: Hotkey control-f2; context editor. Source editor.con. 
 
 ### `action_key_editor_control_f3`
 
-Shipped editor UI action: Hotkey control-f3; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-f3; context editor. Source editor.con. Executes its original command expression `player(3)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22270,7 +22270,7 @@ Shipped editor UI action: Hotkey control-f3; context editor. Source editor.con. 
 
 ### `action_key_editor_control_f4`
 
-Shipped editor UI action: Hotkey control-f4; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-f4; context editor. Source editor.con. Executes its original command expression `player(4)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22305,7 +22305,7 @@ Shipped editor UI action: Hotkey control-f4; context editor. Source editor.con. 
 
 ### `action_key_editor_control_f5`
 
-Shipped editor UI action: Hotkey control-f5; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-f5; context editor. Source editor.con. Executes its original command expression `player(5)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22340,7 +22340,7 @@ Shipped editor UI action: Hotkey control-f5; context editor. Source editor.con. 
 
 ### `action_key_editor_control_f6`
 
-Shipped editor UI action: Hotkey control-f6; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-f6; context editor. Source editor.con. Executes its original command expression `player(6)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22375,7 +22375,7 @@ Shipped editor UI action: Hotkey control-f6; context editor. Source editor.con. 
 
 ### `action_key_editor_control_f7`
 
-Shipped editor UI action: Hotkey control-f7; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-f7; context editor. Source editor.con. Executes its original command expression `player(7)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22410,7 +22410,7 @@ Shipped editor UI action: Hotkey control-f7; context editor. Source editor.con. 
 
 ### `action_key_editor_control_f8`
 
-Shipped editor UI action: Hotkey control-f8; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-f8; context editor. Source editor.con. Executes its original command expression `player(8)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22445,7 +22445,7 @@ Shipped editor UI action: Hotkey control-f8; context editor. Source editor.con. 
 
 ### `action_key_editor_control_f9`
 
-Shipped editor UI action: Hotkey control-f9; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-f9; context editor. Source editor.con. Executes its original command expression `player(9)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22480,7 +22480,7 @@ Shipped editor UI action: Hotkey control-f9; context editor. Source editor.con. 
 
 ### `action_key_editor_control_h`
 
-Shipped editor UI action: Hotkey control-h; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-h; context editor. Source editor.con. Executes its original command expression `gadgetToggle("EditorMenu") gadgetToggle("ToolBar")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22515,7 +22515,7 @@ Shipped editor UI action: Hotkey control-h; context editor. Source editor.con. E
 
 ### `action_key_editor_control_k`
 
-Shipped editor UI action: Hotkey control-k; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-k; context editor. Source editor.con. Executes its original command expression `configToggle("cameraMovementLock")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22550,7 +22550,7 @@ Shipped editor UI action: Hotkey control-k; context editor. Source editor.con. E
 
 ### `action_key_editor_control_l`
 
-Shipped editor UI action: Hotkey control-l; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-l; context editor. Source editor.con. Executes its original command expression `uiScenarioLoad`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22585,7 +22585,7 @@ Shipped editor UI action: Hotkey control-l; context editor. Source editor.con. E
 
 ### `action_key_editor_control_mouse1down`
 
-Shipped editor UI action: Hotkey control-mouse1down; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-mouse1down; context editor. Source editor.con. Executes its original command expression `uiTerrainSelection(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22620,7 +22620,7 @@ Shipped editor UI action: Hotkey control-mouse1down; context editor. Source edit
 
 ### `action_key_editor_control_mouse1up`
 
-Shipped editor UI action: Hotkey control-mouse1up; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-mouse1up; context editor. Source editor.con. Executes its original command expression `uiTerrainSelection(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22655,7 +22655,7 @@ Shipped editor UI action: Hotkey control-mouse1up; context editor. Source editor
 
 ### `action_key_editor_control_mousez`
 
-Shipped editor UI action: Hotkey control-mousez; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-mousez; context editor. Source editor.con. Executes its original command expression `uiWheelRotateCamera`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22690,7 +22690,7 @@ Shipped editor UI action: Hotkey control-mousez; context editor. Source editor.c
 
 ### `action_key_editor_control_n`
 
-Shipped editor UI action: Hotkey control-n; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-n; context editor. Source editor.con. Executes its original command expression `gadgetReal("NewScenarioGadget")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22725,7 +22725,7 @@ Shipped editor UI action: Hotkey control-n; context editor. Source editor.con. E
 
 ### `action_key_editor_control_r`
 
-Shipped editor UI action: Hotkey control-r; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-r; context editor. Source editor.con. Executes its original command expression `uiStartScenarioTest`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22760,7 +22760,7 @@ Shipped editor UI action: Hotkey control-r; context editor. Source editor.con. E
 
 ### `action_key_editor_control_s`
 
-Shipped editor UI action: Hotkey control-s; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-s; context editor. Source editor.con. Executes its original command expression `uiSaveScenarioPrompt`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22795,7 +22795,7 @@ Shipped editor UI action: Hotkey control-s; context editor. Source editor.con. E
 
 ### `action_key_editor_control_shift_s`
 
-Shipped editor UI action: Hotkey control-shift-s; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-shift-s; context editor. Source editor.con. Executes its original command expression `uiSaveScenarioPrompt(true)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22830,7 +22830,7 @@ Shipped editor UI action: Hotkey control-shift-s; context editor. Source editor.
 
 ### `action_key_editor_control_v`
 
-Shipped editor UI action: Hotkey control-v; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-v; context editor. Source editor.con. Executes its original command expression `editMode("unitpaste")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22865,7 +22865,7 @@ Shipped editor UI action: Hotkey control-v; context editor. Source editor.con. E
 
 ### `action_key_editor_control_y`
 
-Shipped editor UI action: Hotkey control-y; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-y; context editor. Source editor.con. Executes its original command expression `redo`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22900,7 +22900,7 @@ Shipped editor UI action: Hotkey control-y; context editor. Source editor.con. E
 
 ### `action_key_editor_control_z`
 
-Shipped editor UI action: Hotkey control-z; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-z; context editor. Source editor.con. Executes its original command expression `undo`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22935,7 +22935,7 @@ Shipped editor UI action: Hotkey control-z; context editor. Source editor.con. E
 
 ### `action_key_editor_delete`
 
-Shipped editor UI action: Hotkey delete; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey delete; context editor. Source editor.con. Executes its original command expression `uiRemoveSelectedUnit`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -22970,7 +22970,7 @@ Shipped editor UI action: Hotkey delete; context editor. Source editor.con. Exec
 
 ### `action_key_editor_e`
 
-Shipped editor UI action: Hotkey e; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey e; context editor. Source editor.con. Executes its original command expression `editmode("elevation") gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23005,7 +23005,7 @@ Shipped editor UI action: Hotkey e; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_f`
 
-Shipped editor UI action: Hotkey f; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey f; context editor. Source editor.con. Executes its original command expression `editmode("paintforest") gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23040,7 +23040,7 @@ Shipped editor UI action: Hotkey f; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_g`
 
-Shipped editor UI action: Hotkey g; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey g; context editor. Source editor.con. Executes its original command expression `editmode("roughen") gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23075,7 +23075,7 @@ Shipped editor UI action: Hotkey g; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_i`
 
-Shipped editor UI action: Hotkey i; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey i; context editor. Source editor.con. Executes its original command expression `editmode("CameraTracks")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23110,7 +23110,7 @@ Shipped editor UI action: Hotkey i; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_l`
 
-Shipped editor UI action: Hotkey l; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey l; context editor. Source editor.con. Executes its original command expression `editMode("PaintLand") gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23145,7 +23145,7 @@ Shipped editor UI action: Hotkey l; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context editor. Source editor.con. Executes its original command expression `uiSelectionButtonDown() refreshObjectInfoPanel()`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23180,7 +23180,7 @@ Shipped editor UI action: Hotkey mouse1down; context editor. Source editor.con. 
 
 ### `action_key_editor_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context editor. Source editor.con. Executes its original command expression `uiSelectionButtonUp() refreshObjectInfoPanel()`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23215,7 +23215,7 @@ Shipped editor UI action: Hotkey mouse1up; context editor. Source editor.con. Ex
 
 ### `action_key_editor_mouse3down`
 
-Shipped editor UI action: Hotkey mouse3down; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse3down; context editor. Source editor.con. Executes its original command expression `uiMoveSelectionButtonDown`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23250,7 +23250,7 @@ Shipped editor UI action: Hotkey mouse3down; context editor. Source editor.con. 
 
 ### `action_key_editor_mouse3up`
 
-Shipped editor UI action: Hotkey mouse3up; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse3up; context editor. Source editor.con. Executes its original command expression `uiMoveSelectionButtonUp editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23285,7 +23285,7 @@ Shipped editor UI action: Hotkey mouse3up; context editor. Source editor.con. Ex
 
 ### `action_key_editor_o`
 
-Shipped editor UI action: Hotkey o; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey o; context editor. Source editor.con. Executes its original command expression `editMode("PlaceUnit")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23320,7 +23320,7 @@ Shipped editor UI action: Hotkey o; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_s`
 
-Shipped editor UI action: Hotkey s; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey s; context editor. Source editor.con. Executes its original command expression `editmode("smooth") gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23355,7 +23355,7 @@ Shipped editor UI action: Hotkey s; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_shift_0`
 
-Shipped editor UI action: Hotkey shift-0; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-0; context editor. Source editor.con. Executes its original command expression `uiSetPlacementPlayer(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23390,7 +23390,7 @@ Shipped editor UI action: Hotkey shift-0; context editor. Source editor.con. Exe
 
 ### `action_key_editor_shift_c`
 
-Shipped editor UI action: Hotkey shift-c; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-c; context editor. Source editor.con. Executes its original command expression `editMode("paintCliff")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23425,7 +23425,7 @@ Shipped editor UI action: Hotkey shift-c; context editor. Source editor.con. Exe
 
 ### `action_key_editor_shift_e`
 
-Shipped editor UI action: Hotkey shift-e; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-e; context editor. Source editor.con. Executes its original command expression `uiChangeGizmoType(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23460,7 +23460,7 @@ Shipped editor UI action: Hotkey shift-e; context editor. Source editor.con. Exe
 
 ### `action_key_editor_shift_f1`
 
-Shipped editor UI action: Hotkey shift-f1; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-f1; context editor. Source editor.con. Executes its original command expression `uiSetPlacementPlayer(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23495,7 +23495,7 @@ Shipped editor UI action: Hotkey shift-f1; context editor. Source editor.con. Ex
 
 ### `action_key_editor_shift_f10`
 
-Shipped editor UI action: Hotkey shift-f10; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-f10; context editor. Source editor.con. Executes its original command expression `uiSetPlacementPlayer(10)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23530,7 +23530,7 @@ Shipped editor UI action: Hotkey shift-f10; context editor. Source editor.con. E
 
 ### `action_key_editor_shift_f11`
 
-Shipped editor UI action: Hotkey shift-f11; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-f11; context editor. Source editor.con. Executes its original command expression `uiSetPlacementPlayer(11)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23565,7 +23565,7 @@ Shipped editor UI action: Hotkey shift-f11; context editor. Source editor.con. E
 
 ### `action_key_editor_shift_f12`
 
-Shipped editor UI action: Hotkey shift-f12; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-f12; context editor. Source editor.con. Executes its original command expression `uiSetPlacementPlayer(12)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23600,7 +23600,7 @@ Shipped editor UI action: Hotkey shift-f12; context editor. Source editor.con. E
 
 ### `action_key_editor_shift_f2`
 
-Shipped editor UI action: Hotkey shift-f2; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-f2; context editor. Source editor.con. Executes its original command expression `uiSetPlacementPlayer(2)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23635,7 +23635,7 @@ Shipped editor UI action: Hotkey shift-f2; context editor. Source editor.con. Ex
 
 ### `action_key_editor_shift_f3`
 
-Shipped editor UI action: Hotkey shift-f3; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-f3; context editor. Source editor.con. Executes its original command expression `uiSetPlacementPlayer(3)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23670,7 +23670,7 @@ Shipped editor UI action: Hotkey shift-f3; context editor. Source editor.con. Ex
 
 ### `action_key_editor_shift_f4`
 
-Shipped editor UI action: Hotkey shift-f4; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-f4; context editor. Source editor.con. Executes its original command expression `uiSetPlacementPlayer(4)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23705,7 +23705,7 @@ Shipped editor UI action: Hotkey shift-f4; context editor. Source editor.con. Ex
 
 ### `action_key_editor_shift_f5`
 
-Shipped editor UI action: Hotkey shift-f5; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-f5; context editor. Source editor.con. Executes its original command expression `uiSetPlacementPlayer(5)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23740,7 +23740,7 @@ Shipped editor UI action: Hotkey shift-f5; context editor. Source editor.con. Ex
 
 ### `action_key_editor_shift_f6`
 
-Shipped editor UI action: Hotkey shift-f6; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-f6; context editor. Source editor.con. Executes its original command expression `uiSetPlacementPlayer(6)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23775,7 +23775,7 @@ Shipped editor UI action: Hotkey shift-f6; context editor. Source editor.con. Ex
 
 ### `action_key_editor_shift_f7`
 
-Shipped editor UI action: Hotkey shift-f7; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-f7; context editor. Source editor.con. Executes its original command expression `uiSetPlacementPlayer(7)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23810,7 +23810,7 @@ Shipped editor UI action: Hotkey shift-f7; context editor. Source editor.con. Ex
 
 ### `action_key_editor_shift_f8`
 
-Shipped editor UI action: Hotkey shift-f8; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-f8; context editor. Source editor.con. Executes its original command expression `uiSetPlacementPlayer(8)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23845,7 +23845,7 @@ Shipped editor UI action: Hotkey shift-f8; context editor. Source editor.con. Ex
 
 ### `action_key_editor_shift_f9`
 
-Shipped editor UI action: Hotkey shift-f9; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-f9; context editor. Source editor.con. Executes its original command expression `uiSetPlacementPlayer(9)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23880,7 +23880,7 @@ Shipped editor UI action: Hotkey shift-f9; context editor. Source editor.con. Ex
 
 ### `action_key_editor_shift_l`
 
-Shipped editor UI action: Hotkey shift-l; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-l; context editor. Source editor.con. Executes its original command expression `editMode("Paint") gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23915,7 +23915,7 @@ Shipped editor UI action: Hotkey shift-l; context editor. Source editor.con. Exe
 
 ### `action_key_editor_shift_mouse3down`
 
-Shipped editor UI action: Hotkey shift-mouse3down; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-mouse3down; context editor. Source editor.con. Executes its original command expression `uiMoveSelectionAddButtonDown`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23950,7 +23950,7 @@ Shipped editor UI action: Hotkey shift-mouse3down; context editor. Source editor
 
 ### `action_key_editor_shift_mouse3up`
 
-Shipped editor UI action: Hotkey shift-mouse3up; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-mouse3up; context editor. Source editor.con. Executes its original command expression `uiMoveSelectionAddButtonUp`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -23985,7 +23985,7 @@ Shipped editor UI action: Hotkey shift-mouse3up; context editor. Source editor.c
 
 ### `action_key_editor_shift_mousez`
 
-Shipped editor UI action: Hotkey shift-mousez; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-mousez; context editor. Source editor.con. Executes its original command expression `uiRotateSelection`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24020,7 +24020,7 @@ Shipped editor UI action: Hotkey shift-mousez; context editor. Source editor.con
 
 ### `action_key_editor_shift_r`
 
-Shipped editor UI action: Hotkey shift-r; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-r; context editor. Source editor.con. Executes its original command expression `uiChangeGizmoType(2)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24055,7 +24055,7 @@ Shipped editor UI action: Hotkey shift-r; context editor. Source editor.con. Exe
 
 ### `action_key_editor_shift_s`
 
-Shipped editor UI action: Hotkey shift-s; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-s; context editor. Source editor.con. Executes its original command expression `uiToggleGizmoSnapping()`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24090,7 +24090,7 @@ Shipped editor UI action: Hotkey shift-s; context editor. Source editor.con. Exe
 
 ### `action_key_editor_shift_w`
 
-Shipped editor UI action: Hotkey shift-w; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-w; context editor. Source editor.con. Executes its original command expression `uiChangeGizmoType(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24125,7 +24125,7 @@ Shipped editor UI action: Hotkey shift-w; context editor. Source editor.con. Exe
 
 ### `action_key_editor_t`
 
-Shipped editor UI action: Hotkey t; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey t; context editor. Source editor.con. Executes its original command expression `editmode("Triggers")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24160,7 +24160,7 @@ Shipped editor UI action: Hotkey t; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_u`
 
-Shipped editor UI action: Hotkey u; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey u; context editor. Source editor.con. Executes its original command expression `editmode("moveunit")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24195,7 +24195,7 @@ Shipped editor UI action: Hotkey u; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_v`
 
-Shipped editor UI action: Hotkey v; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey v; context editor. Source editor.con. Executes its original command expression `editmode("elevationsample")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24230,7 +24230,7 @@ Shipped editor UI action: Hotkey v; context editor. Source editor.con. Execute i
 
 ### `action_key_editor_w`
 
-Shipped editor UI action: Hotkey w; context editor. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey w; context editor. Source editor.con. Executes its original command expression `editmode("paintwater") gadgetReal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24265,7 +24265,7 @@ Shipped editor UI action: Hotkey w; context editor. Source editor.con. Execute i
 
 ### `action_key_editwater_esc`
 
-Shipped editor UI action: Hotkey esc; context editwater. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context editwater. Source editor.con. Executes its original command expression `editMode("none") uiUnSelectWater`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24300,7 +24300,7 @@ Shipped editor UI action: Hotkey esc; context editwater. Source editor.con. Exec
 
 ### `action_key_editwater_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context editwater. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context editwater. Source editor.con. Executes its original command expression `uiSelectWaterAtPointer`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24335,7 +24335,7 @@ Shipped editor UI action: Hotkey mouse1down; context editwater. Source editor.co
 
 ### `action_key_elevation_esc`
 
-Shipped editor UI action: Hotkey esc; context elevation. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context elevation. Source editor.con. Executes its original command expression `editMode("none") gadgetUnreal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24370,7 +24370,7 @@ Shipped editor UI action: Hotkey esc; context elevation. Source editor.con. Exec
 
 ### `action_key_elevation_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context elevation. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context elevation. Source editor.con. Executes its original command expression `uiRaiseElevation(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24405,7 +24405,7 @@ Shipped editor UI action: Hotkey mouse1down; context elevation. Source editor.co
 
 ### `action_key_elevation_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context elevation. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context elevation. Source editor.con. Executes its original command expression `uiRaiseElevation(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24440,7 +24440,7 @@ Shipped editor UI action: Hotkey mouse1up; context elevation. Source editor.con.
 
 ### `action_key_elevation_mouse2down`
 
-Shipped editor UI action: Hotkey mouse2down; context elevation. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse2down; context elevation. Source editor.con. Executes its original command expression `uiLowerElevation(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24475,7 +24475,7 @@ Shipped editor UI action: Hotkey mouse2down; context elevation. Source editor.co
 
 ### `action_key_elevation_mouse2up`
 
-Shipped editor UI action: Hotkey mouse2up; context elevation. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse2up; context elevation. Source editor.con. Executes its original command expression `uiLowerElevation(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24510,7 +24510,7 @@ Shipped editor UI action: Hotkey mouse2up; context elevation. Source editor.con.
 
 ### `action_key_elevationsample_esc`
 
-Shipped editor UI action: Hotkey esc; context elevationsample. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context elevationsample. Source editor.con. Executes its original command expression `editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24545,7 +24545,7 @@ Shipped editor UI action: Hotkey esc; context elevationsample. Source editor.con
 
 ### `action_key_elevationsample_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context elevationsample. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context elevationsample. Source editor.con. Executes its original command expression `uiChangeElevationToSample(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24580,7 +24580,7 @@ Shipped editor UI action: Hotkey mouse1down; context elevationsample. Source edi
 
 ### `action_key_elevationsample_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context elevationsample. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context elevationsample. Source editor.con. Executes its original command expression `uiChangeElevationToSample(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24615,7 +24615,7 @@ Shipped editor UI action: Hotkey mouse1up; context elevationsample. Source edito
 
 ### `action_key_elevationsample_mouse2down`
 
-Shipped editor UI action: Hotkey mouse2down; context elevationsample. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse2down; context elevationsample. Source editor.con. Executes its original command expression `uiSampleElevationAtPointer`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24650,7 +24650,7 @@ Shipped editor UI action: Hotkey mouse2down; context elevationsample. Source edi
 
 ### `action_key_list_esc`
 
-Shipped editor UI action: Hotkey esc; context list. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context list. Source editor.con. Executes its original command expression `editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24685,7 +24685,7 @@ Shipped editor UI action: Hotkey esc; context list. Source editor.con. Execute i
 
 ### `action_key_modifyterrain___`
 
-Shipped editor UI action: Hotkey +[; context modifyterrain. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +[; context modifyterrain. Source editor.con. Executes its original command expression `uiLowerTerrainSelection`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24720,7 +24720,7 @@ Shipped editor UI action: Hotkey +[; context modifyterrain. Source editor.con. E
 
 ### `action_key_modifyterrain____2`
 
-Shipped editor UI action: Hotkey +]; context modifyterrain. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +]; context modifyterrain. Source editor.con. Executes its original command expression `uiRaiseTerrainSelection`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24755,7 +24755,7 @@ Shipped editor UI action: Hotkey +]; context modifyterrain. Source editor.con. E
 
 ### `action_key_modifyterrain__alt__`
 
-Shipped editor UI action: Hotkey +alt-[; context modifyterrain. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-[; context modifyterrain. Source editor.con. Executes its original command expression `uiLowerTerrainSelection`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24790,7 +24790,7 @@ Shipped editor UI action: Hotkey +alt-[; context modifyterrain. Source editor.co
 
 ### `action_key_modifyterrain__alt___2`
 
-Shipped editor UI action: Hotkey +alt-]; context modifyterrain. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-]; context modifyterrain. Source editor.con. Executes its original command expression `uiRaiseTerrainSelection`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24825,7 +24825,7 @@ Shipped editor UI action: Hotkey +alt-]; context modifyterrain. Source editor.co
 
 ### `action_key_modifyterrain_control_space`
 
-Shipped editor UI action: Hotkey control-space; context modifyterrain. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-space; context modifyterrain. Source editor.con. Executes its original command expression `uiFlattenTerrainSelection`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24860,7 +24860,7 @@ Shipped editor UI action: Hotkey control-space; context modifyterrain. Source ed
 
 ### `action_key_modifyterrain_esc`
 
-Shipped editor UI action: Hotkey esc; context modifyterrain. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context modifyterrain. Source editor.con. Executes its original command expression `editMode("none") gadgetUnreal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24895,7 +24895,7 @@ Shipped editor UI action: Hotkey esc; context modifyterrain. Source editor.con. 
 
 ### `action_key_modifyterrain_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context modifyterrain. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context modifyterrain. Source editor.con. Executes its original command expression `uiTerrainSelection(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24930,7 +24930,7 @@ Shipped editor UI action: Hotkey mouse1down; context modifyterrain. Source edito
 
 ### `action_key_modifyterrain_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context modifyterrain. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context modifyterrain. Source editor.con. Executes its original command expression `uiTerrainSelection(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -24965,7 +24965,7 @@ Shipped editor UI action: Hotkey mouse1up; context modifyterrain. Source editor.
 
 ### `action_key_modifyterrain_space`
 
-Shipped editor UI action: Hotkey space; context modifyterrain. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey space; context modifyterrain. Source editor.con. Executes its original command expression `uiFilterTerrainSelection`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25000,7 +25000,7 @@ Shipped editor UI action: Hotkey space; context modifyterrain. Source editor.con
 
 ### `action_key_moveunit__a`
 
-Shipped editor UI action: Hotkey +a; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +a; context moveunit. Source editor.con. Executes its original command expression `uiMoveUnitLeft`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25035,7 +25035,7 @@ Shipped editor UI action: Hotkey +a; context moveunit. Source editor.con. Execut
 
 ### `action_key_moveunit__alt_1`
 
-Shipped editor UI action: Hotkey +alt-1; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-1; context moveunit. Source editor.con. Executes its original command expression `uiRollUnitLeft`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25070,7 +25070,7 @@ Shipped editor UI action: Hotkey +alt-1; context moveunit. Source editor.con. Ex
 
 ### `action_key_moveunit__alt_2`
 
-Shipped editor UI action: Hotkey +alt-2; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-2; context moveunit. Source editor.con. Executes its original command expression `uiRollUnitRight`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25105,7 +25105,7 @@ Shipped editor UI action: Hotkey +alt-2; context moveunit. Source editor.con. Ex
 
 ### `action_key_moveunit__alt_3`
 
-Shipped editor UI action: Hotkey +alt-3; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-3; context moveunit. Source editor.con. Executes its original command expression `uiRollUnitLeft`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25140,7 +25140,7 @@ Shipped editor UI action: Hotkey +alt-3; context moveunit. Source editor.con. Ex
 
 ### `action_key_moveunit__alt_4`
 
-Shipped editor UI action: Hotkey +alt-4; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-4; context moveunit. Source editor.con. Executes its original command expression `uiRollUnitRight`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25175,7 +25175,7 @@ Shipped editor UI action: Hotkey +alt-4; context moveunit. Source editor.con. Ex
 
 ### `action_key_moveunit__alt_a`
 
-Shipped editor UI action: Hotkey +alt-a; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-a; context moveunit. Source editor.con. Executes its original command expression `uiMoveUnitRight`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25210,7 +25210,7 @@ Shipped editor UI action: Hotkey +alt-a; context moveunit. Source editor.con. Ex
 
 ### `action_key_moveunit__alt_arrowdown`
 
-Shipped editor UI action: Hotkey +alt-arrowdown; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-arrowdown; context moveunit. Source editor.con. Executes its original command expression `uiMoveUnitBackward`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25245,7 +25245,7 @@ Shipped editor UI action: Hotkey +alt-arrowdown; context moveunit. Source editor
 
 ### `action_key_moveunit__alt_arrowleft`
 
-Shipped editor UI action: Hotkey +alt-arrowleft; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-arrowleft; context moveunit. Source editor.con. Executes its original command expression `uiMoveUnitLeft`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25280,7 +25280,7 @@ Shipped editor UI action: Hotkey +alt-arrowleft; context moveunit. Source editor
 
 ### `action_key_moveunit__alt_arrowright`
 
-Shipped editor UI action: Hotkey +alt-arrowright; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-arrowright; context moveunit. Source editor.con. Executes its original command expression `uiMoveUnitRight`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25315,7 +25315,7 @@ Shipped editor UI action: Hotkey +alt-arrowright; context moveunit. Source edito
 
 ### `action_key_moveunit__alt_arrowup`
 
-Shipped editor UI action: Hotkey +alt-arrowup; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-arrowup; context moveunit. Source editor.con. Executes its original command expression `uiMoveUnitForward`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25350,7 +25350,7 @@ Shipped editor UI action: Hotkey +alt-arrowup; context moveunit. Source editor.c
 
 ### `action_key_moveunit__alt_control_arrowdown`
 
-Shipped editor UI action: Hotkey +alt-control-arrowdown; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-control-arrowdown; context moveunit. Source editor.con. Executes its original command expression `uiPitchUnitUp`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25385,7 +25385,7 @@ Shipped editor UI action: Hotkey +alt-control-arrowdown; context moveunit. Sourc
 
 ### `action_key_moveunit__alt_control_arrowdown_2`
 
-Shipped editor UI action: Hotkey +alt-control-arrowdown; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-control-arrowdown; context moveunit. Source editor.con. Executes its original command expression `uiPitchUnitUp`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25420,7 +25420,7 @@ Shipped editor UI action: Hotkey +alt-control-arrowdown; context moveunit. Sourc
 
 ### `action_key_moveunit__alt_control_arrowleft`
 
-Shipped editor UI action: Hotkey +alt-control-arrowleft; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-control-arrowleft; context moveunit. Source editor.con. Executes its original command expression `uiYawUnitLeft`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25455,7 +25455,7 @@ Shipped editor UI action: Hotkey +alt-control-arrowleft; context moveunit. Sourc
 
 ### `action_key_moveunit__alt_control_arrowleft_2`
 
-Shipped editor UI action: Hotkey +alt-control-arrowleft; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-control-arrowleft; context moveunit. Source editor.con. Executes its original command expression `uiYawUnitLeft`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25490,7 +25490,7 @@ Shipped editor UI action: Hotkey +alt-control-arrowleft; context moveunit. Sourc
 
 ### `action_key_moveunit__alt_control_arrowright`
 
-Shipped editor UI action: Hotkey +alt-control-arrowright; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-control-arrowright; context moveunit. Source editor.con. Executes its original command expression `uiYawUnitRight`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25525,7 +25525,7 @@ Shipped editor UI action: Hotkey +alt-control-arrowright; context moveunit. Sour
 
 ### `action_key_moveunit__alt_control_arrowright_2`
 
-Shipped editor UI action: Hotkey +alt-control-arrowright; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-control-arrowright; context moveunit. Source editor.con. Executes its original command expression `uiYawUnitRight`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25560,7 +25560,7 @@ Shipped editor UI action: Hotkey +alt-control-arrowright; context moveunit. Sour
 
 ### `action_key_moveunit__alt_control_arrowup`
 
-Shipped editor UI action: Hotkey +alt-control-arrowup; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-control-arrowup; context moveunit. Source editor.con. Executes its original command expression `uiPitchUnitDown`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25595,7 +25595,7 @@ Shipped editor UI action: Hotkey +alt-control-arrowup; context moveunit. Source 
 
 ### `action_key_moveunit__alt_control_arrowup_2`
 
-Shipped editor UI action: Hotkey +alt-control-arrowup; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-control-arrowup; context moveunit. Source editor.con. Executes its original command expression `uiPitchUnitDown`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25630,7 +25630,7 @@ Shipped editor UI action: Hotkey +alt-control-arrowup; context moveunit. Source 
 
 ### `action_key_moveunit__alt_d`
 
-Shipped editor UI action: Hotkey +alt-d; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-d; context moveunit. Source editor.con. Executes its original command expression `uiRollUnitRight`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25665,7 +25665,7 @@ Shipped editor UI action: Hotkey +alt-d; context moveunit. Source editor.con. Ex
 
 ### `action_key_moveunit__alt_d_2`
 
-Shipped editor UI action: Hotkey +alt-d; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-d; context moveunit. Source editor.con. Executes its original command expression `uiMoveUnitLeft`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25700,7 +25700,7 @@ Shipped editor UI action: Hotkey +alt-d; context moveunit. Source editor.con. Ex
 
 ### `action_key_moveunit__alt_s`
 
-Shipped editor UI action: Hotkey +alt-s; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-s; context moveunit. Source editor.con. Executes its original command expression `uiRollUnitLeft`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25735,7 +25735,7 @@ Shipped editor UI action: Hotkey +alt-s; context moveunit. Source editor.con. Ex
 
 ### `action_key_moveunit__alt_s_2`
 
-Shipped editor UI action: Hotkey +alt-s; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-s; context moveunit. Source editor.con. Executes its original command expression `uiMoveUnitForward`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25770,7 +25770,7 @@ Shipped editor UI action: Hotkey +alt-s; context moveunit. Source editor.con. Ex
 
 ### `action_key_moveunit__alt_w`
 
-Shipped editor UI action: Hotkey +alt-w; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +alt-w; context moveunit. Source editor.con. Executes its original command expression `uiMoveUnitBackward`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25805,7 +25805,7 @@ Shipped editor UI action: Hotkey +alt-w; context moveunit. Source editor.con. Ex
 
 ### `action_key_moveunit__arrowdown`
 
-Shipped editor UI action: Hotkey +arrowdown; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +arrowdown; context moveunit. Source editor.con. Executes its original command expression `uiMoveUnitBackward`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25840,7 +25840,7 @@ Shipped editor UI action: Hotkey +arrowdown; context moveunit. Source editor.con
 
 ### `action_key_moveunit__arrowleft`
 
-Shipped editor UI action: Hotkey +arrowleft; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +arrowleft; context moveunit. Source editor.con. Executes its original command expression `uiMoveUnitLeft`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25875,7 +25875,7 @@ Shipped editor UI action: Hotkey +arrowleft; context moveunit. Source editor.con
 
 ### `action_key_moveunit__arrowright`
 
-Shipped editor UI action: Hotkey +arrowright; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +arrowright; context moveunit. Source editor.con. Executes its original command expression `uiMoveUnitRight`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25910,7 +25910,7 @@ Shipped editor UI action: Hotkey +arrowright; context moveunit. Source editor.co
 
 ### `action_key_moveunit__arrowup`
 
-Shipped editor UI action: Hotkey +arrowup; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +arrowup; context moveunit. Source editor.con. Executes its original command expression `uiMoveUnitForward`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25945,7 +25945,7 @@ Shipped editor UI action: Hotkey +arrowup; context moveunit. Source editor.con. 
 
 ### `action_key_moveunit__control_arrowdown`
 
-Shipped editor UI action: Hotkey +control-arrowdown; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +control-arrowdown; context moveunit. Source editor.con. Executes its original command expression `uiPitchUnitUp`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -25980,7 +25980,7 @@ Shipped editor UI action: Hotkey +control-arrowdown; context moveunit. Source ed
 
 ### `action_key_moveunit__control_arrowdown_2`
 
-Shipped editor UI action: Hotkey +control-arrowdown; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +control-arrowdown; context moveunit. Source editor.con. Executes its original command expression `uiPitchUnitUp`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26015,7 +26015,7 @@ Shipped editor UI action: Hotkey +control-arrowdown; context moveunit. Source ed
 
 ### `action_key_moveunit__control_arrowleft`
 
-Shipped editor UI action: Hotkey +control-arrowleft; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +control-arrowleft; context moveunit. Source editor.con. Executes its original command expression `uiYawUnitLeft`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26050,7 +26050,7 @@ Shipped editor UI action: Hotkey +control-arrowleft; context moveunit. Source ed
 
 ### `action_key_moveunit__control_arrowleft_2`
 
-Shipped editor UI action: Hotkey +control-arrowleft; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +control-arrowleft; context moveunit. Source editor.con. Executes its original command expression `uiYawUnitLeft`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26085,7 +26085,7 @@ Shipped editor UI action: Hotkey +control-arrowleft; context moveunit. Source ed
 
 ### `action_key_moveunit__control_arrowright`
 
-Shipped editor UI action: Hotkey +control-arrowright; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +control-arrowright; context moveunit. Source editor.con. Executes its original command expression `uiYawUnitRight`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26120,7 +26120,7 @@ Shipped editor UI action: Hotkey +control-arrowright; context moveunit. Source e
 
 ### `action_key_moveunit__control_arrowright_2`
 
-Shipped editor UI action: Hotkey +control-arrowright; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +control-arrowright; context moveunit. Source editor.con. Executes its original command expression `uiYawUnitRight`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26155,7 +26155,7 @@ Shipped editor UI action: Hotkey +control-arrowright; context moveunit. Source e
 
 ### `action_key_moveunit__control_arrowup`
 
-Shipped editor UI action: Hotkey +control-arrowup; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +control-arrowup; context moveunit. Source editor.con. Executes its original command expression `uiPitchUnitDown`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26190,7 +26190,7 @@ Shipped editor UI action: Hotkey +control-arrowup; context moveunit. Source edit
 
 ### `action_key_moveunit__control_arrowup_2`
 
-Shipped editor UI action: Hotkey +control-arrowup; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +control-arrowup; context moveunit. Source editor.con. Executes its original command expression `uiPitchUnitDown`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26225,7 +26225,7 @@ Shipped editor UI action: Hotkey +control-arrowup; context moveunit. Source edit
 
 ### `action_key_moveunit__d`
 
-Shipped editor UI action: Hotkey +d; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +d; context moveunit. Source editor.con. Executes its original command expression `uiRollUnitRight`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26260,7 +26260,7 @@ Shipped editor UI action: Hotkey +d; context moveunit. Source editor.con. Execut
 
 ### `action_key_moveunit__d_2`
 
-Shipped editor UI action: Hotkey +d; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +d; context moveunit. Source editor.con. Executes its original command expression `uiMoveUnitRight`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26295,7 +26295,7 @@ Shipped editor UI action: Hotkey +d; context moveunit. Source editor.con. Execut
 
 ### `action_key_moveunit__s`
 
-Shipped editor UI action: Hotkey +s; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +s; context moveunit. Source editor.con. Executes its original command expression `uiRollUnitLeft`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26330,7 +26330,7 @@ Shipped editor UI action: Hotkey +s; context moveunit. Source editor.con. Execut
 
 ### `action_key_moveunit__s_2`
 
-Shipped editor UI action: Hotkey +s; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +s; context moveunit. Source editor.con. Executes its original command expression `uiMoveUnitBackward`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26365,7 +26365,7 @@ Shipped editor UI action: Hotkey +s; context moveunit. Source editor.con. Execut
 
 ### `action_key_moveunit__w`
 
-Shipped editor UI action: Hotkey +w; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey +w; context moveunit. Source editor.con. Executes its original command expression `uiMoveUnitForward`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26400,7 +26400,7 @@ Shipped editor UI action: Hotkey +w; context moveunit. Source editor.con. Execut
 
 ### `action_key_moveunit_esc`
 
-Shipped editor UI action: Hotkey esc; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context moveunit. Source editor.con. Executes its original command expression `editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26435,7 +26435,7 @@ Shipped editor UI action: Hotkey esc; context moveunit. Source editor.con. Execu
 
 ### `action_key_moveunit_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context moveunit. Source editor.con. Executes its original command expression `uiMoveSelectionButtonDown`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26470,7 +26470,7 @@ Shipped editor UI action: Hotkey mouse1down; context moveunit. Source editor.con
 
 ### `action_key_moveunit_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context moveunit. Source editor.con. Executes its original command expression `uiMoveSelectionButtonUp`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26505,7 +26505,7 @@ Shipped editor UI action: Hotkey mouse1up; context moveunit. Source editor.con. 
 
 ### `action_key_moveunit_mousez`
 
-Shipped editor UI action: Hotkey mousez; context moveunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mousez; context moveunit. Source editor.con. Executes its original command expression `uiRotateSelection`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26540,7 +26540,7 @@ Shipped editor UI action: Hotkey mousez; context moveunit. Source editor.con. Ex
 
 ### `action_key_paint_alt_mouse1down`
 
-Shipped editor UI action: Hotkey alt-mouse1down; context paint. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey alt-mouse1down; context paint. Source editor.con. Executes its original command expression `uiSampleTerrainAtPointer`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26575,7 +26575,7 @@ Shipped editor UI action: Hotkey alt-mouse1down; context paint. Source editor.co
 
 ### `action_key_paint_alt_mouse1down_2`
 
-Shipped editor UI action: Hotkey alt-mouse1down; context paint. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey alt-mouse1down; context paint. Source editor.con. Executes its original command expression `uiPaint(true, true)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26610,7 +26610,7 @@ Shipped editor UI action: Hotkey alt-mouse1down; context paint. Source editor.co
 
 ### `action_key_paint_esc`
 
-Shipped editor UI action: Hotkey esc; context paint. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context paint. Source editor.con. Executes its original command expression `editMode("none") gadgetUnreal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26645,7 +26645,7 @@ Shipped editor UI action: Hotkey esc; context paint. Source editor.con. Execute 
 
 ### `action_key_paint_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context paint. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context paint. Source editor.con. Executes its original command expression `uiPaint(true)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26680,7 +26680,7 @@ Shipped editor UI action: Hotkey mouse1down; context paint. Source editor.con. E
 
 ### `action_key_paint_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context paint. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context paint. Source editor.con. Executes its original command expression `uiPaint(false)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26715,7 +26715,7 @@ Shipped editor UI action: Hotkey mouse1up; context paint. Source editor.con. Exe
 
 ### `action_key_paint_mouse2down`
 
-Shipped editor UI action: Hotkey mouse2down; context paint. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse2down; context paint. Source editor.con. Executes its original command expression `uiSampleTerrainAtPointer uiErase(true)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26750,7 +26750,7 @@ Shipped editor UI action: Hotkey mouse2down; context paint. Source editor.con. E
 
 ### `action_key_paint_mouse2up`
 
-Shipped editor UI action: Hotkey mouse2up; context paint. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse2up; context paint. Source editor.con. Executes its original command expression `uiErase(false)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26785,7 +26785,7 @@ Shipped editor UI action: Hotkey mouse2up; context paint. Source editor.con. Exe
 
 ### `action_key_paintcliff_esc`
 
-Shipped editor UI action: Hotkey esc; context paintcliff. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context paintcliff. Source editor.con. Executes its original command expression `editMode("none") gadgetUnreal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26820,7 +26820,7 @@ Shipped editor UI action: Hotkey esc; context paintcliff. Source editor.con. Exe
 
 ### `action_key_paintcliff_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context paintcliff. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context paintcliff. Source editor.con. Executes its original command expression `uiPaintCliff(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26855,7 +26855,7 @@ Shipped editor UI action: Hotkey mouse1down; context paintcliff. Source editor.c
 
 ### `action_key_paintcliff_mouse2down`
 
-Shipped editor UI action: Hotkey mouse2down; context paintcliff. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse2down; context paintcliff. Source editor.con. Executes its original command expression `uiPaintCliff(2)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26890,7 +26890,7 @@ Shipped editor UI action: Hotkey mouse2down; context paintcliff. Source editor.c
 
 ### `action_key_paintcliff_mouse2up`
 
-Shipped editor UI action: Hotkey mouse2up; context paintcliff. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse2up; context paintcliff. Source editor.con. Executes its original command expression `uiPaintCliff(3)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26925,7 +26925,7 @@ Shipped editor UI action: Hotkey mouse2up; context paintcliff. Source editor.con
 
 ### `action_key_paintforest_esc`
 
-Shipped editor UI action: Hotkey esc; context paintforest. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context paintforest. Source editor.con. Executes its original command expression `uiPaintForest(false) editMode("none") gadgetUnreal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26960,7 +26960,7 @@ Shipped editor UI action: Hotkey esc; context paintforest. Source editor.con. Ex
 
 ### `action_key_paintforest_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context paintforest. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context paintforest. Source editor.con. Executes its original command expression `uiPaintForest(true)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -26995,7 +26995,7 @@ Shipped editor UI action: Hotkey mouse1down; context paintforest. Source editor.
 
 ### `action_key_paintforest_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context paintforest. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context paintforest. Source editor.con. Executes its original command expression `uiPaintForest(false)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27030,7 +27030,7 @@ Shipped editor UI action: Hotkey mouse1up; context paintforest. Source editor.co
 
 ### `action_key_paintwater_c`
 
-Shipped editor UI action: Hotkey c; context paintwater. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey c; context paintwater. Source editor.con. Executes its original command expression `configToggle("waterColorPaint")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27065,7 +27065,7 @@ Shipped editor UI action: Hotkey c; context paintwater. Source editor.con. Execu
 
 ### `action_key_paintwater_d`
 
-Shipped editor UI action: Hotkey d; context paintwater. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey d; context paintwater. Source editor.con. Executes its original command expression `gadgetToggle("waterColorDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27100,7 +27100,7 @@ Shipped editor UI action: Hotkey d; context paintwater. Source editor.con. Execu
 
 ### `action_key_paintwater_esc`
 
-Shipped editor UI action: Hotkey esc; context paintwater. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context paintwater. Source editor.con. Executes its original command expression `editMode("none") gadgetUnreal("BrushFunctionsWaterTool")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27135,7 +27135,7 @@ Shipped editor UI action: Hotkey esc; context paintwater. Source editor.con. Exe
 
 ### `action_key_paintwater_mouse1doubleup`
 
-Shipped editor UI action: Hotkey mouse1doubleup; context paintwater. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1doubleup; context paintwater. Source editor.con. Executes its original command expression `editMode("editwater") uiSelectWaterAtPointer gadgetToggle("BrushFunctionsWaterTool")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27170,7 +27170,7 @@ Shipped editor UI action: Hotkey mouse1doubleup; context paintwater. Source edit
 
 ### `action_key_paintwater_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context paintwater. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context paintwater. Source editor.con. Executes its original command expression `uiPaintWater(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27205,7 +27205,7 @@ Shipped editor UI action: Hotkey mouse1down; context paintwater. Source editor.c
 
 ### `action_key_paintwater_mouse2down`
 
-Shipped editor UI action: Hotkey mouse2down; context paintwater. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse2down; context paintwater. Source editor.con. Executes its original command expression `uiSampleWaterAtPointer uiErase(true)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27240,7 +27240,7 @@ Shipped editor UI action: Hotkey mouse2down; context paintwater. Source editor.c
 
 ### `action_key_paintwater_mouse2up`
 
-Shipped editor UI action: Hotkey mouse2up; context paintwater. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse2up; context paintwater. Source editor.con. Executes its original command expression `uiErase(false)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27275,7 +27275,7 @@ Shipped editor UI action: Hotkey mouse2up; context paintwater. Source editor.con
 
 ### `action_key_placeTradeRoute_esc`
 
-Shipped editor UI action: Hotkey esc; context placeTradeRoute. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context placeTradeRoute. Source editor.con. Executes its original command expression `editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27310,7 +27310,7 @@ Shipped editor UI action: Hotkey esc; context placeTradeRoute. Source editor.con
 
 ### `action_key_placeTradeRoute_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context placeTradeRoute. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context placeTradeRoute. Source editor.con. Executes its original command expression `uiPlaceTradeRouteWaypoint`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27345,7 +27345,7 @@ Shipped editor UI action: Hotkey mouse1up; context placeTradeRoute. Source edito
 
 ### `action_key_placeTradeRoute_mouse2up`
 
-Shipped editor UI action: Hotkey mouse2up; context placeTradeRoute. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse2up; context placeTradeRoute. Source editor.con. Executes its original command expression `uiRemoveTradeRouteWaypoint`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27380,7 +27380,7 @@ Shipped editor UI action: Hotkey mouse2up; context placeTradeRoute. Source edito
 
 ### `action_key_placeWall_esc`
 
-Shipped editor UI action: Hotkey esc; context placeWall. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context placeWall. Source editor.con. Executes its original command expression `editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27415,7 +27415,7 @@ Shipped editor UI action: Hotkey esc; context placeWall. Source editor.con. Exec
 
 ### `action_key_placeWall_mouse1doubledown`
 
-Shipped editor UI action: Hotkey mouse1doubledown; context placeWall. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1doubledown; context placeWall. Source editor.con. Executes its original command expression `uiBuildWallAtPointer(false)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27450,7 +27450,7 @@ Shipped editor UI action: Hotkey mouse1doubledown; context placeWall. Source edi
 
 ### `action_key_placeWall_mouse1doubleup`
 
-Shipped editor UI action: Hotkey mouse1doubleup; context placeWall. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1doubleup; context placeWall. Source editor.con. Executes its original command expression `uiBuildWallAtPointer(true)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27485,7 +27485,7 @@ Shipped editor UI action: Hotkey mouse1doubleup; context placeWall. Source edito
 
 ### `action_key_placeWall_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context placeWall. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context placeWall. Source editor.con. Executes its original command expression `uiBuildWallAtPointer(false)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27520,7 +27520,7 @@ Shipped editor UI action: Hotkey mouse1down; context placeWall. Source editor.co
 
 ### `action_key_placeWall_shift_mouse1down`
 
-Shipped editor UI action: Hotkey shift-mouse1down; context placeWall. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-mouse1down; context placeWall. Source editor.con. Executes its original command expression `uiBuildWallAtPointer(true)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27555,7 +27555,7 @@ Shipped editor UI action: Hotkey shift-mouse1down; context placeWall. Source edi
 
 ### `action_key_placeunit_esc`
 
-Shipped editor UI action: Hotkey esc; context placeunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context placeunit. Source editor.con. Executes its original command expression `uiClearCursor editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27590,7 +27590,7 @@ Shipped editor UI action: Hotkey esc; context placeunit. Source editor.con. Exec
 
 ### `action_key_placeunit_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context placeunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context placeunit. Source editor.con. Executes its original command expression `uiPlaceAtPointer`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27625,7 +27625,7 @@ Shipped editor UI action: Hotkey mouse1down; context placeunit. Source editor.co
 
 ### `action_key_placeunit_mouse2down`
 
-Shipped editor UI action: Hotkey mouse2down; context placeunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse2down; context placeunit. Source editor.con. Executes its original command expression `uiIncPlaceVariation`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27660,7 +27660,7 @@ Shipped editor UI action: Hotkey mouse2down; context placeunit. Source editor.co
 
 ### `action_key_placeunit_mousez`
 
-Shipped editor UI action: Hotkey mousez; context placeunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mousez; context placeunit. Source editor.con. Executes its original command expression `uiWheelRotatePlacedUnit`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27695,7 +27695,7 @@ Shipped editor UI action: Hotkey mousez; context placeunit. Source editor.con. E
 
 ### `action_key_placeunit_shift_mouse1down`
 
-Shipped editor UI action: Hotkey shift-mouse1down; context placeunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-mouse1down; context placeunit. Source editor.con. Executes its original command expression `uiPlaceAtPointer(false)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27730,7 +27730,7 @@ Shipped editor UI action: Hotkey shift-mouse1down; context placeunit. Source edi
 
 ### `action_key_placeunit_shift_mouse2down`
 
-Shipped editor UI action: Hotkey shift-mouse2down; context placeunit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-mouse2down; context placeunit. Source editor.con. Executes its original command expression `uiDecPlaceVariation`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27765,7 +27765,7 @@ Shipped editor UI action: Hotkey shift-mouse2down; context placeunit. Source edi
 
 ### `action_key_placeunitselect_alt_w`
 
-Shipped editor UI action: Hotkey alt-w; context placeunitselect. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey alt-w; context placeunitselect. Source editor.con. Executes its original command expression `editMode("placewall") uiSetProtoCursor("WallConnector", true)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27800,7 +27800,7 @@ Shipped editor UI action: Hotkey alt-w; context placeunitselect. Source editor.c
 
 ### `action_key_placeunitselect_esc`
 
-Shipped editor UI action: Hotkey esc; context placeunitselect. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context placeunitselect. Source editor.con. Executes its original command expression `uiClearCursor editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27835,7 +27835,7 @@ Shipped editor UI action: Hotkey esc; context placeunitselect. Source editor.con
 
 ### `action_key_recalcvariation_esc`
 
-Shipped editor UI action: Hotkey esc; context recalcvariation. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context recalcvariation. Source editor.con. Executes its original command expression `editMode("none") gadgetUnreal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27870,7 +27870,7 @@ Shipped editor UI action: Hotkey esc; context recalcvariation. Source editor.con
 
 ### `action_key_recalcvariation_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context recalcvariation. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context recalcvariation. Source editor.con. Executes its original command expression `uiRecalcVariation(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27905,7 +27905,7 @@ Shipped editor UI action: Hotkey mouse1down; context recalcvariation. Source edi
 
 ### `action_key_recalcvariation_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context recalcvariation. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context recalcvariation. Source editor.con. Executes its original command expression `uiRecalcVariation(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27940,7 +27940,7 @@ Shipped editor UI action: Hotkey mouse1up; context recalcvariation. Source edito
 
 ### `action_key_roughen_esc`
 
-Shipped editor UI action: Hotkey esc; context roughen. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context roughen. Source editor.con. Executes its original command expression `editMode("none") gadgetUnreal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -27975,7 +27975,7 @@ Shipped editor UI action: Hotkey esc; context roughen. Source editor.con. Execut
 
 ### `action_key_roughen_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context roughen. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context roughen. Source editor.con. Executes its original command expression `uiRoughen(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28010,7 +28010,7 @@ Shipped editor UI action: Hotkey mouse1down; context roughen. Source editor.con.
 
 ### `action_key_roughen_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context roughen. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context roughen. Source editor.con. Executes its original command expression `uiRoughen(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28045,7 +28045,7 @@ Shipped editor UI action: Hotkey mouse1up; context roughen. Source editor.con. E
 
 ### `action_key_selectTransportUnit_esc`
 
-Shipped editor UI action: Hotkey esc; context selectTransportUnit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context selectTransportUnit. Source editor.con. Executes its original command expression `editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28080,7 +28080,7 @@ Shipped editor UI action: Hotkey esc; context selectTransportUnit. Source editor
 
 ### `action_key_selectTransportUnit_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context selectTransportUnit. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context selectTransportUnit. Source editor.con. Executes its original command expression `uiSelectTransportUnit`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28115,7 +28115,7 @@ Shipped editor UI action: Hotkey mouse1up; context selectTransportUnit. Source e
 
 ### `action_key_smooth_esc`
 
-Shipped editor UI action: Hotkey esc; context smooth. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context smooth. Source editor.con. Executes its original command expression `editMode("none") gadgetUnreal("BrushSettingsDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28150,7 +28150,7 @@ Shipped editor UI action: Hotkey esc; context smooth. Source editor.con. Execute
 
 ### `action_key_smooth_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context smooth. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context smooth. Source editor.con. Executes its original command expression `uiSmooth(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28185,7 +28185,7 @@ Shipped editor UI action: Hotkey mouse1down; context smooth. Source editor.con. 
 
 ### `action_key_smooth_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context smooth. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context smooth. Source editor.con. Executes its original command expression `uiSmooth(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28220,7 +28220,7 @@ Shipped editor UI action: Hotkey mouse1up; context smooth. Source editor.con. Ex
 
 ### `action_key_smooth_mouse2down`
 
-Shipped editor UI action: Hotkey mouse2down; context smooth. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse2down; context smooth. Source editor.con. Executes its original command expression `uiSmooth(2)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28255,7 +28255,7 @@ Shipped editor UI action: Hotkey mouse2down; context smooth. Source editor.con. 
 
 ### `action_key_smooth_mouse2up`
 
-Shipped editor UI action: Hotkey mouse2up; context smooth. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse2up; context smooth. Source editor.con. Executes its original command expression `uiSmooth(3)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28290,7 +28290,7 @@ Shipped editor UI action: Hotkey mouse2up; context smooth. Source editor.con. Ex
 
 ### `action_key_smooth_shift_space`
 
-Shipped editor UI action: Hotkey shift-space; context smooth. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey shift-space; context smooth. Source editor.con. Executes its original command expression `editMode("modifyterrain")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28325,7 +28325,7 @@ Shipped editor UI action: Hotkey shift-space; context smooth. Source editor.con.
 
 ### `action_key_trigger_esc`
 
-Shipped editor UI action: Hotkey esc; context trigger. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context trigger. Source editor.con. Executes its original command expression `editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28360,7 +28360,7 @@ Shipped editor UI action: Hotkey esc; context trigger. Source editor.con. Execut
 
 ### `action_key_triggroups_esc`
 
-Shipped editor UI action: Hotkey esc; context triggroups. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context triggroups. Source editor.con. Executes its original command expression `editMode("none")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28395,7 +28395,7 @@ Shipped editor UI action: Hotkey esc; context triggroups. Source editor.con. Exe
 
 ### `action_key_trigrectselect_esc`
 
-Shipped editor UI action: Hotkey esc; context trigrectselect. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context trigrectselect. Source editor.con. Executes its original command expression `editMode("triggers")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28430,7 +28430,7 @@ Shipped editor UI action: Hotkey esc; context trigrectselect. Source editor.con.
 
 ### `action_key_trigrectselect_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context trigrectselect. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context trigrectselect. Source editor.con. Executes its original command expression `uiTerrainSelection(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28465,7 +28465,7 @@ Shipped editor UI action: Hotkey mouse1down; context trigrectselect. Source edit
 
 ### `action_key_trigrectselect_mouse1up`
 
-Shipped editor UI action: Hotkey mouse1up; context trigrectselect. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1up; context trigrectselect. Source editor.con. Executes its original command expression `uiTerrainSelection(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28500,7 +28500,7 @@ Shipped editor UI action: Hotkey mouse1up; context trigrectselect. Source editor
 
 ### `action_key_trigrectselect_mouse2up`
 
-Shipped editor UI action: Hotkey mouse2up; context trigrectselect. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse2up; context trigrectselect. Source editor.con. Executes its original command expression `editMode("triggers")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28535,7 +28535,7 @@ Shipped editor UI action: Hotkey mouse2up; context trigrectselect. Source editor
 
 ### `action_key_trigselect_esc`
 
-Shipped editor UI action: Hotkey esc; context trigselect. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey esc; context trigselect. Source editor.con. Executes its original command expression `editMode("triggers")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28570,7 +28570,7 @@ Shipped editor UI action: Hotkey esc; context trigselect. Source editor.con. Exe
 
 ### `action_key_trigselect_mouse1down`
 
-Shipped editor UI action: Hotkey mouse1down; context trigselect. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse1down; context trigselect. Source editor.con. Executes its original command expression `uiTriggerSelectLocation()`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28605,7 +28605,7 @@ Shipped editor UI action: Hotkey mouse1down; context trigselect. Source editor.c
 
 ### `action_key_trigselect_mouse2up`
 
-Shipped editor UI action: Hotkey mouse2up; context trigselect. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey mouse2up; context trigselect. Source editor.con. Executes its original command expression `editMode("triggers")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28640,7 +28640,7 @@ Shipped editor UI action: Hotkey mouse2up; context trigselect. Source editor.con
 
 ### `action_key_world_control_shift_f10`
 
-Shipped editor UI action: Hotkey control-shift-f10; context world. Source editor.con. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: Hotkey control-shift-f10; context world. Source editor.con. Executes its original command expression `player(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28675,7 +28675,7 @@ Shipped editor UI action: Hotkey control-shift-f10; context world. Source editor
 
 ### `action_mapsize_CancelBtn`
 
-Shipped editor UI action: mapsize_CancelBtn. Source ui_map_size_dlg.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: mapsize_CancelBtn. Source ui_map_size_dlg.xml. Executes its original command expression `gadgetUnReal("AMapSizeDialog")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28710,7 +28710,7 @@ Shipped editor UI action: mapsize_CancelBtn. Source ui_map_size_dlg.xml. Execute
 
 ### `action_pitchEdit_CinematicsButton`
 
-Shipped editor UI action: pitchEdit-CinematicsButton. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-CinematicsButton. Source ui_pitch_editor.xml. Executes its original command expression `editMode("CameraTracks")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28745,7 +28745,7 @@ Shipped editor UI action: pitchEdit-CinematicsButton. Source ui_pitch_editor.xml
 
 ### `action_pitchEdit_bias_10`
 
-Shipped editor UI action: pitchEdit-bias-10. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-bias-10. Source ui_pitch_editor.xml. Executes its original command expression `cameraPitchAngle(10) cameraZoomReset cameraMinZoomSet(20)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28780,7 +28780,7 @@ Shipped editor UI action: pitchEdit-bias-10. Source ui_pitch_editor.xml. Execute
 
 ### `action_pitchEdit_bias_110`
 
-Shipped editor UI action: pitchEdit-bias-110. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-bias-110. Source ui_pitch_editor.xml. Executes its original command expression `cameraPitchAngle(110) cameraZoomReset`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28815,7 +28815,7 @@ Shipped editor UI action: pitchEdit-bias-110. Source ui_pitch_editor.xml. Execut
 
 ### `action_pitchEdit_bias_135`
 
-Shipped editor UI action: pitchEdit-bias-135. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-bias-135. Source ui_pitch_editor.xml. Executes its original command expression `cameraPitchAngle(135) cameraZoomReset`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28850,7 +28850,7 @@ Shipped editor UI action: pitchEdit-bias-135. Source ui_pitch_editor.xml. Execut
 
 ### `action_pitchEdit_bias_15`
 
-Shipped editor UI action: pitchEdit-bias-15. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-bias-15. Source ui_pitch_editor.xml. Executes its original command expression `cameraPitchAngle(15) cameraZoomReset`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28885,7 +28885,7 @@ Shipped editor UI action: pitchEdit-bias-15. Source ui_pitch_editor.xml. Execute
 
 ### `action_pitchEdit_bias_25`
 
-Shipped editor UI action: pitchEdit-bias-25. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-bias-25. Source ui_pitch_editor.xml. Executes its original command expression `cameraPitchAngle(25) cameraZoomReset`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28920,7 +28920,7 @@ Shipped editor UI action: pitchEdit-bias-25. Source ui_pitch_editor.xml. Execute
 
 ### `action_pitchEdit_bias_35`
 
-Shipped editor UI action: pitchEdit-bias-35. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-bias-35. Source ui_pitch_editor.xml. Executes its original command expression `cameraPitchAngle(35) cameraZoomReset`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28955,7 +28955,7 @@ Shipped editor UI action: pitchEdit-bias-35. Source ui_pitch_editor.xml. Execute
 
 ### `action_pitchEdit_bias_5`
 
-Shipped editor UI action: pitchEdit-bias-5. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-bias-5. Source ui_pitch_editor.xml. Executes its original command expression `cameraPitchAngle(5) cameraZoomReset cameraMinZoomSet(20)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -28990,7 +28990,7 @@ Shipped editor UI action: pitchEdit-bias-5. Source ui_pitch_editor.xml. Execute 
 
 ### `action_pitchEdit_bias_55`
 
-Shipped editor UI action: pitchEdit-bias-55. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-bias-55. Source ui_pitch_editor.xml. Executes its original command expression `cameraPitchAngle(55) cameraZoomReset`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29025,7 +29025,7 @@ Shipped editor UI action: pitchEdit-bias-55. Source ui_pitch_editor.xml. Execute
 
 ### `action_pitchEdit_bias_70`
 
-Shipped editor UI action: pitchEdit-bias-70. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-bias-70. Source ui_pitch_editor.xml. Executes its original command expression `cameraPitchAngle(70) cameraZoomReset`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29060,7 +29060,7 @@ Shipped editor UI action: pitchEdit-bias-70. Source ui_pitch_editor.xml. Execute
 
 ### `action_pitchEdit_bias_90`
 
-Shipped editor UI action: pitchEdit-bias-90. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-bias-90. Source ui_pitch_editor.xml. Executes its original command expression `cameraPitchAngle(90.01) cameraZoomReset`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29095,7 +29095,7 @@ Shipped editor UI action: pitchEdit-bias-90. Source ui_pitch_editor.xml. Execute
 
 ### `action_pitchEdit_close`
 
-Shipped editor UI action: pitchEdit-close. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-close. Source ui_pitch_editor.xml. Executes its original command expression `gadgetUnReal("PitchEditorGadget")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29130,7 +29130,7 @@ Shipped editor UI action: pitchEdit-close. Source ui_pitch_editor.xml. Execute i
 
 ### `action_pitchEdit_defaultOrientation`
 
-Shipped editor UI action: pitchEdit-defaultOrientation. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-defaultOrientation. Source ui_pitch_editor.xml. Executes its original command expression `cameraNice`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29165,7 +29165,7 @@ Shipped editor UI action: pitchEdit-defaultOrientation. Source ui_pitch_editor.x
 
 ### `action_pitchEdit_freeCam`
 
-Shipped editor UI action: pitchEdit-freeCam. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-freeCam. Source ui_pitch_editor.xml. Executes its original command expression `setFreeCam()`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29200,7 +29200,7 @@ Shipped editor UI action: pitchEdit-freeCam. Source ui_pitch_editor.xml. Execute
 
 ### `action_pitchEdit_normalpitch`
 
-Shipped editor UI action: pitchEdit-normalpitch. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-normalpitch. Source ui_pitch_editor.xml. Executes its original command expression `cameraPitchAngle(47) cameraZoomReset`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29235,7 +29235,7 @@ Shipped editor UI action: pitchEdit-normalpitch. Source ui_pitch_editor.xml. Exe
 
 ### `action_pitchEdit_normalzoom`
 
-Shipped editor UI action: pitchEdit-normalzoom. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-normalzoom. Source ui_pitch_editor.xml. Executes its original command expression `cameraZoomReset`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29270,7 +29270,7 @@ Shipped editor UI action: pitchEdit-normalzoom. Source ui_pitch_editor.xml. Exec
 
 ### `action_pitchEdit_resetPitch`
 
-Shipped editor UI action: pitchEdit-resetPitch. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-resetPitch. Source ui_pitch_editor.xml. Executes its original command expression `cameraRotate() cameraRotate()`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29305,7 +29305,7 @@ Shipped editor UI action: pitchEdit-resetPitch. Source ui_pitch_editor.xml. Exec
 
 ### `action_pitchEdit_rotate`
 
-Shipped editor UI action: pitchEdit-rotate. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-rotate. Source ui_pitch_editor.xml. Executes its original command expression `cameraRotate`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29340,7 +29340,7 @@ Shipped editor UI action: pitchEdit-rotate. Source ui_pitch_editor.xml. Execute 
 
 ### `action_pitchEdit_zoom20`
 
-Shipped editor UI action: pitchEdit-zoom20. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-zoom20. Source ui_pitch_editor.xml. Executes its original command expression `cameraMinZoomSet(20)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29375,7 +29375,7 @@ Shipped editor UI action: pitchEdit-zoom20. Source ui_pitch_editor.xml. Execute 
 
 ### `action_pitchEdit_zoom5`
 
-Shipped editor UI action: pitchEdit-zoom5. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-zoom5. Source ui_pitch_editor.xml. Executes its original command expression `cameraMinZoomSet(5)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29410,7 +29410,7 @@ Shipped editor UI action: pitchEdit-zoom5. Source ui_pitch_editor.xml. Execute i
 
 ### `action_pitchEdit_zoomdefault`
 
-Shipped editor UI action: pitchEdit-zoomdefault. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: pitchEdit-zoomdefault. Source ui_pitch_editor.xml. Executes its original command expression `cameraMinZoomSet(-1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29445,7 +29445,7 @@ Shipped editor UI action: pitchEdit-zoomdefault. Source ui_pitch_editor.xml. Exe
 
 ### `action_trEdit_LoadAllTriggers`
 
-Shipped editor UI action: trEdit-LoadAllTriggers. Source ui_trigger_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: trEdit-LoadAllTriggers. Source ui_trigger_editor.xml. Executes its original command expression `uiImportTriggers`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29480,7 +29480,7 @@ Shipped editor UI action: trEdit-LoadAllTriggers. Source ui_trigger_editor.xml. 
 
 ### `action_trEdit_SaveAllTriggers`
 
-Shipped editor UI action: trEdit-SaveAllTriggers. Source ui_trigger_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: trEdit-SaveAllTriggers. Source ui_trigger_editor.xml. Executes its original command expression `uiExportTriggers`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29515,7 +29515,7 @@ Shipped editor UI action: trEdit-SaveAllTriggers. Source ui_trigger_editor.xml. 
 
 ### `action_ui_editor_menu_item_61`
 
-Shipped editor UI action: ui_editor_menu_item_61. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_61. Source ui_editor_menu.xml. Executes its original command expression `player(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29550,7 +29550,7 @@ Shipped editor UI action: ui_editor_menu_item_61. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_62`
 
-Shipped editor UI action: ui_editor_menu_item_62. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_62. Source ui_editor_menu.xml. Executes its original command expression `uiSetTerrainDetailPaintMode(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29585,7 +29585,7 @@ Shipped editor UI action: ui_editor_menu_item_62. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_63`
 
-Shipped editor UI action: ui_editor_menu_item_63. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_63. Source ui_editor_menu.xml. Executes its original command expression `uiSetTerrainDetailPaintMode(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29620,7 +29620,7 @@ Shipped editor UI action: ui_editor_menu_item_63. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_64`
 
-Shipped editor UI action: ui_editor_menu_item_64. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_64. Source ui_editor_menu.xml. Executes its original command expression `uiSetTerrainDetailPaintMode(2)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29655,7 +29655,7 @@ Shipped editor UI action: ui_editor_menu_item_64. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_65`
 
-Shipped editor UI action: ui_editor_menu_item_65. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_65. Source ui_editor_menu.xml. Executes its original command expression `uiSetClipboardRotation(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29690,7 +29690,7 @@ Shipped editor UI action: ui_editor_menu_item_65. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_66`
 
-Shipped editor UI action: ui_editor_menu_item_66. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_66. Source ui_editor_menu.xml. Executes its original command expression `uiSetClipboardRotation(90)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29725,7 +29725,7 @@ Shipped editor UI action: ui_editor_menu_item_66. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_67`
 
-Shipped editor UI action: ui_editor_menu_item_67. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_67. Source ui_editor_menu.xml. Executes its original command expression `uiSetClipboardRotation(180)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29760,7 +29760,7 @@ Shipped editor UI action: ui_editor_menu_item_67. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_68`
 
-Shipped editor UI action: ui_editor_menu_item_68. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_68. Source ui_editor_menu.xml. Executes its original command expression `uiSetClipboardRotation(270)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29795,7 +29795,7 @@ Shipped editor UI action: ui_editor_menu_item_68. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_69`
 
-Shipped editor UI action: ui_editor_menu_item_69. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_69. Source ui_editor_menu.xml. Executes its original command expression `uiChangeBrushType("circular")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29830,7 +29830,7 @@ Shipped editor UI action: ui_editor_menu_item_69. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_70`
 
-Shipped editor UI action: ui_editor_menu_item_70. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_70. Source ui_editor_menu.xml. Executes its original command expression `uiChangeBrushType("Rectangular")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29865,7 +29865,7 @@ Shipped editor UI action: ui_editor_menu_item_70. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_71`
 
-Shipped editor UI action: ui_editor_menu_item_71. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_71. Source ui_editor_menu.xml. Executes its original command expression `uiChangeBrushType("HollowSquare")`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29900,7 +29900,7 @@ Shipped editor UI action: ui_editor_menu_item_71. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_72`
 
-Shipped editor UI action: ui_editor_menu_item_72. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_72. Source ui_editor_menu.xml. Executes its original command expression `player(0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29935,7 +29935,7 @@ Shipped editor UI action: ui_editor_menu_item_72. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_73`
 
-Shipped editor UI action: ui_editor_menu_item_73. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_73. Source ui_editor_menu.xml. Executes its original command expression `player(1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -29970,7 +29970,7 @@ Shipped editor UI action: ui_editor_menu_item_73. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_74`
 
-Shipped editor UI action: ui_editor_menu_item_74. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_74. Source ui_editor_menu.xml. Executes its original command expression `player(2)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30005,7 +30005,7 @@ Shipped editor UI action: ui_editor_menu_item_74. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_75`
 
-Shipped editor UI action: ui_editor_menu_item_75. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_75. Source ui_editor_menu.xml. Executes its original command expression `player(3)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30040,7 +30040,7 @@ Shipped editor UI action: ui_editor_menu_item_75. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_76`
 
-Shipped editor UI action: ui_editor_menu_item_76. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_76. Source ui_editor_menu.xml. Executes its original command expression `player(4)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30075,7 +30075,7 @@ Shipped editor UI action: ui_editor_menu_item_76. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_77`
 
-Shipped editor UI action: ui_editor_menu_item_77. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_77. Source ui_editor_menu.xml. Executes its original command expression `player(5)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30110,7 +30110,7 @@ Shipped editor UI action: ui_editor_menu_item_77. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_78`
 
-Shipped editor UI action: ui_editor_menu_item_78. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_78. Source ui_editor_menu.xml. Executes its original command expression `player(6)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30145,7 +30145,7 @@ Shipped editor UI action: ui_editor_menu_item_78. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_79`
 
-Shipped editor UI action: ui_editor_menu_item_79. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_79. Source ui_editor_menu.xml. Executes its original command expression `player(7)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30180,7 +30180,7 @@ Shipped editor UI action: ui_editor_menu_item_79. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_80`
 
-Shipped editor UI action: ui_editor_menu_item_80. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_80. Source ui_editor_menu.xml. Executes its original command expression `player(8)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30215,7 +30215,7 @@ Shipped editor UI action: ui_editor_menu_item_80. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_81`
 
-Shipped editor UI action: ui_editor_menu_item_81. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_81. Source ui_editor_menu.xml. Executes its original command expression `player(9)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30250,7 +30250,7 @@ Shipped editor UI action: ui_editor_menu_item_81. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_82`
 
-Shipped editor UI action: ui_editor_menu_item_82. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_82. Source ui_editor_menu.xml. Executes its original command expression `player(10)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30285,7 +30285,7 @@ Shipped editor UI action: ui_editor_menu_item_82. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_83`
 
-Shipped editor UI action: ui_editor_menu_item_83. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_83. Source ui_editor_menu.xml. Executes its original command expression `player(11)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30320,7 +30320,7 @@ Shipped editor UI action: ui_editor_menu_item_83. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_84`
 
-Shipped editor UI action: ui_editor_menu_item_84. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_84. Source ui_editor_menu.xml. Executes its original command expression `player(12)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30355,7 +30355,7 @@ Shipped editor UI action: ui_editor_menu_item_84. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_85`
 
-Shipped editor UI action: ui_editor_menu_item_85. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_85. Source ui_editor_menu.xml. Executes its original command expression `configSetInt("playtestDifficultyLevel", 0)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30390,7 +30390,7 @@ Shipped editor UI action: ui_editor_menu_item_85. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_86`
 
-Shipped editor UI action: ui_editor_menu_item_86. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_86. Source ui_editor_menu.xml. Executes its original command expression `configSetInt("playtestDifficultyLevel", 1)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30425,7 +30425,7 @@ Shipped editor UI action: ui_editor_menu_item_86. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_87`
 
-Shipped editor UI action: ui_editor_menu_item_87. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_87. Source ui_editor_menu.xml. Executes its original command expression `configSetInt("playtestDifficultyLevel", 2)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30460,7 +30460,7 @@ Shipped editor UI action: ui_editor_menu_item_87. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_88`
 
-Shipped editor UI action: ui_editor_menu_item_88. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_88. Source ui_editor_menu.xml. Executes its original command expression `configSetInt("playtestDifficultyLevel", 3)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30495,7 +30495,7 @@ Shipped editor UI action: ui_editor_menu_item_88. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_89`
 
-Shipped editor UI action: ui_editor_menu_item_89. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_89. Source ui_editor_menu.xml. Executes its original command expression `configSetInt("playtestDifficultyLevel", 4)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30530,7 +30530,7 @@ Shipped editor UI action: ui_editor_menu_item_89. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_editor_menu_item_90`
 
-Shipped editor UI action: ui_editor_menu_item_90. Source ui_editor_menu.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_editor_menu_item_90. Source ui_editor_menu.xml. Executes its original command expression `configSetInt("playtestDifficultyLevel", 5)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30565,7 +30565,7 @@ Shipped editor UI action: ui_editor_menu_item_90. Source ui_editor_menu.xml. Exe
 
 ### `action_ui_pitch_editor_item_21`
 
-Shipped editor UI action: ui_pitch_editor_item_21. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_pitch_editor_item_21. Source ui_pitch_editor.xml. Executes its original command expression `cameraMaxZoomSet(85)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30600,7 +30600,7 @@ Shipped editor UI action: ui_pitch_editor_item_21. Source ui_pitch_editor.xml. E
 
 ### `action_ui_pitch_editor_item_22`
 
-Shipped editor UI action: ui_pitch_editor_item_22. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_pitch_editor_item_22. Source ui_pitch_editor.xml. Executes its original command expression `cameraMaxZoomSet(100)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30635,7 +30635,7 @@ Shipped editor UI action: ui_pitch_editor_item_22. Source ui_pitch_editor.xml. E
 
 ### `action_ui_pitch_editor_item_23`
 
-Shipped editor UI action: ui_pitch_editor_item_23. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_pitch_editor_item_23. Source ui_pitch_editor.xml. Executes its original command expression `cameraMaxZoomSet(150)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30670,7 +30670,7 @@ Shipped editor UI action: ui_pitch_editor_item_23. Source ui_pitch_editor.xml. E
 
 ### `action_ui_pitch_editor_item_24`
 
-Shipped editor UI action: ui_pitch_editor_item_24. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_pitch_editor_item_24. Source ui_pitch_editor.xml. Executes its original command expression `cameraMaxZoomSet(175)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30705,7 +30705,7 @@ Shipped editor UI action: ui_pitch_editor_item_24. Source ui_pitch_editor.xml. E
 
 ### `action_ui_pitch_editor_item_25`
 
-Shipped editor UI action: ui_pitch_editor_item_25. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_pitch_editor_item_25. Source ui_pitch_editor.xml. Executes its original command expression `cameraMaxZoomSet(200)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30740,7 +30740,7 @@ Shipped editor UI action: ui_pitch_editor_item_25. Source ui_pitch_editor.xml. E
 
 ### `action_ui_pitch_editor_item_26`
 
-Shipped editor UI action: ui_pitch_editor_item_26. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_pitch_editor_item_26. Source ui_pitch_editor.xml. Executes its original command expression `cameraMaxZoomSet(250)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30775,7 +30775,7 @@ Shipped editor UI action: ui_pitch_editor_item_26. Source ui_pitch_editor.xml. E
 
 ### `action_ui_pitch_editor_item_27`
 
-Shipped editor UI action: ui_pitch_editor_item_27. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_pitch_editor_item_27. Source ui_pitch_editor.xml. Executes its original command expression `cameraMaxZoomSet(300)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30810,7 +30810,7 @@ Shipped editor UI action: ui_pitch_editor_item_27. Source ui_pitch_editor.xml. E
 
 ### `action_ui_pitch_editor_item_28`
 
-Shipped editor UI action: ui_pitch_editor_item_28. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_pitch_editor_item_28. Source ui_pitch_editor.xml. Executes its original command expression `cameraMaxZoomSet(400)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30845,7 +30845,7 @@ Shipped editor UI action: ui_pitch_editor_item_28. Source ui_pitch_editor.xml. E
 
 ### `action_ui_pitch_editor_item_29`
 
-Shipped editor UI action: ui_pitch_editor_item_29. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_pitch_editor_item_29. Source ui_pitch_editor.xml. Executes its original command expression `cameraMaxZoomSet(500)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30880,7 +30880,7 @@ Shipped editor UI action: ui_pitch_editor_item_29. Source ui_pitch_editor.xml. E
 
 ### `action_ui_pitch_editor_item_30`
 
-Shipped editor UI action: ui_pitch_editor_item_30. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_pitch_editor_item_30. Source ui_pitch_editor.xml. Executes its original command expression `cameraMaxZoomSet(750)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 
@@ -30915,7 +30915,7 @@ Shipped editor UI action: ui_pitch_editor_item_30. Source ui_pitch_editor.xml. E
 
 ### `action_ui_pitch_editor_item_31`
 
-Shipped editor UI action: ui_pitch_editor_item_31. Source ui_pitch_editor.xml. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
+Shipped editor UI action: ui_pitch_editor_item_31. Source ui_pitch_editor.xml. Executes its original command expression `cameraMaxZoomSet(1000)`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.
 
 **Required arguments:** `confirmDestructive`
 

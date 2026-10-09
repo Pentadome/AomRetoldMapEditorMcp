@@ -365,13 +365,14 @@ internal sealed partial class Catalog
     {
         // Host tool prefixes: editor_=typed native name, action_=original shipped expression;
         // Server strips seven chars. Annotation field names are defined by MCP ToolAnnotations.
+        var gadgets = ShippedGadgetNames();
         foreach (var c in Commands.Values.Where(c => !RemovedCommand(c.Name)
             && (toolNames is null || toolNames.Contains("editor_" + c.Name)))
             .OrderBy(c => c.Name, StringComparer.Ordinal))
             yield return new
             {
                 name = "editor_" + c.Name,
-                description = c.Help
+                description = c.Help + GadgetVisibilityNote(c.Name, gadgets)
                     + $" Native {c.ReturnType}; reports dispatcher return only, not a captured value or independently verified effect. Editor mode required.",
                 inputSchema = Schema(c),
                 annotations = new
@@ -388,7 +389,7 @@ internal sealed partial class Catalog
             yield return new
             {
                 name = "action_" + a.Name,
-                description = $"Shipped editor UI action: {a.Label}. Source {a.Source}. Execute its original command expression; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.",
+                description = $"Shipped editor UI action: {a.Label}. Source {a.Source}. Executes its original command expression `{a.Script}`; dialog field values must be set first using editor UI input tools. Native return is not semantic verification.",
                 inputSchema = new
                 {
                     type = "object",
@@ -407,6 +408,38 @@ internal sealed partial class Catalog
                     openWorldHint = false,
                 },
             };
+    }
+
+    /// <summary>Lists gadget names that shipped action expressions show, hide or toggle.</summary>
+    /// <returns>Distinct ordinal-sorted names; empty when decoded editor XML was not loaded.</returns>
+    string[] ShippedGadgetNames() => Actions.Values
+        .SelectMany(a => GadgetVisibilityCallRegex().Matches(a.Script).Select(m => m.Groups[1].Value))
+        .Distinct(StringComparer.Ordinal)
+        .Order(StringComparer.Ordinal)
+        .ToArray();
+
+    /// <summary>Explains gadget visibility commands in searchable terms; native help only says "makes real".</summary>
+    /// <param name="name">Native command name.</param>
+    /// <param name="gadgets">Gadget names referenced by shipped actions.</param>
+    /// <returns>Description suffix starting with a space, or empty for other commands.</returns>
+    static string GadgetVisibilityNote(string name, string[] gadgets)
+    {
+        // Meaning inferred from shipped editor XML: open buttons call gadgetReal, close buttons gadgetUnreal.
+        var effect = name switch
+        {
+            "gadgetReal" or "gadgetRealIfNotMP" => "Shows/opens",
+            "gadgetUnreal" => "Hides/closes",
+            "gadgetToggle" or "gadgetToggleIfNotMP" => "Shows or hides (toggles open/closed)",
+            _ => null,
+        };
+        if (effect is null)
+            return "";
+        var note = $" {effect} the named UI gadget (dialog, panel, menu or window); real = visible, un-real = hidden.";
+        if (name.EndsWith("IfNotMP", StringComparison.Ordinal))
+            note += " IfNotMP variant: name indicates it acts only outside multiplayer.";
+        if (gadgets.Length != 0)
+            note += " Gadget names used by shipped editor actions: " + string.Join(", ", gadgets) + ".";
+        return note;
     }
 
     /// <summary>Checks escaping and confirmation classification without calling the game.</summary>
@@ -428,6 +461,11 @@ internal sealed partial class Catalog
             || Confirmation("uiSetProtoCursor"))
             throw new InvalidOperationException("Confirmation classification test failed.");
         RemovedCommandSelfTest();
+        // Synthetic gadget name; search relies on open/close wording and listed names in descriptions.
+        if (!GadgetVisibilityNote("gadgetReal", ["FixtureDialog"]).Contains("Shows/opens", StringComparison.Ordinal)
+            || !GadgetVisibilityNote("gadgetUnreal", ["FixtureDialog"]).Contains("FixtureDialog", StringComparison.Ordinal)
+            || GadgetVisibilityNote("uiScenarioLoad", ["FixtureDialog"]).Length != 0)
+            throw new InvalidOperationException("Gadget description fixture failed.");
         // Synthetic native-help fixture; no game/file operation. Import must not bypass helper confirmation.
         var loader = new Command("uiLoadTriggers", "void", [new("string", "filename")], "Synthetic fixture.");
         try
@@ -467,6 +505,9 @@ internal sealed partial class Catalog
             var tools = JsonSerializer.SerializeToElement(catalog.Tools());
             if (tools.EnumerateArray().Any(t => t.GetProperty("name").GetString() is "editor_loadScenario" or "action_LegacyLoad"))
                 throw new InvalidOperationException("Removed command stale-metadata exposure fixture failed.");
+            if (!tools.EnumerateArray().Any(t => t.GetProperty("name").GetString() == "action_LoadButton"
+                    && t.GetProperty("description").GetString()!.Contains("`uiScenarioLoad`", StringComparison.Ordinal)))
+                throw new InvalidOperationException("Action expression description fixture failed.");
             foreach (var name in new[] { "loadScenario", "LOADSCENARIO" })
             {
                 try
@@ -479,6 +520,11 @@ internal sealed partial class Catalog
         }
         finally { Directory.Delete(temporary, true); }
     }
+
+    // Shipped expressions spell these calls gadgetReal/gadgetUnReal/gadgetUnreal/gadgetToggle("Name");
+    // group 1 is the literal gadget name.
+    [GeneratedRegex(@"\bgadget(?:Real|Unreal|Toggle)(?:IfNotMP)?\s*\(\s*""([^""\\]+)""", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex GadgetVisibilityCallRegex();
 
     // Native/XS identifier spelling observed in shipped expressions (ASCII letters/digits/underscore).
     [GeneratedRegex(@"\b[A-Za-z_][A-Za-z_0-9]*")]
