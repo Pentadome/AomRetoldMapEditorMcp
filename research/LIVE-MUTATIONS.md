@@ -53,4 +53,12 @@ Normal UI, 2560×1440, build 100.19.17020.0, operator-authorized, blank scenario
 - `PlayerDataDialog` opened an empty shell. No visible effect alone: `HelpDialog`, `PlayerDiplomacyDialog`, `waterColorDialog`, `animgadget`, `camEdit-position-window`, `soundgadget`, `SPCNoteDlg`, `ScenarioSummaryDialog`, `CameraStartDlg`, `MapElevationDialog`.
 - `uiCloseDialog()` acknowledged but did not close `PlayerEditDlg`; `gadgetUnreal("PlayerEditDlg")` did. Every acknowledgement reported `nativeReturned: true`, including the ineffective close: screenshots are the evidence.
 - Camera target moved once between sweeps (143,176 → 135,102); repeating 13 camera/map/trigger gadgets one at a time with camera reads did not reproduce it, so cause is unattributed (likely edge-scroll while the game had focus).
-- Alternative-UI-only names (`UIEditor.bar` XML) and `EditorMenu`/`ToolBar`/Letterbox bars were not exercised.
+- `EditorMenu`/`ToolBar`/Letterbox bars were not exercised in normal UI.
+
+Repeated on the alternative UI (same build/size, blank scenario) for all 68 names above plus the 17 alternative-XML names:
+
+- All 38 names in `VerifiedGadgets` opened populated alternative-styled windows. Two did not close with their own name: `DiplomacyDialog` closed with `gadgetUnreal("PlayerDiplomacyDialog")` (its Close button's command); `ATriggerGadget` stayed open after `gadgetUnreal("ATriggerGadget")` and `editMode("None")`, and closed with `gadgetUnreal("trEditor")`. A first restore attempt with `gadgetReal` reopened Diplomacy before the correct close.
+- `MapElevationGadget` and `CombatCommands` had no visible effect alone. `PlayerDiplomacyDialog` opened the Diplomacy grid (no effect in normal UI). `PlayerDataDialog` and the nine other normal no-effect names stayed invisible.
+- Alternative-only windows: `AniMode` (animation tool bar), `ShapesDLG`, `PaintWaterToolPalette`, `BrushFunctionsAdjustElevation`, `BrushFunctionsDeleteObjects`, `ScreenshotDialog`, `Name-Dialog`, `Add-dialog`. No visible effect: `MapSettings`, `MapSizeSection`, `BrushSelectorPanel`, `PaintTerrainTool`, `MoreCamTools`, `Stats`, `TGEditor-Groups`, `TGEditor-Triggers`.
+- `TerraMode` is the default-visible bottom terrain tool bar: `gadgetUnreal` hid it, `gadgetReal` restored it exactly.
+- Final `editor_ui_state`: alternative UI, edit mode None, nothing selected, camera unchanged.
