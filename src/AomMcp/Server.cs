@@ -203,7 +203,7 @@ internal sealed partial class Server(
         };
     }
 
-    /// <param name="preflighted">Batch already preflighted every step before connecting.</param>
+    // preflighted: batch already preflighted every step before connecting.
     CallToolResult Call(string name, JsonElement args, Game? batchGame = null, bool preflighted = false)
     {
         var passedPreflight = false;
