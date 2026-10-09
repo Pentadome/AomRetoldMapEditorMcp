@@ -288,10 +288,7 @@ internal static class CampaignTriggers
         var search = args.TryGetProperty("player", out _) || args.TryGetProperty("arg", out _) || args.TryGetProperty("references", out _);
         if (search)
         {
-            if (offset < 0 || limit is < 1 or > 200) throw new ArgumentException("offset/limit outside bounds.");
             var player = args.TryGetProperty("player", out var p) ? p.GetInt32().ToString(System.Globalization.CultureInfo.InvariantCulture) : null;
-            if (player is not null && (int.Parse(player, System.Globalization.CultureInfo.InvariantCulture) is < 0 or > 12))
-                throw new ArgumentException("player outside 0..12.");
             string? key = null, value = null;
             if (args.TryGetProperty("arg", out var match))
             {
@@ -320,8 +317,7 @@ internal static class CampaignTriggers
                         if (references is not null)
                         {
                             if (!e.Name.StartsWith("Trigger:", StringComparison.OrdinalIgnoreCase)) continue;
-                            matchedArgs = matchedArgs.Where(a => a.Key == "EventID" && a.Values.Any(v =>
-                                uint.TryParse(v, out var id) && (id == references || t.Id == references))).ToArray();
+                            matchedArgs = matchedArgs.Where(a => a.Key == "EventID").ToArray();
                         }
                         foreach (var a in matchedArgs)
                             foreach (var v in a.Values.Where(v => key is null || v == value))

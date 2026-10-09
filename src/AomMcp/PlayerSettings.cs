@@ -425,16 +425,11 @@ internal static class PlayerSettings
             return new { verified = errors.Length == 0, mismatches = errors, sourceSha256 = source.Sha256, observedSha256 = observed.Sha256 };
         }
         if (op != "apply" || game is null) throw new ArgumentException("operation: preview/verify/apply.");
-        if (!args.TryGetProperty("confirmDestructive", out var conf) || !conf.GetBoolean()
-            || !args.TryGetProperty("confirmIsolatedScene", out var isolated) || !isolated.GetBoolean())
-            throw new ArgumentException("apply requires confirmDestructive=true and confirmIsolatedScene=true.");
-        if (!args.TryGetProperty("scenarioProfileDirectory", out var sp) || !args.TryGetProperty("triggerProfileDirectory", out var tp)
-            || !args.TryGetProperty("backupScenarioPath", out var bp) || !args.TryGetProperty("backupTriggerPath", out var bt)
-            || !args.TryGetProperty("verificationDirectory", out var vd)) throw new ArgumentException("apply requires explicit profile directories, backups and verificationDirectory.");
-        var backup = EditorFiles.ApprovedNewPath(bp.GetString()!, ".mythscn");
-        var trigger = EditorFiles.ApprovedNewPath(bt.GetString()!, ".trg");
-        var dir = Path.GetDirectoryName(EditorFiles.LocalPath(Path.Combine(vd.GetString()!, "aom-player-probe.mythscn")))!;
-        var profile = sp.GetString()!; var triggerProfile = tp.GetString()!;
+        PreflightApply(args);
+        var backup = EditorFiles.ApprovedNewPath(args.GetProperty("backupScenarioPath").GetString()!, ".mythscn");
+        var trigger = EditorFiles.ApprovedNewPath(args.GetProperty("backupTriggerPath").GetString()!, ".trg");
+        var dir = Path.GetDirectoryName(EditorFiles.LocalPath(Path.Combine(args.GetProperty("verificationDirectory").GetString()!, "aom-player-probe.mythscn")))!;
+        var profile = args.GetProperty("scenarioProfileDirectory").GetString()!; var triggerProfile = args.GetProperty("triggerProfileDirectory").GetString()!;
         var (width, height) = Ui.ClientSize(game);
         game.Focus();
         var ui = (UiRead.DetectFieldUi(ScreenProbe.Capture(game), "players.1.control", width, height, hash).Kind == "normal" ? Normal : Alternative).For(width, height);

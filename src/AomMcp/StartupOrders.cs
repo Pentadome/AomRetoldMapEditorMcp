@@ -233,15 +233,15 @@ internal static class StartupOrders
             limitation = "Caller-designated startup trigger; conditions/timing and indirect XS references are not evaluated." };
         if (audit.UnsupportedEffects.Length > 0 || audit.InvalidWorkers.Length > 0 || audit.DuplicateWorkers.Length > 0) throw new InvalidDataException("Unknown/invalid/duplicate selected-worker jobs block planning. Audit and explicitly review replacement effects.");
         var capacity = args.GetProperty("job").GetString() == "farm" ? 1 : args.GetProperty("treeCapacity").GetInt32();
-        if (capacity is < 1 or > 200 || args.GetProperty("job").GetString() == "farm" && (targetRefs.Any(t => t.Proto != "Farm" || t.Player != args.GetProperty("player").GetUInt32())))
-            throw new ArgumentException("Farm requires exact Farm prototype/same owner/one worker; treeCapacity must be 1..200.");
+        if (args.GetProperty("job").GetString() == "farm" && (targetRefs.Any(t => t.Proto != "Farm" || t.Player != args.GetProperty("player").GetUInt32())))
+            throw new ArgumentException("Farm requires exact Farm prototype/same owner/one worker.");
         var pending = audit.UnassignedWorkers.Select(id => units[id]).ToArray(); var targets = targetRefs.Select(t => units[t.UnitId]).ToArray();
         var capacities = targets.Select(t => capacity - audit.Jobs.Where(j => j.TargetId == t.UnitId).Select(j => j.WorkerId).Distinct().Count()).ToArray();
         if (capacities.Any(c => c < 0)) throw new InvalidDataException("Existing jobs already exceed requested target capacity.");
         var assignments = Match(pending, targets, capacities, args.GetProperty("maxDistance").GetDouble());
         var preserved = audit.Jobs.Where(j => selected.Contains(j.WorkerId)).Select(j => new Assignment(j.WorkerId, j.TargetId, Distance(units[j.WorkerId], units[j.TargetId]), true)).ToArray();
         var templateIndex = args.GetProperty("templateEffectIndex").GetInt32();
-        if (templateIndex < 0 || templateIndex >= trigger.Effects.Length || !Work(trigger.Effects[templateIndex])) throw new InvalidDataException("Reviewed Unit: Task template required.");
+        if (templateIndex >= trigger.Effects.Length || !Work(trigger.Effects[templateIndex])) throw new InvalidDataException("Reviewed Unit: Task template required.");
         var template = trigger.Effects[templateIndex];
         var tasks = assignments.Select(a => TriggerObjects.Retarget(document.Body, template, new Dictionary<string, CampaignTriggers.ObjectRef[]>
         {

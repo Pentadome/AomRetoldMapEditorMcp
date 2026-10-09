@@ -379,7 +379,8 @@ internal sealed partial class Server
         {
             if (_layout.World is null || _layout.Selection is null) throw new InvalidDataException("Heading requires reviewed world/selection layouts; object placed without rotation.");
             rotation = RotateTo(game, placed.Unit.UnitId, h, true);
-            placed = placed with { Unit = LiveUnits.Read(game).First(u => u.UnitId == placed.Unit.UnitId) };
+            placed = placed with { Unit = LiveUnits.Read(game).FirstOrDefault(u => u.UnitId == placed.Unit.UnitId)
+                ?? throw new InvalidDataException($"Placed unit {placed.Unit.UnitId} missing after rotation; inspect units before retrying.") };
         }
         return new
         {

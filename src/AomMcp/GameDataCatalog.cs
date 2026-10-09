@@ -243,8 +243,6 @@ internal sealed class GameDataCatalog
         string Text(string key) => args.TryGetProperty(key, out var v) ? v.GetString()! : "";
         var offset = args.TryGetProperty("offset", out var o) ? o.GetInt32() : 0;
         var limit = args.TryGetProperty("limit", out var l) ? l.GetInt32() : 50; // Host default/cap, not game constants.
-        if (offset < 0 || limit is < 1 or > 200)
-            throw new ArgumentException("Catalog offset must be >= 0; limit must be 1..200.");
         var definition = args.TryGetProperty("includeDefinition", out var d) && d.GetBoolean();
         var culture = args.TryGetProperty("pantheon", out var p) ? Culture(p.GetString()!) : "";
         bool Equal(string a, string b) => a.Equals(b, StringComparison.OrdinalIgnoreCase);
@@ -292,6 +290,7 @@ internal sealed class GameDataCatalog
         CheckFresh(exe, hash);
         var catalogs = _data.GetProperty("catalogs");
         Dictionary<string, XElement> Definitions(string kind) => catalogs.GetProperty(kind).EnumerateArray()
+            .DistinctBy(e => e.GetProperty("name").GetString()!, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(e => e.GetProperty("name").GetString()!, e => XElement.Parse(e.GetProperty("definition").GetString()!), StringComparer.OrdinalIgnoreCase);
         _protoXml ??= Definitions("prototypes");
         _techXml ??= Definitions("technologies");

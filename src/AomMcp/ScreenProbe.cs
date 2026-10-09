@@ -27,7 +27,7 @@ internal static class ScreenProbe
     internal static Frame Capture(Game game)
     {
         Win.Check(Win.GetClientRect(game.Window, out var rect), "GetClientRect");
-        if (game.Layout.ExeSha256 != "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff"
+        if (!UiLayouts.BuildMatches(game.Layout.ExeSha256)
             || !UiLayouts.IsReviewed(rect.Right, rect.Bottom))
             throw new WorkflowFailure("UI_LAYOUT_UNREVIEWED", "ui-preflight", $"Dialog pixel gates only reviewed for {UiLayouts.ReviewedText} clients on the pinned build; client is {rect.Right}x{rect.Bottom}.", false, false,
                 "Switch the game to a reviewed resolution, or use manual UI and verify a game-written checkpoint; no input sent.");

@@ -41,6 +41,7 @@ static DWORD Execute(Packet* p, HWND window) {
     if (p->payloadSize == 0 || p->payloadSize >= sizeof(p->payload) ||
         p->payload[p->payloadSize] != 0 || std::memchr(p->payload, 0, p->payloadSize) != nullptr ||
         p->prefixSize == 0 || p->prefixSize > sizeof(p->prefix)) return 3;
+    if ((p->flags & ~3u) != 0) return 3; // Only the two documented guard bits (mask 1|2) exist.
     // Retail Steam executable basename, verified against the host's configured executable/hash.
     auto* base = reinterpret_cast<unsigned char*>(GetModuleHandleW(L"AoMRT_s.exe"));
     MODULEINFO module{};
@@ -79,7 +80,6 @@ static DWORD Execute(Packet* p, HWND window) {
         if (!Read(editor + p->protoOffset, &proto, sizeof(proto)) || proto != p->expectedProto ||
             !Read(editor + p->playerOffset, &player, sizeof(player)) || player != p->expectedPlayer) return 11;
     }
-    if ((p->flags & ~3u) != 0) return 3; // Only the two documented guard bits (mask 1|2) exist.
     p->callsStarted = 1;
     // Do not catch and hide engine access violations: state would not be trustworthy afterward.
     reinterpret_cast<void (*)(const char*)>(base + p->dispatcher)(p->payload);
@@ -89,7 +89,7 @@ static DWORD Execute(Packet* p, HWND window) {
 extern "C" __declspec(dllexport) LRESULT CALLBACK EditorHook(int code, WPARAM wParam, LPARAM lParam) {
     if (code >= 0 && lParam != 0) {
         const auto* m = reinterpret_cast<const CWPSTRUCT*>(lParam);
-        const UINT message = RegisterWindowMessageW(MessageName);
+        static const UINT message = RegisterWindowMessageW(MessageName); // Same atom for the session; register once.
         if (message != 0 && m->message == message && m->wParam == Magic) {
             wchar_t name[100]; // Host-sized buffer for session-local mapping name + PID + 8-digit nonce.
             const DWORD nonce = static_cast<DWORD>(m->lParam);

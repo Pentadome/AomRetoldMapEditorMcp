@@ -113,7 +113,7 @@ internal sealed partial class XsApi
             throw new ArgumentException("context must be any|" + string.Join('|', Contexts) + ".");
         var contexts = _model.Libraries.ToDictionary(x => x.Id, x => x.Context);
         bool LibraryMatch(string lib) => (library.Length == 0 || lib.Equals(library, StringComparison.OrdinalIgnoreCase))
-            && (context == "any" || contexts[lib] == context);
+            && (context == "any" || (contexts.TryGetValue(lib, out var c) && c == context));
         bool Match(string entryName, string? summary) =>
             (name.Length == 0 || entryName.Equals(name, StringComparison.OrdinalIgnoreCase))
             && terms.All(t => entryName.Contains(t, StringComparison.OrdinalIgnoreCase)
@@ -157,7 +157,8 @@ internal sealed partial class XsApi
         // Exact name first, then shorter names.
         var ordered = results.OrderBy(r => r.Name.Equals(name, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
             .ThenBy(r => r.Name.Length).ThenBy(r => r.Name, StringComparer.Ordinal).ToArray();
-        var page = ordered.Skip(offset).Take(limit).Select(r => Present(r.Kind, r.Entry, local)).ToArray();
+        var sourceLines = new Dictionary<string, string[]?>(StringComparer.OrdinalIgnoreCase);
+        var page = ordered.Skip(offset).Take(limit).Select(r => Present(r.Kind, r.Entry, local, sourceLines)).ToArray();
         return new
         {
             total = ordered.Length,
@@ -179,7 +180,7 @@ internal sealed partial class XsApi
         return _localError ?? "official help and source comments read from local install " + _installDir;
     }
 
-    JsonObject Present(string kind, object entry, bool local)
+    JsonObject Present(string kind, object entry, bool local, Dictionary<string, string[]?> sourceLines)
     {
         var node = JsonSerializer.SerializeToNode(entry, entry.GetType(), Json)!.AsObject();
         node["kind"] = kind;
@@ -194,13 +195,13 @@ internal sealed partial class XsApi
                 break;
             case Function f:
                 node["summary"] = _summaries.GetValueOrDefault(f.Library + "/" + (f.Class is null ? "" : f.Class + ".") + f.Name);
-                if (local) node["sourceComment"] = SourceComment(f.File, f.Line, f.Name);
+                if (local) node["sourceComment"] = SourceComment(f.File, f.Line, f.Name, sourceLines);
                 break;
             case ClassDef x:
                 node["summary"] = _summaries.GetValueOrDefault(x.Library + "/" + x.Name);
                 node["methods"] = new JsonArray(_model.Functions.Where(f => f.Class == x.Name && f.Library == x.Library)
                     .Select(f => (JsonNode)f.Signature).ToArray());
-                if (local) node["sourceComment"] = SourceComment(x.File, x.Line, x.Name);
+                if (local) node["sourceComment"] = SourceComment(x.File, x.Line, x.Name, sourceLines);
                 break;
         }
         return node;
@@ -218,7 +219,8 @@ internal sealed partial class XsApi
                 .Select(n => n!.AsObject()).GroupBy(n => n["name"]!.GetValue<string>())
                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or JsonException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or JsonException
+            or NullReferenceException or InvalidOperationException)
         {
             _localError = "local install help unavailable: " + e.Message;
             _localSyscalls = [];
@@ -234,11 +236,14 @@ internal sealed partial class XsApi
     }
 
     /// <summary>Comment lines directly above a declaration in the installed source; null when absent or the line moved.</summary>
-    string? SourceComment(string file, int line, string name)
+    string? SourceComment(string file, int line, string name, Dictionary<string, string[]?> sourceLines)
     {
-        var path = Path.Combine(_installDir, "game", file);
-        if (!File.Exists(path)) return null;
-        var lines = File.ReadAllLines(path);
+        if (!sourceLines.TryGetValue(file, out var lines))
+        {
+            var path = Path.Combine(_installDir, "game", file);
+            sourceLines[file] = lines = File.Exists(path) ? File.ReadAllLines(path) : null;
+        }
+        if (lines is null) return null;
         if (line < 1 || line > lines.Length || !lines[line - 1].Contains(name, StringComparison.Ordinal)) return null;
         var collected = new List<string>();
         for (var i = line - 2; i >= 0; i--)

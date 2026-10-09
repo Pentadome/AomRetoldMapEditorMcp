@@ -239,7 +239,8 @@ internal sealed partial class Server
     static void RequireNoHeldInput()
     {
         if (HeldInputKeys.Any(k => (Win.GetAsyncKeyState(k) & 0x8000) != 0)) // GetAsyncKeyState high bit = currently held.
-            throw new InvalidOperationException("Mouse button/modifier held; no input sent.");
+            throw new WorkflowFailure("INPUT_HELD", "input", "Mouse button/modifier held; no input sent.", false, false,
+                "Release mouse buttons/modifier keys, then retry; no input sent.");
     }
 
     // ---------------- paint ----------------
@@ -279,6 +280,8 @@ internal sealed partial class Server
     {
         var kind = String(args, "kind");
         var requested = String(args, "type");
+        string[]? mixes = null;
+        string[] Mixes() => mixes ??= MixTitles();
         var points = args.GetProperty("points").EnumerateArray().Select(p => (X: p[0].GetDouble(), Z: p[1].GetDouble())).ToArray();
         var moveCamera = !args.TryGetProperty("moveCamera", out var mc) || mc.GetBoolean();
         var keepMode = args.TryGetProperty("keepMode", out var km) && km.GetBoolean();
@@ -291,12 +294,12 @@ internal sealed partial class Server
             "forest" => ExactName(names.Forest, requested),
             "cliff" => ExactName(names.Cliff, requested),
             "texture" => ExactName(names.Subtypes.SelectMany(s => s), requested),
-            "mix" => ExactName(MixTitles(), requested),
+            "mix" => ExactName(Mixes(), requested),
             _ => null,
         } ?? throw new WorkflowFailure("UNKNOWN_PAINT_TYPE", "preflight", $"Unknown {kind} type '{requested}'. Suggestions: "
             + string.Join(", ", GameDataCatalog.Suggest(requested, kind switch
             {
-                "water" => names.Water, "forest" => names.Forest, "cliff" => names.Cliff, "mix" => MixTitles(),
+                "water" => names.Water, "forest" => names.Forest, "cliff" => names.Cliff, "mix" => Mixes(),
                 _ => names.Subtypes.SelectMany(s => s).Where(s => s.Length > 0),
             })), false, false, "Use editor_terrain_catalog for exact names. No input sent.");
         var view0 = EditorView.ReadView(game);
@@ -317,7 +320,7 @@ internal sealed partial class Server
                 case "forest": _bridge.Execute(game, $"uiSetForestType({Catalog.Quote(type)})"); break;
                 case "cliff": _bridge.Execute(game, $"uiSetCliffType({Catalog.Quote(type)})"); break;
                 case "texture": selectionNote = SelectTexture(game, type, names); break;
-                case "mix": selectionNote = SelectFromPalette(game, type, MixTitles(), mix: true); break;
+                case "mix": selectionNote = SelectFromPalette(game, type, Mixes(), mix: true); break;
             }
             if (kind is not "mix")
             {
@@ -528,9 +531,12 @@ internal sealed partial class Server
 
     static HeightStats AreaHeights(EditorView.ViewState v, double minX, double minZ, double maxX, double maxZ, double target, double tolerance)
     {
-        int ix0 = (int)Math.Ceiling(minX * v.InverseScale), ix1 = Math.Min(v.Vertices[0] - 1, (int)Math.Floor(maxX * v.InverseScale));
-        int iz0 = (int)Math.Ceiling(minZ * v.InverseScale), iz1 = Math.Min(v.Vertices[1] - 1, (int)Math.Floor(maxZ * v.InverseScale));
-        var values = Enumerable.Range(ix0, Math.Max(0, ix1 - ix0 + 1)).SelectMany(ix => v.HeightRow(ix, iz0, Math.Max(1, iz1 - iz0 + 1))).ToArray();
+        int ix0 = Math.Max(0, (int)Math.Ceiling(minX * v.InverseScale)), ix1 = Math.Min(v.Vertices[0] - 1, (int)Math.Floor(maxX * v.InverseScale));
+        int iz0 = Math.Max(0, (int)Math.Ceiling(minZ * v.InverseScale)), iz1 = Math.Min(v.Vertices[1] - 1, (int)Math.Floor(maxZ * v.InverseScale));
+        if (ix1 < ix0 || iz1 < iz0)
+            throw new WorkflowFailure("AREA_NO_NODES", "preflight", "Area contains no height nodes.", false, false,
+                "Widen area to at least one node spacing (view.Scale). No input sent.");
+        var values = Enumerable.Range(ix0, ix1 - ix0 + 1).SelectMany(ix => v.HeightRow(ix, iz0, iz1 - iz0 + 1)).ToArray();
         return new(values.Length, values.Count(h => Math.Abs(h - target) <= tolerance), values.Min(), values.Max(), values.Average(h => (double)h));
     }
 
@@ -1147,14 +1153,15 @@ internal sealed partial class Server
     object MirrorUnits(Game game, JsonElement args)
     {
         var source = Int(args, "sourcePlayer"); var target = Int(args, "targetPlayer"); var mode = String(args, "mode");
-        var view = EditorView.ReadView(game);
-        var units = LiveUnits.Read(game);
         var radius = Dbl(args, "radius", 0);
         double? cx = args.TryGetProperty("x", out var xe) ? xe.GetDouble() : null, cz = args.TryGetProperty("z", out var ze) ? ze.GetDouble() : null;
+        if (cx.HasValue != cz.HasValue || (radius > 0) != cx.HasValue) throw new ArgumentException("x, z and radius > 0 must be given together or not at all.");
         var includeGaia = args.TryGetProperty("includeGaiaNear", out var ig) && ig.GetBoolean();
+        if (includeGaia && cx is null) throw new ArgumentException("includeGaiaNear requires x, z and radius.");
+        var view = EditorView.ReadView(game);
+        var units = LiveUnits.Read(game);
         var picked = units.Where(u => (u.Player == source || (includeGaia && u.Player == 0))
-            && (radius <= 0 || cx is null || Math.Pow(u.Position.X - cx.Value, 2) + Math.Pow(u.Position.Z - cz!.Value, 2) <= radius * radius)).ToArray();
-        if (includeGaia && (radius <= 0 || cx is null)) throw new ArgumentException("includeGaiaNear requires x, z and radius.");
+            && (cx is null || Math.Pow(u.Position.X - cx.Value, 2) + Math.Pow(u.Position.Z - cz!.Value, 2) <= radius * radius)).ToArray();
         var items = picked.Select(u =>
         {
             var (mx, mz) = MirrorPoint(mode, u.Position.X, u.Position.Z, view.WorldWidth, view.WorldDepth);

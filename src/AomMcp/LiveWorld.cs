@@ -119,7 +119,7 @@ internal static class LiveWorld
 
     internal sealed record Catalogs(string[] Groups, string[][] Subtypes, string[] Water, string[] Forest, string[] Cliff);
 
-    static (nint Manager, Catalogs Value)? _cache; // Type catalogs are loaded once per game data load; keyed by manager pointer and counts.
+    static (uint Pid, nint Manager, Catalogs Value)? _cache; // Type catalogs are loaded once per game data load; keyed by process, manager pointer and counts.
 
     internal static Catalogs Names(Game game)
     {
@@ -136,7 +136,7 @@ internal static class LiveWorld
         var groupCount = Count(l.GroupCountOffset, MaxGroups);
         int waterCount = Count(l.WaterTypeCountOffset, MaxNamed), forestCount = Count(l.ForestTypeCountOffset, MaxNamed),
             cliffCount = Count(l.CliffTypeCountOffset, MaxNamed);
-        if (_cache is { } c && c.Manager == tm && c.Value.Groups.Length == groupCount && c.Value.Water.Length == waterCount
+        if (_cache is { } c && c.Pid == game.Pid && c.Manager == tm && c.Value.Groups.Length == groupCount && c.Value.Water.Length == waterCount
             && c.Value.Forest.Length == forestCount && c.Value.Cliff.Length == cliffCount)
             return c.Value;
         var groups = Ptr(game, tm + l.GroupArrayOffset);
@@ -162,7 +162,7 @@ internal static class LiveWorld
         }
         var value = new Catalogs(groupNames, subtypes, Named(waterCount, l.WaterTypeArrayOffset, l.WaterTypeNameOffset),
             Named(forestCount, l.ForestTypeArrayOffset, l.ForestTypeNameOffset), Named(cliffCount, l.CliffTypeArrayOffset, l.CliffTypeNameOffset));
-        _cache = (tm, value);
+        _cache = (game.Pid, tm, value);
         return value;
     }
 

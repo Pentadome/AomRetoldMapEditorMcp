@@ -133,7 +133,6 @@ internal sealed class Bridge : IDisposable
         // Win32 winuser.h: 4 = WH_CALLWNDPROC, invokes EditorHook on the window's owning thread.
         var hook = Win.SetHook(4, _callback, _library, game.Thread);
         Win.Check(hook != 0, "SetWindowsHookEx");
-        var removed = false;
         bool delivered;
         try
         {
@@ -150,8 +149,7 @@ internal sealed class Bridge : IDisposable
         }
         finally
         {
-            removed = Win.Unhook(hook);
-            Win.Check(removed, "UnhookWindowsHookEx");
+            Win.Check(Win.Unhook(hook), "UnhookWindowsHookEx");
         }
         // Private ABI: state 0=pending, -1=claimed, 1=finished; result 1=dispatcher returned.
         var state = view.ReadInt32(24);
@@ -171,7 +169,7 @@ internal sealed class Bridge : IDisposable
             command,
             pid = game.Pid,
             executionThread = view.ReadUInt32(104),
-            hookRemoved = removed,
+            hookRemoved = true, // Win.Check throws otherwise.
             elapsedDeadlineRemainingMs = Math.Max(
                 0L,
                 (long)view.ReadUInt64(96) - (long)Win.GetTickCount64()

@@ -82,8 +82,6 @@ internal static class ScenarioDiff
                     throw new ArgumentException("Assertion selectors outside bounds.");
             }
         }
-        if (args.TryGetProperty("offset", out var o) && o.GetInt32() < 0 || args.TryGetProperty("limit", out var l) && l.GetInt32() is < 1 or > 200)
-            throw new ArgumentException("offset/limit outside bounds.");
     }
     internal static object Query(JsonElement args)
     {
@@ -96,6 +94,12 @@ internal static class ScenarioDiff
     {
         var changes = new List<Change>(); var coverage = new List<Coverage>();
         var keys = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        // Decode each document's TR and entities once; scopes and assertions share the result (exceptions rethrow per access).
+        var triggers = new Dictionary<CheckpointDocument, Lazy<CampaignTriggers.Document>> {
+            [before] = new(() => CampaignTriggers.ParseScenarioSection(before.Root.One("TR").ToArray())),
+            [after] = new(() => CampaignTriggers.ParseScenarioSection(after.Root.One("TR").ToArray())) };
+        var units = new Dictionary<CheckpointDocument, Lazy<CheckpointUnits.Snapshot>> {
+            [before] = new(() => CheckpointUnits.Read(before)), [after] = new(() => CheckpointUnits.Read(after)) };
         void ReadScope(string scope, Func<CheckpointDocument, Dictionary<string, JsonElement>> read)
         {
             try
@@ -109,9 +113,9 @@ internal static class ScenarioDiff
         }
         ReadScope("raw", Raw);
         ReadScope("players", d => Players(ScenarioReader.ReadPlayers(d.World.One("PL").ToArray(), requireReviewedVersion: true)));
-        ReadScope("triggers", d => Triggers(CampaignTriggers.ParseScenarioSection(d.Root.One("TR").ToArray())));
-        ReadScope("groups", d => Groups(CampaignTriggers.ParseScenarioSection(d.Root.One("TR").ToArray())));
-        ReadScope("entities", d => Entities(CheckpointUnits.Read(d)));
+        ReadScope("triggers", d => Triggers(triggers[d].Value));
+        ReadScope("groups", d => Groups(triggers[d].Value));
+        ReadScope("entities", d => Entities(units[d].Value));
         var checks = new List<object>();
         if (args.TryGetProperty("assertions", out var assertions))
             foreach (var rule in assertions.EnumerateArray())
@@ -124,8 +128,7 @@ internal static class ScenarioDiff
                 var missing = !unsupported && selected?.Any(x => !keys[scope].Contains(x)) == true;
                 if (!unsupported && scope == "entities" && fields?.Contains("proto") == true)
                 {
-                    var units = CheckpointUnits.Read(before).Units.Concat(CheckpointUnits.Read(after).Units);
-                    unsupported = units.Any(u => u.Proto is null && (selected is null || selected.Contains(u.UnitId.ToString(System.Globalization.CultureInfo.InvariantCulture))));
+                    unsupported = units[before].Value.Units.Concat(units[after].Value.Units).Any(u => u.Proto is null && (selected is null || selected.Contains(u.UnitId.ToString(System.Globalization.CultureInfo.InvariantCulture))));
                 }
                 var violations = changes.Where(c => c.Scope == scope && (policy == "preserve"
                     ? (selected is null || selected.Contains(c.Key)) && (fields is null || fields.Contains(c.Field) || c.Field == "presence")

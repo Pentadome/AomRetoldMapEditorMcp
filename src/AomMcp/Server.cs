@@ -89,8 +89,8 @@ internal sealed partial class Server(
         using (this)
         using (var calls = new SemaphoreSlim(1, 1))
         {
-            _ = CoreTools;
-            _ = FullTools; // Build immutable snapshots before SDK dispatches concurrent requests.
+            _ = CoreIndex;
+            _ = FullIndex; // Build immutable snapshots before SDK dispatches concurrent requests.
             var options = new McpServerOptions
             {
                 // Host identity/release version; not the MCP protocol version (negotiated by SDK).
@@ -143,6 +143,9 @@ internal sealed partial class Server(
         .Select(t => JsonSerializer.SerializeToElement(t, Json).Deserialize<Tool>(Json)!).ToArray();
     Tool[] FullTools => field ??= Extras().Concat(WorkflowExtras()).Concat(_catalog.Tools())
         .Select(t => JsonSerializer.SerializeToElement(t, Json).Deserialize<Tool>(Json)!).ToArray();
+    Dictionary<string, Tool> ToolIndex => _fullTools ? FullIndex : CoreIndex;
+    Dictionary<string, Tool> CoreIndex => field ??= CoreTools.ToDictionary(t => t.Name, StringComparer.Ordinal);
+    Dictionary<string, Tool> FullIndex => field ??= FullTools.ToDictionary(t => t.Name, StringComparer.Ordinal);
 
     ListToolsResult List(ListToolsRequestParams? p)
     {
@@ -172,7 +175,6 @@ internal sealed partial class Server(
         var offset = Int(args, "offset", 0);
         var limit = Int(args, "limit", ToolSearchDefaultLimit);
         var full = _fullTools;
-        var coreNames = CoreTools.Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
         int Rank(Tool tool) => tool.Name.Equals(query, StringComparison.OrdinalIgnoreCase) ? 0
             : tool.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ? 1
             : terms.All(term => tool.Name.Contains(term, StringComparison.OrdinalIgnoreCase)) ? 2 : 3;
@@ -184,8 +186,8 @@ internal sealed partial class Server(
         {
             name = t.Name,
             description = t.Description ?? "",
-            available = full || coreNames.Contains(t.Name),
-            requiredToolset = coreNames.Contains(t.Name) ? "core" : "full",
+            available = full || CoreIndex.ContainsKey(t.Name),
+            requiredToolset = CoreIndex.ContainsKey(t.Name) ? "core" : "full",
         }).ToArray();
         return new
         {
@@ -201,7 +203,8 @@ internal sealed partial class Server(
         };
     }
 
-    CallToolResult Call(string name, JsonElement args, Game? batchGame = null)
+    /// <param name="preflighted">Batch already preflighted every step before connecting.</param>
+    CallToolResult Call(string name, JsonElement args, Game? batchGame = null, bool preflighted = false)
     {
         var passedPreflight = false;
         try
@@ -210,7 +213,7 @@ internal sealed partial class Server(
                 args = Empty;
             if (name == "editor_batch")
                 return Batch(args);
-            Preflight(name, args);
+            if (!preflighted) Preflight(name, args);
             passedPreflight = true;
             var value = Invoke(name, args, batchGame);
             if (value is ImageResult image)
@@ -231,13 +234,14 @@ internal sealed partial class Server(
         }
         catch (Exception e)
         {
-            var noInput = e.Message.Contains("no input sent", StringComparison.OrdinalIgnoreCase);
+            var noInput = e is FocusRefusedException;
             // Read-only annotated helpers never dispatch native commands or write files, so their failures are inspections.
-            var readOnly = Tools.FirstOrDefault(t => t.Name == name)?.Annotations?.ReadOnlyHint == true;
+            var readOnly = ToolIndex.GetValueOrDefault(name)?.Annotations?.ReadOnlyHint == true;
             var safeInspection = passedPreflight && (noInput || readOnly || WorkflowSafeInspection(name, args) || name is "editor_search_tools" or "editor_trigger_list" or "editor_players" or "editor_player_dependency_audit"
                 || (name is "editor_set_diplomacy" or "editor_player_settings") && args.GetProperty("operation").GetString() != "apply"
                 || (name is "editor_trigger_edit" or "editor_stage_ai")
                     && (!args.TryGetProperty("preview", out var preview) || preview.GetBoolean()));
+            var unknown = passedPreflight && !safeInspection;
             var failure = e is WorkflowFailure known ? known.Details
                 : e is BridgeRefusal refusal && SingleCommandTool(name) ? RefusalDetails(refusal, name)
                 : new
@@ -252,9 +256,9 @@ internal sealed partial class Server(
                 },
                 phase = noInput ? "focus" : safeInspection ? "inspect/preview" : passedPreflight ? "unknown" : "preflight",
                 message = e.Message,
-                nativeDispatched = (bool?)(passedPreflight && !safeInspection ? null : false),
-                outcomeUnknown = (bool?)(passedPreflight && !safeInspection ? null : false),
-                retrySafe = !passedPreflight || safeInspection,
+                nativeDispatched = (bool?)(unknown ? null : false),
+                outcomeUnknown = (bool?)(unknown ? null : false),
+                retrySafe = !unknown,
                 stagingPath = (string?)null,
                 destinationPath = (string?)null,
                 nextAction = noInput ? "Bring editor window foreground manually; no input sent. Inspect state before proceeding."
@@ -303,7 +307,7 @@ internal sealed partial class Server(
             Thread.Sleep(Int(step, "delayMs", 0));
             var name = String(step, "name");
             var a = step.TryGetProperty("arguments", out var arguments) ? arguments : Empty;
-            var result = Call(name, a, game);
+            var result = Call(name, a, game, preflighted: true);
             failed = result.IsError == true;
             results.Add(new
             {
@@ -409,7 +413,7 @@ internal sealed partial class Server(
     {
         if (name.StartsWith("editor_", StringComparison.Ordinal) && Catalog.RemovedCommand(name[7..]))
             throw new ArgumentException("Native loadScenario tool removed after game crash. Use editor Load Scenario UI.");
-        var spec = Tools.FirstOrDefault(t => t.Name == name)
+        var spec = ToolIndex.GetValueOrDefault(name)
             ?? throw new ArgumentException($"Unknown or unexposed tool: {name}. Use editor_toolset mode=full or --toolset full for expanded surface.");
         ValidateSchema(args, spec.InputSchema);
         if (name == "editor_search_tools")
@@ -419,7 +423,15 @@ internal sealed partial class Server(
                 throw new ArgumentException("query must be nonblank and at most 256 characters.");
         }
         if (name == "editor_key")
-            _ = Ui.VirtualKey(String(args, "key")); // Unknown key names refuse before focus/input.
+        {
+            var key = String(args, "key");
+            _ = Ui.VirtualKey(key); // Unknown key names refuse before focus/input.
+            var mods = KeyModifiers(args);
+            var dataLoss = (key.Equals("F4", StringComparison.OrdinalIgnoreCase) && mods.Contains("ALT", StringComparer.OrdinalIgnoreCase))
+                || (DataLossKeys.Contains(key, StringComparer.OrdinalIgnoreCase) && mods.Contains("CTRL", StringComparer.OrdinalIgnoreCase));
+            if (dataLoss && (!args.TryGetProperty("confirmDestructive", out var confirmed) || confirmed.ValueKind != JsonValueKind.True))
+                throw new ArgumentException("New/load/save/close hotkey requires confirmDestructive=true.");
+        }
         if (name == "editor_map_info" && args.TryGetProperty("planeY", out _) && !args.TryGetProperty("screen", out _))
             throw new ArgumentException("planeY requires screen coordinates.");
         if (name.StartsWith("editor_", StringComparison.Ordinal)
@@ -446,6 +458,10 @@ internal sealed partial class Server(
             _ = ScenarioChecks.LoadController(path.GetString()!, out _);
     }
 
+    static string[] KeyModifiers(JsonElement args) =>
+        args.TryGetProperty("modifiers", out var m) ? m.EnumerateArray().Select(v => v.GetString() ?? "").ToArray() : [];
+
+    // Invoke runs only after Preflight: schema, confirmations and argument checks are not repeated here.
     object Invoke(string name, JsonElement args, Game? batchGame = null)
     {
         if (WorkflowNames.Contains(name)) return InvokeWorkflow(name, args);
@@ -503,18 +519,11 @@ internal sealed partial class Server(
         if (name == "editor_dependencies")
             return (_gameData ??= new GameDataCatalog()).Dependencies(exe, _layout.ExeSha256, args);
         if (GameDataCatalog.ToolKinds.TryGetValue(name, out var kind))
-        {
-            ValidateSchema(args, Tools.First(t => t.Name == name).InputSchema);
             return (_gameData ??= new GameDataCatalog()).Query(exe, _layout.ExeSha256, kind, args);
-        }
         if (name == "editor_xs_api")
-        {
-            Catalog.ValidateObject(args, ["name", "filter", "kind", "context", "library", "includeLocal", "offset", "limit"]);
             return (_xsApi ??= XsApi.Load(exe)).Query(args);
-        }
         if (name == "editor_generate_catalog")
         {
-            Catalog.ValidateObject(args, ["force"]);
             var output = Generator.DefaultOutput();
             var force = args.TryGetProperty("force", out var f) && f.GetBoolean();
             var hadUi = Directory.Exists(Path.Combine(output, "ui"));
@@ -527,14 +536,12 @@ internal sealed partial class Server(
         }
         if (name == "editor_pantheon")
         {
-            Catalog.ValidateObject(args, ["pantheon", "culture"]);
             var pantheon = args.TryGetProperty("pantheon", out var pv) ? pv.GetString() : args.TryGetProperty("culture", out var cv) ? cv.GetString() : null;
             return (_gameData ??= new GameDataCatalog()).Lookup(exe, _layout.ExeSha256,
                 pantheon ?? throw new ArgumentException("Missing required argument 'pantheon' (alias 'culture'), e.g. greeks."));
         }
         if (name == "editor_catalog")
         {
-            Catalog.ValidateObject(args, ["filter"]);
             var filter = String(args, "filter", "");
             return new
             {
@@ -551,13 +558,10 @@ internal sealed partial class Server(
         }
         if (name is "editor_units" or "editor_inspect_selection" or "editor_map_info" or "editor_validate_scenario")
         {
-            ValidateSchema(args, Tools.First(t => t.Name == name).InputSchema);
             if ((name is "editor_units" or "editor_inspect_selection" or "editor_validate_scenario" && _layout.Units is null)
                 || (name == "editor_inspect_selection" && _layout.Selection is null)
                 || (name == "editor_map_info" && _layout.Map is null))
                 throw new InvalidDataException("Live read layout unavailable for this build. Passive review required; offsets are never guessed.");
-            if (name == "editor_map_info" && args.TryGetProperty("planeY", out _) && !args.TryGetProperty("screen", out _))
-                throw new ArgumentException("planeY requires screen coordinates.");
             using var connected = batchGame is null ? new Game(exe, _layout, pid) : null;
             var live = batchGame ?? connected!;
             return name switch
@@ -570,7 +574,6 @@ internal sealed partial class Server(
         }
         if (name == "editor_status")
         {
-            Catalog.ValidateObject(args, []);
             try
             {
                 using var connected = batchGame is null ? new Game(exe, _layout, pid) : null;
@@ -603,14 +606,12 @@ internal sealed partial class Server(
                 _bridge.Execute(game, Catalog.Build(_catalog.Commands[command], a)));
         if (name == "editor_focus")
         {
-            Catalog.ValidateObject(args, []);
             game.Focus();
             return game.State();
         }
         if (name == "editor_ui_read") return UiRead.Query(game, args, _layout.ExeSha256);
         if (name == "editor_screenshot")
         {
-            Catalog.ValidateObject(args, ["maxWidth", "region", "scale", "resolutionScale"]);
             // Host default 1280 px is half the tested 2560-wide client; region uses full-resolution pixels.
             var region = args.TryGetProperty("region", out var rect) ? rect.EnumerateArray().Select(n => n.GetInt32()).ToArray() : null;
             var resolutionScale = args.TryGetProperty("resolutionScale", out var rs) ? rs.GetDouble() : 1;
@@ -618,20 +619,17 @@ internal sealed partial class Server(
         }
         if (name == "editor_mouse_move")
         {
-            Catalog.ValidateObject(args, ["x", "y"]);
             game.Move(Int(args, "x"), Int(args, "y"));
             Thread.Sleep(120); // Host pointer/frame settle interval from live hover tests, not engine guarantee.
             return game.State();
         }
         if (name == "editor_mouse_click")
         {
-            Catalog.ValidateObject(args, ["x", "y", "button"]);
             Ui.Click(game, Int(args, "x"), Int(args, "y"), String(args, "button", "left"));
             return new { inputSent = true, semanticSuccessVerified = false };
         }
         if (name == "editor_mouse_drag")
         {
-            Catalog.ValidateObject(args, ["x1", "y1", "x2", "y2", "durationMs"]);
             Ui.Drag(
                 game,
                 Int(args, "x1"),
@@ -644,42 +642,16 @@ internal sealed partial class Server(
         }
         if (name == "editor_mouse_wheel")
         {
-            Catalog.ValidateObject(args, ["steps"]);
             Ui.Wheel(game, Int(args, "steps"));
             return new { inputSent = true };
         }
         if (name == "editor_key")
         {
-            Catalog.ValidateObject(args, ["key", "modifiers", "confirmDestructive"]);
-            var mods = args.TryGetProperty("modifiers", out var m)
-                ? m.EnumerateArray().Select(v => v.GetString() ?? "").ToArray()
-                : [];
-            var key = String(args, "key");
-            var dataLoss =
-                (
-                    key.Equals("F4", StringComparison.OrdinalIgnoreCase)
-                    && mods.Contains("ALT", StringComparer.OrdinalIgnoreCase)
-                )
-                || (
-                    DataLossKeys.Contains(key, StringComparer.OrdinalIgnoreCase)
-                    && mods.Contains("CTRL", StringComparer.OrdinalIgnoreCase)
-                );
-            if (
-                dataLoss
-                && (
-                    !args.TryGetProperty("confirmDestructive", out var confirmed)
-                    || confirmed.ValueKind != JsonValueKind.True
-                )
-            )
-                throw new ArgumentException(
-                    "New/load/save/close hotkey requires confirmDestructive=true."
-                );
-            Ui.Press(game, key, mods);
+            Ui.Press(game, String(args, "key"), KeyModifiers(args)); // Data-loss hotkey confirmation checked in Preflight.
             return new { inputSent = true, semanticSuccessVerified = false };
         }
         if (name == "editor_text")
         {
-            Catalog.ValidateObject(args, ["text"]);
             Ui.Text(game, String(args, "text"));
             return new { inputSent = true };
         }
@@ -699,23 +671,13 @@ internal sealed partial class Server(
             name.StartsWith("action_", StringComparison.Ordinal)
             && _catalog.Actions.TryGetValue(name[7..], out var action)
         )
-        {
-            Catalog.ValidateObject(args, ["confirmDestructive"]);
-            if (
-                !args.TryGetProperty("confirmDestructive", out var c)
-                || c.ValueKind != JsonValueKind.True
-            )
-                throw new ArgumentException(
-                    "Shipped UI actions can change/discard data. confirmDestructive=true required; inspect action description and dialog state first."
-                );
-            return _bridge.Execute(game, action.Script);
-        }
+            return _bridge.Execute(game, action.Script); // Schema requires confirmDestructive=true (const) in Preflight.
         throw new ArgumentException("Unknown tool. Use tools/list or editor_catalog.");
     }
 
+    /// <summary>Single placement; callers pass schema-checked args (Preflight or Formations' own constructed points).</summary>
     object Place(Game game, JsonElement args)
     {
-        Catalog.ValidateObject(args, ["proto", "player", "x", "y"]);
         var proto = String(args, "proto");
         // Host default player 1; editor slot 0=Gaia, 1..12=players (same bound as Catalog.Build).
         var player = Int(args, "player", 1);
@@ -731,6 +693,7 @@ internal sealed partial class Server(
         if (x < 0 || y < 0 || x >= rect.Right || y >= rect.Bottom)
             throw new ArgumentException("Placement point outside client.");
         var steps = new List<object>();
+        var failed = false;
         try
         {
             // Native command/mode names from embedded help + shipped editor.con; verified cursor cleanup.
@@ -770,17 +733,27 @@ internal sealed partial class Server(
                 note = "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved.",
             };
         }
+        catch
+        {
+            failed = true;
+            throw;
+        }
         finally
         {
-            _bridge.Execute(game, "uiClearCursor()");
-            _bridge.Execute(game, "editMode(\"None\")");
-            WaitSelection(game, clear: true, player);
-            // PlaceUnit → editMode("None") lands in PlaceUnitSelect (27) with the palette still open; a second call reaches 0.
-            if (_layout.World is not null && WaitMode(game, m => m == 0, 300) != 0)
+            // Cleanup failure must not mask the original error; after success it still surfaces.
+            try
             {
+                _bridge.Execute(game, "uiClearCursor()");
                 _bridge.Execute(game, "editMode(\"None\")");
-                WaitMode(game, m => m == 0, 600);
+                WaitSelection(game, clear: true, player);
+                // PlaceUnit → editMode("None") lands in PlaceUnitSelect (27) with the palette still open; a second call reaches 0.
+                if (_layout.World is not null && WaitMode(game, m => m == 0, 300) != 0)
+                {
+                    _bridge.Execute(game, "editMode(\"None\")");
+                    WaitMode(game, m => m == 0, 600);
+                }
             }
+            catch when (failed) { }
         }
     }
 

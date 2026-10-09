@@ -128,8 +128,8 @@ internal static class TriggerObjects
     internal static byte[] ReplaceElements(CampaignTriggers.Document doc, CampaignTriggers.Trigger trigger, byte[][] conditions, byte[][] effects)
     {
         ValidateGroups(doc);
-        if (conditions.Length is < 1 or > CampaignTriggers.MaxItems || effects.Length is < 1 or > CampaignTriggers.MaxItems)
-            throw new ArgumentException("At least one condition/effect required within reviewed count bound.");
+        if (conditions.Length > CampaignTriggers.MaxItems || effects.Length is < 1 or > CampaignTriggers.MaxItems)
+            throw new ArgumentException("At least one effect required; conditions/effects within reviewed count bound.");
         var countOffset = (trigger.Conditions.Length > 0 ? trigger.Conditions[0].Start : trigger.EffectsCountOffset) - 4;
         using var record = new MemoryStream(); record.Write(doc.Body.AsSpan(trigger.Start, countOffset - trigger.Start));
         record.Write(BitConverter.GetBytes(conditions.Length)); foreach (var c in conditions) record.Write(c);

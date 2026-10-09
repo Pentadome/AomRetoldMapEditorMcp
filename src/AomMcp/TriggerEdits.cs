@@ -125,8 +125,9 @@ internal static class TriggerEdits
         if (arg.Values[0] != before) throw new ArgumentException("Parameter expected value differs from source.");
         if (numeric)
         {
-            if (!double.TryParse(before, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _)
-                || !double.TryParse(after, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _))
+            if (!double.TryParse(before, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var oldNumber)
+                || !double.TryParse(after, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var newNumber)
+                || !double.IsFinite(oldNumber) || !double.IsFinite(newNumber))
                 throw new ArgumentException("Numeric parameter precondition/value invalid.");
             if (key.Equals("EventID", StringComparison.OrdinalIgnoreCase) && (!int.TryParse(after, out var eventId) || eventId < 0)
                 || (key.Equals("Player", StringComparison.OrdinalIgnoreCase) || key.EndsWith("PlayerID", StringComparison.OrdinalIgnoreCase))
@@ -207,8 +208,7 @@ internal static class TriggerEdits
         if (trigger.Effects.Length - removed.Count + dupEffects.Length < 1)
             throw new ArgumentException("At least one effect must remain in edited trigger.");
         if (trigger.Effects.Length - removed.Count + dupEffects.Length > CampaignTriggers.MaxItems
-            || trigger.Conditions.Length - removedConditions.Count + dupConditions.Length > CampaignTriggers.MaxItems
-            || trigger.Conditions.Length - removedConditions.Count + dupConditions.Length < 1)
+            || trigger.Conditions.Length - removedConditions.Count + dupConditions.Length > CampaignTriggers.MaxItems)
             throw new ArgumentException("Edited condition/effect count exceeds reviewed bound.");
         if (removed.Count > 0 || dupEffects.Length > 0)
             edits.Add(new(Local(trigger.EffectsCountOffset), 4, BitConverter.GetBytes(trigger.Effects.Length - removed.Count + dupEffects.Length)));

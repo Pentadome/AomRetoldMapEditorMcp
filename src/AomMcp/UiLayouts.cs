@@ -29,6 +29,11 @@ internal static class UiLayouts
 
     internal static bool IsSupported(int width, int height) => IsReviewed(width, height) || IsDerivable(width, height);
 
+    /// <summary>Executable hash equals the buildHash pinned in a reviewed 2560×1440 layout (either UI).</summary>
+    internal static bool BuildMatches(string exeSha256) => ((string[])["alt", "normal"]).Any(kind =>
+        Load(kind, 2560, 1440)?.Root.TryGetProperty("buildHash", out var hash) == true
+        && string.Equals(exeSha256, hash.GetString(), StringComparison.OrdinalIgnoreCase));
+
     internal static string Alt(int width, int height) => $"alt-{width}x{height}.json";
     internal static string Normal(int width, int height) => $"normal-en-{width}x{height}.json";
     internal static string File(string kind, int width, int height) => kind == "normal" ? Normal(width, height) : Alt(width, height);

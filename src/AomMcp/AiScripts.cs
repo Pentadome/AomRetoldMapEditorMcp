@@ -31,15 +31,14 @@ internal static class AiScripts
                 startAttacking = false, includeChecks = Array.Empty<object>() };
         var name = Relative(relative, appendExtension: true);
         var path = Contained(root, name);
-        if (!path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException("AI personality escaped installed game AI root.");
         if (!File.Exists(path))
             return new { aiPath = relative, installedAiRoot = root, resolved = false,
                 reason = "Personality not found in INSTALLPATH\\game\\ai. Active-profile Games\\Age of Mythology Retold\\<id>\\ai did NOT work; triggers go in active-profile trigger directory.",
                 waveStrategy = false, startAttacking = false, includeChecks = Array.Empty<object>() };
         var info = new FileInfo(path);
         if (info.Length > 1_000_000) throw new InvalidDataException("XS file exceeds read-only host bound.");
-        var text = File.ReadAllText(path, Encoding.UTF8);
+        var bytes = File.ReadAllBytes(path);
+        string text; using (var reader = new StreamReader(new MemoryStream(bytes), Encoding.UTF8)) text = reader.ReadToEnd();
         var checks = new List<object>();
         foreach (var line in text.Split('\n').Where(l => l.TrimStart().StartsWith("include ", StringComparison.Ordinal)).Take(100))
         {
@@ -55,6 +54,6 @@ internal static class AiScripts
         return new { aiPath = relative, installedAiRoot = root, resolved = true, reason = "Source present; XS compilation/runtime effect NOT verified.",
             waveStrategy = text.Contains("AttackWave", StringComparison.Ordinal) && text.Contains("scenarioAttackWaveStrategy", StringComparison.Ordinal),
             startAttacking = text.Contains("startAttacking", StringComparison.Ordinal), includeChecks = checks.ToArray(),
-            sha256 = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path))) };
+            sha256 = Convert.ToHexStringLower(SHA256.HashData(bytes)) };
     }
 }

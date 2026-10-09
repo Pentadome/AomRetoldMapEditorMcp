@@ -66,8 +66,6 @@ internal static class RuntimeReport
             || args.GetProperty("expectedSha256").GetString() is not { Length: 64 } sha || !sha.All(Uri.IsHexDigit)) throw new ArgumentException("Evidence hash, run and own player required.");
         var min = args.GetProperty("minGameTime").GetInt32(); var max = args.GetProperty("maxGameTime").GetInt32();
         if (min < 0 || max < min || max > 864_000) throw new ArgumentException("Explicit fresh game-time window invalid.");
-        if (args.TryGetProperty("maxAgeSeconds", out var age) && age.GetInt32() is < 1 or > 3600 || args.TryGetProperty("offset", out var o) && o.GetInt32() < 0
-            || args.TryGetProperty("limit", out var l) && l.GetInt32() is < 1 or > 200) throw new ArgumentException("Evidence age/paging bounds invalid.");
         var rules = args.GetProperty("assertions"); if (rules.ValueKind != JsonValueKind.Array || rules.GetArrayLength() is < 1 or > 200) throw new ArgumentException("assertions requires 1..200 checks.");
         _ = Time(args, "runStartedAtUtc"); _ = Time(args, "capturedAtUtc");
         foreach (var r in rules.EnumerateArray())

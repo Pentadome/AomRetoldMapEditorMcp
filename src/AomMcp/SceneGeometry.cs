@@ -139,9 +139,6 @@ internal static class SceneGeometry
             c.Min, c.Max, c.Max - c.Min)).ToArray();
     }
 
-    /// <summary>Gate check helper: counts sample points within per-channel tolerance.</summary>
-    internal static int GateMatches(ScreenProbe.Frame frame, JsonElement gate, int tolerance) => GateMatches(frame, gate, tolerance, 0);
-
     /// <summary>Gate points matching within tolerance at the exact frame pixel, or (radius &gt; 0, derived layouts) any pixel of the clamped neighborhood.</summary>
     internal static int GateMatches(ScreenProbe.Frame frame, JsonElement gate, int tolerance, int radius) =>
         gate.EnumerateArray().Count(p =>

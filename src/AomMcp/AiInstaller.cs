@@ -8,8 +8,8 @@ namespace AomMcp;
 internal static partial class AiInstaller
 {
     const string Issuer = "AomMcp.editor_install_ai.v1";
-    internal sealed record Receipt(string Issuer, string DestinationPath, string InstalledSha256, string SourceSha256,
-        string? PreviousSha256, string StagingPath, string? BackupPath, DateTimeOffset AppliedUtc);
+    internal sealed record Receipt(string Issuer, string DestinationPath, string InstalledSha256,
+        string? PreviousSha256, string StagingPath, string? BackupPath, DateTimeOffset AppliedUtc, bool Forced = false);
     internal sealed record Include(string Path, string Sha256, int Bytes);
     [GeneratedRegex("^\\s*include\\s+\"([^\"\\r\\n]+)\"\\s*;?\\s*$", RegexOptions.CultureInvariant)]
     private static partial Regex IncludeLine();
@@ -17,7 +17,7 @@ internal static partial class AiInstaller
     static byte[] ReadXs(string path)
     {
         var info = new FileInfo(EditorFiles.LocalPath(path)); if (!info.Exists || info.Length is < 1 or > 1_000_000) throw new InvalidDataException("XS missing/empty/over 1 MB: " + path);
-        return File.ReadAllBytes(path);
+        return File.ReadAllBytes(info.FullName);
     }
     static string StripComments(string source)
     {
@@ -68,7 +68,7 @@ internal static partial class AiInstaller
     }
     internal static void Preflight(JsonElement args)
     {
-        Catalog.ValidateObject(args, ["sourcePath", "expectedSha256", "destination", "preview", "stagingPath", "receiptPath", "ownershipReceiptPath", "expectedReceiptSha256", "expectedInstalledSha256", "backupPath", "confirmWrite", "confirmDestructive"]);
+        Catalog.ValidateObject(args, ["sourcePath", "expectedSha256", "destination", "preview", "stagingPath", "receiptPath", "ownershipReceiptPath", "expectedReceiptSha256", "expectedInstalledSha256", "backupPath", "confirmWrite", "confirmDestructive", "force"]);
         _ = EditorFiles.LocalPath(args.GetProperty("sourcePath").GetString()!); _ = AiScripts.Relative(args.GetProperty("destination").GetString()!);
         _ = RequiredHash(args, "expectedSha256");
         if (!Preview(args))
@@ -81,9 +81,15 @@ internal static partial class AiInstaller
                 _ = EditorFiles.LocalPath(receipt.GetString()!); _ = RequiredHash(args, "expectedReceiptSha256"); _ = RequiredHash(args, "expectedInstalledSha256");
                 EditorFiles.Confirm(args, "confirmDestructive"); _ = EditorFiles.ApprovedNewPath(args.GetProperty("backupPath").GetString()!, ".xs");
             }
+            else if (Force(args))
+            {
+                _ = RequiredHash(args, "expectedInstalledSha256");
+                EditorFiles.Confirm(args, "confirmDestructive"); _ = EditorFiles.ApprovedNewPath(args.GetProperty("backupPath").GetString()!, ".xs");
+            }
         }
     }
     static bool Preview(JsonElement args) => !args.TryGetProperty("preview", out var p) || p.GetBoolean();
+    static bool Force(JsonElement args) => args.TryGetProperty("force", out var f) && f.GetBoolean();
     static void NewBytes(string path, byte[] bytes)
     {
         using (var file = new FileStream(EditorFiles.LocalPath(path), FileMode.CreateNew, FileAccess.Write, FileShare.None)) { file.Write(bytes); file.Flush(true); }
@@ -141,6 +147,19 @@ internal static partial class AiInstaller
             }
             File.WriteAllText(Path.Combine(managed, "unregistered.xs"), "// not owned\n");
             Refuse(() => Execute(Json(new Dictionary<string, object>(args) { ["destination"] = "unregistered.xs", ["expectedSha256"] = Layout.Hash(source) }), exe));
+            var unregistered = Path.Combine(managed, "unregistered.xs"); var unregisteredHash = Layout.Hash(unregistered);
+            var forced = new Dictionary<string, object>(args) { ["destination"] = "unregistered.xs", ["expectedSha256"] = Layout.Hash(source), ["force"] = true,
+                ["expectedInstalledSha256"] = unregisteredHash, ["stagingPath"] = Path.Combine(directory, "stage-forced.xs"),
+                ["backupPath"] = Path.Combine(directory, "backup-forced.xs"), ["receiptPath"] = Path.Combine(managed, ".receipts", "forced.json") };
+            Refuse(() => Execute(Json(forced), exe));
+            forced["confirmDestructive"] = true;
+            Refuse(() => Execute(Json(new Dictionary<string, object>(forced) { ["expectedInstalledSha256"] = new string('0', 64) }), exe));
+            Refuse(() => Execute(Json(new Dictionary<string, object>(forced) { ["ownershipReceiptPath"] = oldReceipt, ["expectedReceiptSha256"] = Layout.Hash(oldReceipt) }), exe));
+            Refuse(() => Execute(Json(new Dictionary<string, object>(forced) { ["destination"] = "absent.xs" }), exe));
+            _ = Execute(Json(forced), exe);
+            if (Layout.Hash((string)forced["backupPath"]) != unregisteredHash || Layout.Hash(unregistered) != Layout.Hash(source)
+                || JsonSerializer.Deserialize<Receipt>(File.ReadAllBytes((string)forced["receiptPath"])) is not { Forced: true } forcedReceipt || forcedReceipt.PreviousSha256 != unregisteredHash)
+                throw new InvalidOperationException("Forced update lost backup, bytes or forced receipt.");
             foreach (var unsafeName in new[] { "../stock.xs", "\\\\host\\file.xs", "C:\\stock.xs", "folder//name.xs", ".receipts/name.xs" })
                 Refuse(() => Execute(Json(new Dictionary<string, object>(args) { ["destination"] = unsafeName }), exe));
             Refuse(() => Includes(root, destination, Encoding.UTF8.GetBytes("include \"missing.xs\";\n")));
@@ -193,9 +212,21 @@ internal static partial class AiInstaller
         var dependencies = Includes(root, destination, source); var update = File.Exists(destination);
         if (Directory.Exists(destination)) throw new ArgumentException("Destination is directory.");
         string? oldHash = null, oldReceiptPath = null;
-        if (update)
+        var force = Force(args);
+        if (update && force)
         {
-            if (!args.TryGetProperty("ownershipReceiptPath", out var ownership)) throw new ArgumentException("Existing managed file lacks explicit ownership receipt; no update.");
+            // Explicit override for managed files without a matching receipt; the current bytes stay hash-pinned and backed up.
+            if (args.TryGetProperty("ownershipReceiptPath", out _) || args.TryGetProperty("expectedReceiptSha256", out _))
+                throw new ArgumentException("force skips the ownership receipt; omit ownershipReceiptPath/expectedReceiptSha256.");
+            _ = RequiredHash(args, "expectedInstalledSha256");
+            if (new FileInfo(destination).Length > 1_000_000) throw new InvalidDataException("Installed AI exceeds byte bound.");
+            oldHash = Layout.Hash(destination); CheckpointDocument.RequireHash(oldHash, args.GetProperty("expectedInstalledSha256").GetString());
+            if ((File.GetAttributes(destination) & FileAttributes.ReadOnly) != 0) throw new UnauthorizedAccessException("Managed AI destination is read-only.");
+            if (!Preview(args)) EditorFiles.Confirm(args, "confirmDestructive");
+        }
+        else if (update)
+        {
+            if (!args.TryGetProperty("ownershipReceiptPath", out var ownership)) throw new ArgumentException("Existing managed file lacks explicit ownership receipt; no update (force=true overrides).");
             _ = RequiredHash(args, "expectedReceiptSha256"); _ = RequiredHash(args, "expectedInstalledSha256");
             if (new FileInfo(destination).Length > 1_000_000) throw new InvalidDataException("Installed AI exceeds byte bound.");
             oldReceiptPath = EditorFiles.LocalPath(ownership.GetString()!);
@@ -204,11 +235,11 @@ internal static partial class AiInstaller
             var receipt = JsonSerializer.Deserialize<Receipt>(File.ReadAllBytes(oldReceiptPath)) ?? throw new InvalidDataException("Ownership receipt missing.");
             oldHash = Layout.Hash(destination); CheckpointDocument.RequireHash(oldHash, args.GetProperty("expectedInstalledSha256").GetString());
             if (receipt.Issuer != Issuer || !string.Equals(receipt.DestinationPath, destination, StringComparison.OrdinalIgnoreCase) || receipt.InstalledSha256 != oldHash)
-                throw new ArgumentException("Unregistered/changed personality; no update.");
+                throw new ArgumentException("Unregistered/changed personality; no update (force=true overrides).");
             if ((File.GetAttributes(destination) & FileAttributes.ReadOnly) != 0) throw new UnauthorizedAccessException("Managed AI destination is read-only.");
             if (!Preview(args)) EditorFiles.Confirm(args, "confirmDestructive");
         }
-        else if (args.TryGetProperty("ownershipReceiptPath", out _) || args.TryGetProperty("expectedInstalledSha256", out _)) throw new ArgumentException("Update assertions supplied for absent destination.");
+        else if (force || args.TryGetProperty("ownershipReceiptPath", out _) || args.TryGetProperty("expectedInstalledSha256", out _)) throw new ArgumentException("Update assertions supplied for absent destination.");
         string? staging = null, backup = null, receiptPath = null;
         if (args.TryGetProperty("stagingPath", out var stage)) staging = EditorFiles.ApprovedNewPath(stage.GetString()!, ".xs");
         if (args.TryGetProperty("backupPath", out var bp)) backup = EditorFiles.ApprovedNewPath(bp.GetString()!, ".xs");
@@ -222,7 +253,7 @@ internal static partial class AiInstaller
         var paths = new[] { sourcePath, destination, staging, backup, receiptPath }.Where(p => p is not null).Cast<string>().ToArray();
         if (paths.Distinct(StringComparer.OrdinalIgnoreCase).Count() != paths.Length) throw new ArgumentException("Installer paths must be distinct.");
         if (Preview(args)) return new { preview = true, sourcePath, sourceSha256 = sha, destinationPath = destination, aiPath = "aom_mcp\\" + relative,
-            update, expectedInstalledSha256 = oldHash, stagingPath = staging, backupPath = backup, receiptPath, includes = dependencies,
+            update, force, expectedInstalledSha256 = oldHash, stagingPath = staging, backupPath = backup, receiptPath, includes = dependencies,
             permissions = "No permission-probing writes performed; OS access checked during confirmed apply.", compilationVerified = false, runtimeVerified = false };
         if (staging is null || receiptPath is null || update && backup is null) throw new ArgumentException("Apply requires stagingPath/receiptPath; update also requires new backupPath.");
         var phase = "stage"; var writesStarted = false;
@@ -235,7 +266,7 @@ internal static partial class AiInstaller
             phase = "destination";
             if (update)
             {
-                CheckpointDocument.RequireHash(Layout.Hash(oldReceiptPath!), args.GetProperty("expectedReceiptSha256").GetString());
+                if (oldReceiptPath is not null) CheckpointDocument.RequireHash(Layout.Hash(oldReceiptPath), args.GetProperty("expectedReceiptSha256").GetString());
                 using var file = new FileStream(EditorFiles.LocalPath(destination), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
                 if (file.Length > 1_000_000) throw new InvalidDataException("Installed AI changed beyond byte bound.");
                 var old = new byte[(int)file.Length]; file.ReadExactly(old); CheckpointDocument.RequireHash(CheckpointDocument.Hash(old), oldHash);
@@ -252,7 +283,7 @@ internal static partial class AiInstaller
             }
             CheckpointDocument.RequireHash(Layout.Hash(EditorFiles.LocalPath(destination)), sha); testFault?.Invoke("destination-written");
             phase = "receipt"; _ = EditorFiles.LocalPath(receiptPath); Directory.CreateDirectory(Path.GetDirectoryName(receiptPath)!);
-            var receipt = new Receipt(Issuer, destination, sha, sha, oldHash, staging, backup, DateTimeOffset.UtcNow);
+            var receipt = new Receipt(Issuer, destination, sha, oldHash, staging, backup, DateTimeOffset.UtcNow, update && force);
             NewBytes(receiptPath, JsonSerializer.SerializeToUtf8Bytes(receipt)); testFault?.Invoke("receipt-written");
             var verified = JsonSerializer.Deserialize<Receipt>(File.ReadAllBytes(receiptPath));
             if (verified != receipt) throw new IOException("Receipt semantic readback mismatch.");

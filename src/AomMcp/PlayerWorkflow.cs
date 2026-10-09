@@ -183,6 +183,16 @@ internal static class PlayerWorkflow
         _ = EditorFiles.ProfileDirectory(ProfileArgs(args.GetProperty("triggerProfileDirectory").GetString()!), "trigger");
     }
 
+    /// <summary>Legacy oneWay/mutual arguments as directed matrix changes (already precondition-checked by Diplomacy).</summary>
+    static StanceChange[] LegacyChanges(JsonElement args)
+    {
+        var from = args.GetProperty("player").GetInt32(); var to = args.GetProperty("target").GetInt32();
+        var forward = new StanceChange(from, to, args.GetProperty("expectedStance").GetInt32(), args.GetProperty("desiredStance").GetInt32());
+        return args.GetProperty("direction").GetString() == "mutual"
+            ? [forward, new(to, from, args.GetProperty("expectedReverseStance").GetInt32(), args.GetProperty("desiredReverseStance").GetInt32())]
+            : [forward];
+    }
+
     static JsonElement ProfileArgs(string directory) => JsonSerializer.SerializeToElement(new { profileDirectory = directory });
     static int NextStance(int stance) => stance switch
     {
@@ -213,84 +223,9 @@ internal static class PlayerWorkflow
 
     internal static object Apply(Game game, JsonElement args, string exe, Action<string, JsonElement> native)
     {
-        if (args.TryGetProperty("changes", out _)) return ApplyMatrix(game, args, exe, native);
         PreflightApply(args, exe);
         var source = ScenarioReader.Read(args.GetProperty("scenarioPath").GetString()!);
-        var from = args.GetProperty("player").GetInt32(); var to = args.GetProperty("target").GetInt32();
-        var directions = new List<(int From, int To, int Old, int Desired)>
-        {
-            (from, to, args.GetProperty("expectedStance").GetInt32(), args.GetProperty("desiredStance").GetInt32()),
-        };
-        if (args.GetProperty("direction").GetString() == "mutual")
-            directions.Add((to, from, args.GetProperty("expectedReverseStance").GetInt32(), args.GetProperty("desiredReverseStance").GetInt32()));
-        var backupScenario = EditorFiles.ApprovedNewPath(args.GetProperty("backupScenarioPath").GetString()!, ".mythscn");
-        var backupTrigger = EditorFiles.ApprovedNewPath(args.GetProperty("backupTriggerPath").GetString()!, ".trg");
-        var verifyDir = Path.GetDirectoryName(EditorFiles.LocalPath(Path.Combine(args.GetProperty("verificationDirectory").GetString()!, "aom-verify-probe.mythscn")))!;
-        var scenarioProfile = args.GetProperty("scenarioProfileDirectory").GetString()!;
-        var triggerProfile = args.GetProperty("triggerProfileDirectory").GetString()!;
-        game.Focus();
-        var uiKind = ScreenProbe.DiplomacyUi(ScreenProbe.Capture(game));
-        ScreenProbe.RequireCell(ScreenProbe.Capture(game), from, to, directions[0].Old);
-        var backupSaved = EditorFiles.Checkpoint(game,
-            JsonSerializer.SerializeToElement(new { path = backupScenario, profileDirectory = scenarioProfile, confirmWrite = true }), native);
-        _ = backupSaved;
-        _ = EditorFiles.Triggers(game,
-            JsonSerializer.SerializeToElement(new { operation = "export", path = backupTrigger, profileDirectory = triggerProfile, confirmWrite = true }), native);
-        var baseline = ScenarioReader.Read(backupScenario);
-        if (baseline.Players.Length != source.Players.Length || baseline.Players[0].Diplomacy.Length != source.Players[0].Diplomacy.Length)
-            throw new WorkflowFailure("PLAYER_SCENE_CHANGED", "backup", "Backup player/stance count differs from source; no UI input.", true, false,
-                "Inspect backup/scene before preparing another change.", backupScenario, backupTrigger);
-        var expected = new int[baseline.Players.Length, baseline.Players[0].Diplomacy.Length];
-        for (var i = 0; i < baseline.Players.Length; i++)
-            for (var j = 0; j < baseline.Players[i].Diplomacy.Length; j++) expected[i, j] = source.Players[i].Diplomacy[j];
-        Compare(source, baseline, expected, backupScenario, backupScenario);
-        var checkpoints = new List<string>();
-        var clicked = false;
-        string? latest = null;
-        try
-        {
-            foreach (var (owner, target, old, desired) in directions)
-            {
-                var state = old;
-                var attempts = 0;
-                while (state != desired)
-                {
-                    if (++attempts > 2) throw new InvalidDataException("Diplomacy transition exceeded two reviewed clicks.");
-                    ScreenProbe.RequireCell(ScreenProbe.Capture(game), owner, target, state);
-                    var next = NextStance(state);
-                    var (x, y) = ScreenProbe.Cell(owner, target);
-                    clicked = true; // Input outcome becomes uncertain from this point onward.
-                    var (cx, cy) = ScreenProbe.CellClient(game, x, y);
-                    Ui.Click(game, cx, cy, "left");
-                    Thread.Sleep(180);
-                    ScreenProbe.RequireCell(ScreenProbe.Capture(game), owner, target, next);
-                    latest = EditorFiles.ApprovedNewPath(Path.Combine(verifyDir,
-                        "aom-player-verify-" + Guid.NewGuid().ToString("N", System.Globalization.CultureInfo.InvariantCulture) + ".mythscn"), ".mythscn");
-                    _ = EditorFiles.Checkpoint(game,
-                        JsonSerializer.SerializeToElement(new { path = latest, profileDirectory = scenarioProfile, confirmWrite = true }), native);
-                    checkpoints.Add(latest);
-                    expected[owner, target] = next;
-                    Compare(source, ScenarioReader.Read(latest), expected, backupScenario, latest);
-                    state = next;
-                }
-            }
-            return new { verified = true, uiKind, backupScenarioPath = backupScenario, backupTriggerPath = backupTrigger,
-                checkpoints, finalCheckpointPath = latest, requestedDirections = directions.Count,
-                limitation = "Verified game-written directional P6 fields after each click; no .mythscn edit. AI path/XS runtime, other scene state and scenario reload NOT proven. Backups retained." };
-        }
-        catch (Exception e)
-        {
-            throw new WorkflowFailure(clicked ? "PLAYER_UI_OUTCOME_UNKNOWN" : "PLAYER_UI_REFUSED", clicked ? "input/verify" : "ui-observe",
-                e.Message, clicked, clicked, "STOP. Inspect latest checkpoint/game UI and backups; no retry, rollback or extra click.",
-                backupScenario, latest ?? backupTrigger, e);
-        }
-    }
-
-    static object ApplyMatrix(Game game, JsonElement args, string exe, Action<string, JsonElement> native)
-    {
-        PreflightApply(args, exe);
-        var source = ScenarioReader.Read(args.GetProperty("scenarioPath").GetString()!);
-        var changes = Matrix(args, source);
+        var changes = args.TryGetProperty("changes", out _) ? Matrix(args, source) : LegacyChanges(args);
         var backupScenario = EditorFiles.ApprovedNewPath(args.GetProperty("backupScenarioPath").GetString()!, ".mythscn");
         var backupTrigger = EditorFiles.ApprovedNewPath(args.GetProperty("backupTriggerPath").GetString()!, ".trg");
         var verifyDir = Path.GetDirectoryName(EditorFiles.LocalPath(Path.Combine(args.GetProperty("verificationDirectory").GetString()!, "aom-verify-probe.mythscn")))!;
