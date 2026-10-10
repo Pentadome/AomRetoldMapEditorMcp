@@ -798,6 +798,23 @@ try:
     for args in [{'name': 'AOM_NO_SUCH_WINDOW'}, {'ui': 'bogus'}, {'limit': 0}, {'limit': 201}, {'offset': -1},
                  {'filter': 42}, {'unexpected': True}]:
         assert tool('editor_dialogs', args)['isError'], args
+    # Live dialog tools: schema/annotations and preflight refusals before any game connection.
+    state_spec = next(t for t in tools if t['name'] == 'editor_dialog_state')
+    act_spec = next(t for t in tools if t['name'] == 'editor_dialog_act')
+    assert state_spec['annotations']['readOnlyHint'] and act_spec['inputSchema']['required'] == ['gadget', 'action']
+    assert act_spec['inputSchema']['properties']['action']['enum'] == ['open', 'close', 'press', 'click', 'setText', 'toggle', 'select']
+    for args, message in [({'gadget': 'NewScenarioGadget', 'action': 'press'}, 'requires control'),
+                          ({'gadget': 'NewScenarioGadget', 'action': 'select', 'control': 'x'}, 'requires item'),
+                          ({'gadget': 'NewScenarioGadget', 'action': 'setText', 'control': 'Seed'}, 'requires text'),
+                          ({'gadget': 'NewScenarioGadget', 'action': 'setText', 'control': 'Seed', 'text': '42'}, 'confirmDestructive'),
+                          ({'gadget': 'NewScenarioGadget', 'action': 'setText', 'control': 'Seed', 'text': 'ab', 'confirmDestructive': True}, 'control characters'),
+                          ({'gadget': 'VictoryConditionsGadget', 'action': 'toggle', 'control': 'x'}, 'confirmDestructive'),
+                          ({'gadget': 'G', 'action': 'bogus'}, ''), ({'action': 'open'}, ''), ({'gadget': 'G', 'action': 'open', 'timeout': 1}, '')]:
+        refused = tool('editor_dialog_act', args)
+        assert refused['isError'] and message in str(refused) and 'Process with an Id' not in str(refused), (args, refused)
+    for args in [{'limit': 0}, {'limit': 201}, {'offset': -1}, {'read': 'yes'}, {'unexpected': True}]:
+        refused = tool('editor_dialog_state', args)
+        assert refused['isError'] and 'Process with an Id' not in str(refused), (args, refused)
     dialog_batch = tool('editor_batch', {'steps': [
         {'name': 'editor_dialogs', 'arguments': {'name': 'VictoryConditionsGadget', 'ui': 'normal'}},
         {'name': 'editor_pantheon', 'arguments': {'pantheon': 'Greeks'}}]})
@@ -951,7 +968,8 @@ try:
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
     expected_core = (helper_names - workflow_names) | core_native
-    assert len(expected_core) == 76 and len(names) == 926
+    assert len(expected_core) == 78 and len(names) == 928
+    assert {'editor_dialog_state', 'editor_dialog_act'} <= expected_core
     world_tools = {'editor_terrain_info', 'editor_live_players', 'editor_edit_mode', 'editor_paint_world', 'editor_elevation',
                    'editor_transform_unit', 'editor_terrain_catalog', 'editor_camera_frame', 'editor_overview',
                    'editor_resource_balance', 'editor_mirror_units', 'editor_scatter'}

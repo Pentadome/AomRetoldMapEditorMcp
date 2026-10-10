@@ -500,6 +500,7 @@ internal sealed partial class Server(
         PreflightWorkflow(name, args);
         PreflightScene(name, args);
         PreflightWorld(name, args);
+        PreflightDialog(name, args);
         if (name == "editor_set_diplomacy" && args.GetProperty("operation").GetString() == "apply")
             PlayerWorkflow.PreflightApply(args, exe);
         if (name == "editor_player_settings" && args.GetProperty("operation").GetString() == "apply")
@@ -523,6 +524,7 @@ internal sealed partial class Server(
         if (WorkflowNames.Contains(name)) return InvokeWorkflow(name, args);
         if (SceneNames.Contains(name)) return InvokeScene(name, args, batchGame);
         if (WorldNames.Contains(name)) return InvokeWorld(name, args, batchGame);
+        if (DialogNames.Contains(name)) return InvokeDialog(name, args, batchGame);
         if (name == "editor_search_tools") return SearchTools(args);
         if (name == "editor_toolset")
         {
@@ -1395,5 +1397,7 @@ internal sealed partial class Server(
             yield return scene;
         foreach (var world in WorldExtras())
             yield return world;
+        foreach (var dialog in DialogExtras())
+            yield return dialog;
     }
 }

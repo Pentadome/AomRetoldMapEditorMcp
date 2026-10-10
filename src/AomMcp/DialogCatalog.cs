@@ -109,6 +109,23 @@ internal sealed class DialogCatalog
 
     DialogCatalog(DialogFile file) => _file = file;
 
+    /// <summary>All decoded windows (both UI kinds), for live dialog state/actions.</summary>
+    internal IReadOnlyList<DialogWindow> AllWindows => _file.Windows;
+
+    /// <summary>"fresh" or "stale" for the installed executable/UI archives (never throws on staleness).</summary>
+    internal string Freshness(string exe, string hash)
+    {
+        try
+        {
+            CheckFresh(exe, hash);
+            return "fresh";
+        }
+        catch (WorkflowFailure)
+        {
+            return "stale";
+        }
+    }
+
     /// <summary>Loads generated dialog metadata without connecting to the game.</summary>
     /// <exception cref="FileNotFoundException">Dialog metadata has not been generated.</exception>
     internal static DialogCatalog Load()

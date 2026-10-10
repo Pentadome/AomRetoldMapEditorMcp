@@ -84,6 +84,7 @@ if (selfTest)
 {
     Catalog.SelfTest();
     DialogCatalog.SelfTest();
+    DialogState.SelfTest();
     Ui.SelfTest();
     Server.OverviewSelfTest();
     ScreenProbe.SelfTest();

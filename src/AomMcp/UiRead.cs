@@ -164,6 +164,15 @@ internal static class UiRead
         var capture = Ui.CapturePixels(game, 2560);
         if (!UiLayouts.IsSupported(capture.Width, capture.Height))
             throw new WorkflowFailure("UI_LAYOUT_MISMATCH", "ui-observe", $"Unsupported UI client size {capture.Width}x{capture.Height} ({UiLayouts.SupportedText}).", false, false, "Stop without input.");
+        return Lines(capture, rect, scale);
+    }
+
+    /// <summary>OCR of one guarded region of an already captured full-resolution client frame (several regions, one capture).</summary>
+    internal static ObservedLine[] Lines((int Width, int Height, byte[] Bgra) capture, int[] rect, int scale = 3)
+    {
+        if (rect.Length != 4 || rect[0] < 0 || rect[1] < 0 || rect[2] < 1 || rect[3] < 1
+            || rect[2] > 850 || rect[3] > 500 || (long)rect[2] * rect[3] > 300_000)
+            throw new ArgumentException("UI readback region outside guarded bound.");
         var crop = Ui.CropZoom(capture.Bgra, capture.Width, capture.Height, rect, scale);
         return Engine.Value.Run(crop.Bgra, crop.Width, crop.Height, format: ImagePixelFormat.Bgra32)
             .Lines.Select(l => new ObservedLine(l.Text,

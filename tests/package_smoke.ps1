@@ -14,7 +14,8 @@ try {
         'uilayouts/playtest-alt-en-2560x1440.json', 'fixtures/playtest-ui-evidence.json',
         'uilayouts/playtest-normal-en-2560x1440.json', 'fixtures/playtest-ui-evidence-normal-en-2560x1440.json',
         'uilayouts/playtest-alt-en-1920x1080.json', 'fixtures/playtest-ui-evidence-alt-en-1920x1080.json',
-        'uilayouts/playtest-normal-en-1920x1080.json', 'fixtures/playtest-ui-evidence-normal-en-1920x1080.json')) {
+        'uilayouts/playtest-normal-en-1920x1080.json', 'fixtures/playtest-ui-evidence-normal-en-1920x1080.json',
+        'uilayouts/dialogs-normal-en-2560x1440.json')) {
         if (!(Test-Path -LiteralPath (Join-Path $root $name) -PathType Leaf)) { throw "Missing package file: $name" }
     }
     if (!(Get-ChildItem -LiteralPath (Join-Path $root 'layouts') -Filter '*.json')) { throw 'Reviewed layouts missing.' }
@@ -74,7 +75,8 @@ try {
             'uilayouts/playtest-alt-en-2560x1440.json', 'fixtures/playtest-ui-evidence.json',
         'uilayouts/playtest-normal-en-2560x1440.json', 'fixtures/playtest-ui-evidence-normal-en-2560x1440.json',
         'uilayouts/playtest-alt-en-1920x1080.json', 'fixtures/playtest-ui-evidence-alt-en-1920x1080.json',
-        'uilayouts/playtest-normal-en-1920x1080.json', 'fixtures/playtest-ui-evidence-normal-en-1920x1080.json')) {
+        'uilayouts/playtest-normal-en-1920x1080.json', 'fixtures/playtest-ui-evidence-normal-en-1920x1080.json',
+        'uilayouts/dialogs-normal-en-2560x1440.json')) {
             if ((Get-FileHash -LiteralPath (Join-Path $runtime $name)).Hash -ne
                 (Get-FileHash -LiteralPath (Join-Path $root $name)).Hash) {
                 throw "npm/ZIP payload mismatch: $name"

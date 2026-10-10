@@ -1,6 +1,6 @@
 # Complete Age of Mythology Retold editor MCP tool reference
 
-**Current full: 926 tools = 74 helpers + 434 native commands + 418 shipped editor actions. Default core: 76 = 67 core helpers + nine essential native commands; `editor_call` reaches every other tool from core.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Twelve world editing helpers (core): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
+**Current full: 928 tools = 76 helpers + 434 native commands + 418 shipped editor actions. Default core: 78 = 69 core helpers + nine essential native commands; `editor_call` reaches every other tool from core.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Twelve world editing helpers (core): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
 
 Authoritative source: production `aom-retold-editor` `0.1.0` `tools/list` with `--toolset full`, protocol `2025-11-25`. Executable SHA-256: `dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff`.
 
@@ -518,6 +518,8 @@ Available in core/full. Calls any full-catalog tool by exact name without switch
 - [`editor_generate_catalog`](#editor_generate_catalog)
 - [`editor_xs_api`](#editor_xs_api)
 - [`editor_dialogs`](#editor_dialogs)
+- [`editor_dialog_state`](#editor_dialog_state)
+- [`editor_dialog_act`](#editor_dialog_act)
 - [`editor_pause`](#editor_pause)
 - [`editor_place_formation`](#editor_place_formation)
 - [`editor_place_unit`](#editor_place_unit)
@@ -1692,6 +1694,118 @@ Understand editor dialogs, windows, panels and menus without screenshots: decode
     }
   },
   "required": [],
+  "additionalProperties": false
+}
+```
+
+### `editor_dialog_state`
+
+Which editor dialogs are open right now and what they show, without reading screenshots. Detects calibrated dialogs (normal UI, 2560x1440 reference; 38 gadgetReal names) by pixel signatures: state open/partial with score and client bounds, close name; closedCount for the rest. With gadget (exact open name, e.g. NewScenarioGadget, VictoryConditionsGadget, PlayerEditDlg) or controls=true: its controls from editor_dialogs metadata mapped to client rects (kind button/checkbox/textInput/dropdown/radio/list/slider/text, label, tooltip, script). read=true adds OCR: lines, per-control text (text inputs/dropdowns read per control at zoom 2 then 3, textSource control@Nx|control|dialogTiles, up to 32 per dialog, rest fieldReadsSkipped; values without their label or dropdown arrow, e.g. Seed -1), observedChecked for checkboxes (green tick pixel heuristic) and an OCR-fitted offset (geometry.mode nominal/approximate). OCR covers up to 3 open dialogs. offset/limit page controls (default 60). Moved windows, uncalibrated windows and the alternative UI (not yet calibrated) are not detected: use editor_dialogs + screenshot there. Observations only; checkpoints stay authoritative. Read-only.
+
+**Required arguments:** None.
+
+**MCP annotations:**
+
+```json
+{
+  "destructiveHint": false,
+  "idempotentHint": true,
+  "openWorldHint": false,
+  "readOnlyHint": true
+}
+```
+
+**Input schema:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "gadget": {
+      "type": "string"
+    },
+    "read": {
+      "type": "boolean"
+    },
+    "controls": {
+      "type": "boolean"
+    },
+    "offset": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}
+```
+
+### `editor_dialog_act`
+
+Operate an editor dialog by gadget/control name, verified by pixel signature/OCR. action=open (gadgetReal, polls until the signature shows; skipped if open) | close (gadgetUnreal with the catalog close name, then inner window names; verified closed, DIALOG_STILL_OPEN otherwise) | press (runs the control's shipped script as validated native calls; view-only gadget scripts and Close/Cancel need no confirmation, anything else confirmDestructive=true; controls without scripts: NO_SCRIPT, use click) | select (radio item by label/index or menu entry path via its script) | click (pixel click on a button/checkbox/text field of an open, default-position dialog after OCR label verification; confirmDestructive=true except Close/Cancel) | setText (click the field, END, BACKSPACEs, type text, OCR verify over up to 3 frames (framesRead; the caret can hide short text, keys are never re-sent); never TAB/ENTER/ESC; nothing is applied until the dialog's own OK/Generate; confirmDestructive=true) | toggle (checkbox script or click, before/after green-tick heuristic; confirmDestructive=true; some dialogs such as Victory Conditions apply immediately). control = exact control name or unique label (case/punctuation-insensitive). Pixel actions need the calibrated client size (2560x1440 normal UI) and refuse on occlusion/moved windows (no input sent). Failures carry code/nativeDispatched/outcomeUnknown/nextAction; never retry blindly.
+
+**Required arguments:** `gadget`, `action`.
+
+**MCP annotations:**
+
+```json
+{
+  "destructiveHint": true,
+  "idempotentHint": false,
+  "openWorldHint": false,
+  "readOnlyHint": false
+}
+```
+
+**Input schema:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "gadget": {
+      "type": "string"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "open",
+        "close",
+        "press",
+        "click",
+        "setText",
+        "toggle",
+        "select"
+      ]
+    },
+    "control": {
+      "type": "string"
+    },
+    "item": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "confirmDestructive": {
+      "type": "boolean"
+    },
+    "timeout": {
+      "type": "integer",
+      "minimum": 500,
+      "maximum": 10000
+    }
+  },
+  "required": [
+    "gadget",
+    "action"
+  ],
   "additionalProperties": false
 }
 ```
