@@ -1,0 +1,42 @@
+using System.Text.Json;
+
+namespace AomMcp;
+
+/// <summary>Connection-free script diagnostics tools: editor_xs_diagnostics (MythLog / trigtemp.xs readers).</summary>
+internal sealed partial class Server
+{
+    static readonly HashSet<string> ScriptNames = new(StringComparer.Ordinal) { XsDiagnostics.Tool };
+
+    static void PreflightScript(string name, JsonElement args)
+    {
+        if (name == XsDiagnostics.Tool) XsDiagnostics.Preflight(args);
+    }
+
+    object InvokeScript(string name, JsonElement args) => XsDiagnostics.Query(args, exe);
+
+    static IEnumerable<object> ScriptExtras()
+    {
+        yield return Spec(XsDiagnostics.Tool,
+            "Read the game's own XS compile errors without screenshots. operation=errors (default): parses MythLog.txt (<Games>/Age of Mythology Retold/temp/Logs; override logPath=MythLog*.txt), groups each AI/XS error chain, merges the per-player repeats (occurrences, players, compiledFiles), names the failing function/rule, adds a short hint and a source excerpt (context lines, default 3) resolved under INSTALLPATH/game/ai or the profile trigger dir, flagged modifiedAfterLog when the file changed after the log. loads[] lists scenario loads of this game session (log lines carry no wall-clock time); load=latest (default)|latestWithErrors|all or loadIndex selects; offset/limit page diagnostics (limit 1..100, default 20). operation=trigtemp: indexes trigger/trigtemp.xs, the game's output of its LAST trigger compile: list rules (filter, offset, limit), or one of trigger (rule or trigger name, or numeric id with triggerPath), line (compiled line to rule), eventId (handler to enabled rule); triggerPath+expectedSha256 (hash-pinned export) maps rules to trigger IDs and reports staleness; bodyOffset/maxLines page a rule body. Zero errors does not prove scripts compiled (AI scripts compile when their player's AI loads). Read-only, no game connection, nothing is compiled or written.",
+            new Dictionary<string, object>
+            {
+                ["operation"] = new { type = "string", @enum = XsDiagnostics.Operations },
+                ["logPath"] = new { type = "string" },
+                ["load"] = new { type = "string", @enum = XsDiagnostics.LoadModes },
+                ["loadIndex"] = new { type = "integer", minimum = 0 },
+                ["context"] = new { type = "integer", minimum = 0, maximum = XsDiagnostics.MaxContext },
+                ["trigger"] = new { type = "string" },
+                ["line"] = new { type = "integer", minimum = 1 },
+                ["eventId"] = new { type = "integer", minimum = 0 },
+                ["triggerPath"] = new { type = "string" },
+                ["expectedSha256"] = new { type = "string" },
+                ["filter"] = new { type = "string" },
+                ["bodyOffset"] = new { type = "integer", minimum = 0 },
+                ["maxLines"] = new { type = "integer", minimum = 1, maximum = XsDiagnostics.MaxBodyLines },
+                ["profileDirectory"] = new { type = "string" },
+                ["offset"] = new { type = "integer", minimum = 0 },
+                ["limit"] = new { type = "integer", minimum = 1, maximum = XsDiagnostics.MaxLimit },
+            },
+            [], true);
+    }
+}

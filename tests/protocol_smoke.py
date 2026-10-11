@@ -738,6 +738,23 @@ try:
     xs = tool('editor_xs_api', {'filter': 'forest', 'context': 'trigger', 'kind': 'function', 'includeLocal': False})
     assert xs['structuredContent']['total'] == 0, xs  # Library functions are random-map/AI only.
     assert tool('editor_xs_api', {'kind': 'bogus'})['isError']
+    diag_spec = next(t for t in tools if t['name'] == 'editor_xs_diagnostics')
+    assert diag_spec['annotations']['readOnlyHint'] and diag_spec['inputSchema']['required'] == []
+    with tempfile.TemporaryDirectory() as diag_dir:
+        diag_log = pathlib.Path(diag_dir) / 'MythLog.txt'
+        diag_text = chr(10).join([
+            "File 'MythLog.txt' opened at Sat Oct 10 23:29:04 2026",
+            '3250     00:00:03:  Loading game file: demo' + chr(92) + 'demo.mythscn',
+            "3250     00:00:03:  AI Error Encountered. Title: Player #-1 (????): AI Error. Description: campaign" + chr(92) + "demo" + chr(92) + "a.xs(7) : XS: Error 0172: 'gX' is not a valid operator.",
+            "XS: Error: could not compile file 'campaign" + chr(92) + "demo" + chr(92) + "a.xs'.", ''])
+        diag_log.write_text(diag_text, encoding='utf-8')
+        diag = tool('editor_xs_diagnostics', {'logPath': str(diag_log)})
+        assert not diag['isError'] and diag['structuredContent']['total'] == 1, diag
+        found = diag['structuredContent']['diagnostics'][0]
+        assert found['code'] == '0172' and found['line'] == 7 and found['file'].endswith('a.xs'), found
+        assert tool('editor_xs_diagnostics', {'logPath': str(pathlib.Path(diag_dir) / 'other.txt')})['isError']
+        assert tool('editor_xs_diagnostics', {'operation': 'errors', 'line': 3})['isError']
+        assert tool('editor_xs_diagnostics', {'operation': 'trigtemp', 'triggerPath': str(diag_log)})['isError']
     pantheon_spec = next(t for t in tools if t['name'] == 'editor_pantheon')
     assert pantheon_spec['annotations']['readOnlyHint'] and not pantheon_spec['annotations']['destructiveHint']
     # pantheon or its alias culture; one is required at call time.
@@ -968,7 +985,7 @@ try:
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
     expected_core = (helper_names - workflow_names) | core_native
-    assert len(expected_core) == 78 and len(names) == 928
+    assert len(expected_core) == 79 and len(names) == 929
     assert {'editor_dialog_state', 'editor_dialog_act'} <= expected_core
     world_tools = {'editor_terrain_info', 'editor_live_players', 'editor_edit_mode', 'editor_paint_world', 'editor_elevation',
                    'editor_transform_unit', 'editor_terrain_catalog', 'editor_camera_frame', 'editor_overview',

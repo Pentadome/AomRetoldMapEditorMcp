@@ -100,6 +100,7 @@ if (selfTest)
     CheckpointUnits.SelfTest();
     ScenarioDiff.SelfTest();
     AiInstaller.SelfTest();
+    XsDiagnostics.SelfTest();
     PlayerSettings.SelfTest();
     StartupOrders.SelfTest();
     RuntimeProbes.SelfTest();

@@ -442,7 +442,7 @@ internal sealed partial class Server(
 
     static bool ConnectionFree(string name, JsonElement args) => name == CallToolName
         ? CallTarget(args) is var (target, targetArgs) && ConnectionFree(target, targetArgs)
-        : WorkflowNames.Contains(name) || name is "editor_toolset" or "editor_search_tools" or "editor_catalog" or "editor_capabilities" or "editor_export_recovery" or "editor_trigger_list" or "editor_trigger_player_parity" or "editor_trigger_edit" or "editor_players" or "editor_player_dependency_audit" or "editor_stage_ai" or "editor_pantheon" or "editor_dependencies" or "editor_generate_catalog" or "editor_xs_api" or "editor_dialogs"
+        : WorkflowNames.Contains(name) || name is "editor_toolset" or "editor_search_tools" or "editor_catalog" or "editor_capabilities" or "editor_export_recovery" or "editor_trigger_list" or "editor_trigger_player_parity" or "editor_trigger_edit" or "editor_players" or "editor_player_dependency_audit" or "editor_stage_ai" or "editor_pantheon" or "editor_dependencies" or "editor_generate_catalog" or "editor_xs_api" or "editor_dialogs" or "editor_xs_diagnostics"
         || GameDataCatalog.ToolKinds.ContainsKey(name)
         || (name == "editor_terrain_catalog" && args.TryGetProperty("kind", out var catalogKind) && catalogKind.GetString() is "mixes" or "editModes")
         || (name is "editor_set_diplomacy" or "editor_player_settings" && (args.GetProperty("operation").GetString() is "preview" or "verify"))
@@ -501,6 +501,7 @@ internal sealed partial class Server(
         PreflightScene(name, args);
         PreflightWorld(name, args);
         PreflightDialog(name, args);
+        PreflightScript(name, args);
         if (name == "editor_set_diplomacy" && args.GetProperty("operation").GetString() == "apply")
             PlayerWorkflow.PreflightApply(args, exe);
         if (name == "editor_player_settings" && args.GetProperty("operation").GetString() == "apply")
@@ -525,6 +526,7 @@ internal sealed partial class Server(
         if (SceneNames.Contains(name)) return InvokeScene(name, args, batchGame);
         if (WorldNames.Contains(name)) return InvokeWorld(name, args, batchGame);
         if (DialogNames.Contains(name)) return InvokeDialog(name, args, batchGame);
+        if (ScriptNames.Contains(name)) return InvokeScript(name, args);
         if (name == "editor_search_tools") return SearchTools(args);
         if (name == "editor_toolset")
         {
@@ -1399,5 +1401,7 @@ internal sealed partial class Server(
             yield return world;
         foreach (var dialog in DialogExtras())
             yield return dialog;
+        foreach (var script in ScriptExtras())
+            yield return script;
     }
 }
