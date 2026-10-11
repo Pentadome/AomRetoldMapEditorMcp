@@ -142,9 +142,9 @@ internal sealed partial class Server(
 
     Tool[] Tools => _fullTools ? FullTools : CoreTools;
     Tool[] CoreTools => field ??= Extras().Concat(_catalog.Tools(CoreNativeTools))
-        .Select(t => JsonSerializer.SerializeToElement(t, Json).Deserialize<Tool>(Json)!).ToArray();
+        .Select(t => AddShaping(JsonSerializer.SerializeToElement(t, Json).Deserialize<Tool>(Json)!)).ToArray();
     Tool[] FullTools => field ??= Extras().Concat(WorkflowExtras()).Concat(_catalog.Tools())
-        .Select(t => JsonSerializer.SerializeToElement(t, Json).Deserialize<Tool>(Json)!).ToArray();
+        .Select(t => AddShaping(JsonSerializer.SerializeToElement(t, Json).Deserialize<Tool>(Json)!)).ToArray();
     Dictionary<string, Tool> ToolIndex => _fullTools ? FullIndex : CoreIndex;
     Dictionary<string, Tool> CoreIndex => field ??= CoreTools.ToDictionary(t => t.Name, StringComparer.Ordinal);
     Dictionary<string, Tool> FullIndex => field ??= FullTools.ToDictionary(t => t.Name, StringComparer.Ordinal);
@@ -472,6 +472,8 @@ internal sealed partial class Server(
                 ? $"Unknown tool: {name}. Find exact names with editor_search_tools."
                 : $"Unknown or unexposed tool: {name}. Call it via {CallToolName}, or use editor_toolset mode=full or --toolset full for expanded surface.");
         ValidateSchema(args, spec.InputSchema);
+        PreflightShaping(name, args);
+        args = StripShaping(name, args);
         if (name == "editor_search_tools")
         {
             var query = String(args, "query");
@@ -520,7 +522,7 @@ internal sealed partial class Server(
         args.TryGetProperty("modifiers", out var m) ? m.EnumerateArray().Select(v => v.GetString() ?? "").ToArray() : [];
 
     // Invoke runs only after Preflight: schema, confirmations and argument checks are not repeated here.
-    object Invoke(string name, JsonElement args, Game? batchGame = null)
+    object InvokeCore(string name, JsonElement args, Game? batchGame = null)
     {
         if (WorkflowNames.Contains(name)) return InvokeWorkflow(name, args);
         if (SceneNames.Contains(name)) return InvokeScene(name, args, batchGame);

@@ -779,6 +779,23 @@ try:
         assert tool('editor_xs_api', bad)['isError'], bad
     constants = tool('editor_xs_api', {'kind': 'constant', 'limit': 1})
     assert not constants['isError'] and 'constants' in constants['structuredContent'], constants  # Local file may be absent: status says so.
+    shaped = tool('editor_xs_api', {'filter': 'kbUnit', 'limit': 5, 'includeLocal': False, 'fields': ['name', 'signature']})
+    assert not shaped['isError'], shaped
+    rows = shaped['structuredContent']['entries']
+    assert rows and all(set(r) <= {'name', 'signature'} for r in rows), rows
+    assert tool('editor_xs_api', {'filter': 'kb', 'fields': []})['isError']
+    big = tool('editor_xs_api', {'filter': 'kb', 'limit': 100, 'includeLocal': False})['structuredContent']
+    assert 'truncationHint' in big and big['truncationHint']['bytes'] > 16384, list(big)
+    with tempfile.TemporaryDirectory(prefix='aom-saveto-') as save_dir:
+        target = pathlib.Path(save_dir) / 'result.json'
+        saved = tool('editor_xs_api', {'filter': 'kb', 'limit': 100, 'includeLocal': False, 'saveTo': str(target)})
+        assert not saved['isError'], saved
+        saved = saved['structuredContent']
+        assert saved['savedTo'] == str(target) and saved['bytes'] == target.stat().st_size and 'entries' not in saved, saved
+        assert hashlib.sha256(target.read_bytes()).hexdigest() == saved['sha256']
+        assert len(json.loads(target.read_text(encoding='utf-8'))['entries']) == 100
+        assert tool('editor_xs_api', {'filter': 'kb', 'saveTo': str(target)})['isError']  # never overwrite
+        assert tool('editor_prototypes', {'name': 'Hoplite', 'fields': ['cost'], 'saveTo': str(pathlib.Path(save_dir) / 'p.json')})['structuredContent']['bytes'] > 0
     elements_sample = root / 'research/defense-code-sample.trg'
     assert tool('editor_trigger_elements', {'path': str(elements_sample)})['isError']  # path needs expectedSha256
     assert tool('editor_trigger_elements', {'kind': 'bogus'})['isError']
