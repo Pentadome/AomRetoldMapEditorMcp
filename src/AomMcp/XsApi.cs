@@ -33,7 +33,7 @@ internal sealed partial class XsApi
     const string FileName = "xs_api.json";
     const string SummariesName = "xs_summaries.json";
     internal static readonly string[] Contexts = ["ai", "randomMap", "trigger"];
-    static readonly string[] Kinds = ["syscall", "function", "class", "global", "rule", "aiPlanConstant"];
+    static readonly string[] Kinds = ["syscall", "function", "class", "global", "rule", "aiPlanConstant", "constant"];
     // BANG_Documentation "What is allowed in AI/RM/TR scripts": XS + KB syscalls everywhere, plus AI/RM/TR families.
     static string[] SyscallContexts(string group) => group switch
     {
@@ -74,9 +74,7 @@ internal sealed partial class XsApi
         _installDir = installDir;
     }
 
-    /// <summary>Loads the shipped API beside the host (or repository xs/ directory).</summary>
-    /// <exception cref="FileNotFoundException">Shipped API file is missing from this build.</exception>
-    internal static XsApi Load(string exe)
+    static (string Dir, Model Model) ReadModel()
     {
         string? dir = null;
         for (DirectoryInfo? d = new(AppContext.BaseDirectory); d != null && dir == null; d = d.Parent)
@@ -86,6 +84,16 @@ internal sealed partial class XsApi
             throw new FileNotFoundException("Shipped XS API (xs/xs_api.json) missing from this build.");
         var model = JsonSerializer.Deserialize<Model>(File.ReadAllText(Path.Combine(dir, FileName)), Json)
             ?? throw new InvalidDataException("Invalid xs_api.json.");
+        return (dir, model);
+    }
+
+    internal static Model LoadModel() => ReadModel().Model;
+
+    /// <summary>Loads the shipped API beside the host (or repository xs/ directory).</summary>
+    /// <exception cref="FileNotFoundException">Shipped API file is missing from this build.</exception>
+    internal static XsApi Load(string exe)
+    {
+        var (dir, model) = ReadModel();
         var summariesFile = Path.Combine(dir, SummariesName);
         var summaries = File.Exists(summariesFile)
             ? JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(summariesFile)) ?? []
@@ -101,6 +109,13 @@ internal sealed partial class XsApi
         var limit = args.TryGetProperty("limit", out var l) ? l.GetInt32() : 20; // Host default/cap.
         if (offset < 0 || limit is < 1 or > 100)
             throw new ArgumentException("offset must be >= 0; limit must be 1..100.");
+        if (args.TryGetProperty("names", out var batch))
+        {
+            if (args.TryGetProperty("name", out _) || args.TryGetProperty("filter", out _) || args.TryGetProperty("offset", out _))
+                throw new ArgumentException("names cannot be combined with name, filter or offset.");
+            return Names(batch, Text("detail"), !args.TryGetProperty("includeLocal", out var batchLocal) || batchLocal.GetBoolean());
+        }
+        if (Text("detail").Length > 0) throw new ArgumentException("detail applies to names only.");
         var name = Text("name").Trim();
         var terms = Text("filter").Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var kind = Text("kind") is { Length: > 0 } k ? k : "any";
@@ -146,6 +161,10 @@ internal sealed partial class XsApi
             foreach (var p in _model.AiPlanConstants)
                 if (Match(p.Name, null))
                     results.Add(("aiPlanConstant", p.Name, p));
+        if (kind is "any" or "constant" && library.Length == 0 && context == "any")
+            foreach (var constant in Constants().Names)
+                if (Match(constant, null))
+                    results.Add(("constant", constant, new ConstantEntry(constant, ConstantFamily(constant))));
         if (local && kind is "any" or "syscall" && library.Length == 0)
         {
             var shipped = _model.Syscalls.Select(s => s.Name).ToHashSet(StringComparer.Ordinal);
@@ -166,10 +185,98 @@ internal sealed partial class XsApi
             limit,
             nextOffset = offset + page.Length < ordered.Length ? (int?)(offset + page.Length) : null,
             entries = page,
+            constants = kind is "any" or "constant" ? ConstantsStatus() : null,
             shippedFromGameVersion = _model.GameFileVersion,
             localHelp = local ? LocalStatus() : "disabled",
             usage = "AI scripts may call ai/kb/xs syscalls; random maps rm/kb/xs; triggers trigger/kb/xs. Library entries need include \"<include>\"; relative to game/random_maps (rm/*) or game/ai (ai/*). summary = this project's own words; officialHelp/sourceComment are read from your install, never redistributed.",
         };
+    }
+
+    internal static readonly string[] DetailModes = ["compact", "full"];
+
+    internal sealed record ConstantEntry(string Name, string Family, string Status = "exe string; not verified as XS-visible");
+
+    (string[] Names, bool Present) _constants;
+    bool _constantsLoaded;
+
+    (string[] Names, bool Present) Constants()
+    {
+        if (_constantsLoaded) return _constants;
+        _constantsLoaded = true;
+        try
+        {
+            var document = XsConstants.Load(Generator.DefaultOutput());
+            _constants = document is null ? ([], false) : (document.Names, true);
+        }
+        catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException) { _constants = ([], false); }
+        return _constants;
+    }
+
+    static string ConstantFamily(string name)
+    {
+        var m = Regex.Match(name, "^(c[A-Z][a-z0-9]*)");
+        return m.Success ? m.Groups[1].Value : "c";
+    }
+
+    string ConstantsStatus() => Constants().Present
+        ? "constant names come from identifier strings in the game executable (local generated/xs_constants.json); not verified as XS-visible and no values are known"
+        : "constants unavailable: run editor_generate_catalog to scan the executable (local file, not shipped)";
+
+    Dictionary<string, List<(string Kind, object Entry)>>? _byName;
+
+    Dictionary<string, List<(string Kind, object Entry)>> ByName()
+    {
+        if (_byName is not null) return _byName;
+        var map = new Dictionary<string, List<(string Kind, object Entry)>>(StringComparer.OrdinalIgnoreCase);
+        void Add(string kind, string name, object entry)
+        {
+            if (!map.TryGetValue(name, out var list)) map[name] = list = [];
+            list.Add((kind, entry));
+        }
+        foreach (var x in _model.Syscalls) Add("syscall", x.Name, x);
+        foreach (var x in _model.Functions) Add("function", x.Name, x);
+        foreach (var x in _model.Classes) Add("class", x.Name, x);
+        foreach (var x in _model.Globals) Add("global", x.Name, x);
+        foreach (var x in _model.Rules) Add("rule", x.Name, x);
+        foreach (var x in _model.AiPlanConstants) Add("aiPlanConstant", x.Name, x);
+        foreach (var x in Constants().Names) Add("constant", x, new ConstantEntry(x, ConstantFamily(x)));
+        return _byName = map;
+    }
+
+    static object Compact(string kind, object entry) => entry switch
+    {
+        Syscall s => new { kind, name = s.Name, signature = s.Signature, group = s.Group, contexts = s.Contexts },
+        Function f => new { kind, name = f.Name, signature = f.Signature, include = f.Include, library = f.Library, @class = f.Class },
+        ClassDef c => new { kind, name = c.Name, include = c.Include, library = c.Library },
+        Global g => new { kind, name = g.Name, signature = g.Type + " " + g.Name, include = g.Include, library = g.Library },
+        Rule r => new { kind, name = r.Name, library = r.Library },
+        PlanConstant p => new { kind, name = p.Name, signature = p.VariableType + " " + p.Name + " = " + p.Value },
+        ConstantEntry k => new { kind, name = k.Name, family = k.Family, status = k.Status },
+        _ => (object)new { kind },
+    };
+
+    object Names(JsonElement batch, string detail, bool local)
+    {
+        if (batch.ValueKind != JsonValueKind.Array) throw new ArgumentException("names must be an array of strings.");
+        var requested = batch.EnumerateArray().Select(e => (e.GetString() ?? "").Trim()).ToArray();
+        if (requested.Length is < 1 or > 50 || requested.Any(r => r.Length == 0 || r.Length > 128))
+            throw new ArgumentException("names must contain 1..50 non-empty names (max 128 characters).");
+        if (detail.Length > 0 && !DetailModes.Contains(detail))
+            throw new ArgumentException("detail must be compact or full.");
+        var full = detail == "full";
+        var index = ByName();
+        var sourceLines = new Dictionary<string, string[]?>(StringComparer.OrdinalIgnoreCase);
+        var found = new List<object>();
+        var missing = new List<object>();
+        foreach (var name in requested.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (index.TryGetValue(name, out var hits))
+                found.AddRange(hits.Select(h => full ? Present(h.Kind, h.Entry, local, sourceLines) : Compact(h.Kind, h.Entry)));
+            else
+                missing.Add(new { name, suggestions = GameDataCatalog.Suggest(name, index.Keys) });
+        }
+        return new { requested = requested.Length, found = found.Count, entries = found, missing,
+            detail = full ? "full" : "compact", constants = ConstantsStatus(), shippedFromGameVersion = _model.GameFileVersion };
     }
 
     internal sealed record LocalOnly(string Name, string Signature, string Group, bool LocalOnlyEntry = true);

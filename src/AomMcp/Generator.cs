@@ -150,6 +150,8 @@ internal static class Generator
         foreach (var path in paths)
             archive.ExportXml(path, Path.Combine(data, Path.GetFileName(path)[..^4])); // Remove .XMB after decoding.
         GameDataCatalog.Generate(exe, output, data, powers.Select(p => Path.GetFileName(p)[..^4]).ToArray());
+        try { _ = XsConstants.Generate(exe, output); } // Silent: this also runs inside the MCP host, where stdout is the protocol stream.
+        catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException) { } // editor_xs_api reports constants as unavailable.
         return (paths.Count, mixes.Length, powers.Length);
     }
 

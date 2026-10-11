@@ -204,6 +204,10 @@ internal sealed class GameDataCatalog
         };
     }
 
+    const int MaxFields = 20, MaxWhere = 8;
+    internal static readonly string[] WhereOps = ["=", "!=", "<", "<=", ">", ">=", "contains"];
+    XElement[]? _prototypeNodes, _technologyNodes;
+
     // Host schema policy: bounded pages keep prototype/terrain catalogs out of giant tool responses.
     internal static Dictionary<string, object> Properties(string kind)
     {
@@ -217,6 +221,18 @@ internal sealed class GameDataCatalog
         };
         if (kind is "prototypes" or "gods" or "technologies" or "godPowers")
             properties["pantheon"] = new { type = "string", description = "Optional culture association (not current-player availability)." };
+        if (kind is "prototypes" or "technologies")
+        {
+            properties["fields"] = new { type = "array", items = new { type = "string" }, minItems = 1, maxItems = MaxFields,
+                description = "Project these definition child elements (case-insensitive, 'a/b' descends) into entries[].fields; entries then carry only name/source/displayNameId/explicitCulture plus fields, e.g. maxhitpoints, maxvelocity, armor, cost." };
+            properties["where"] = new { type = "array", maxItems = MaxWhere,
+                description = "Keep entries whose definition field matches ALL conditions: {field, op, value}; op = | != | < | <= | > | >= | contains; numeric compare when both sides parse, otherwise case-insensitive text; multi-valued fields match when any value does.",
+                items = new { type = "object", additionalProperties = false, required = new[] { "field", "op", "value" },
+                    properties = new Dictionary<string, object>
+                    {
+                        ["field"] = new { type = "string" }, ["op"] = new { type = "string", @enum = WhereOps }, ["value"] = new { type = "string" },
+                    } } };
+        }
         if (kind == "prototypes")
         {
             properties["category"] = new { type = "string", @enum = new[] { "all", "units", "buildings", "trees", "resources", "objects" } };
@@ -253,7 +269,18 @@ internal sealed class GameDataCatalog
         var category = Text("category");
         var unitType = Text("unitType");
         var terrainType = Text("terrainType");
-        var matches = _data.GetProperty("catalogs").GetProperty(kind).EnumerateArray().Where(e =>
+        var projection = args.TryGetProperty("fields", out var fieldList) ? ParseFields(fieldList) : [];
+        var conditions = args.TryGetProperty("where", out var whereList) ? ParseWhere(whereList) : [];
+        var needsXml = projection.Length > 0 || conditions.Length > 0;
+        if (needsXml && kind is not ("prototypes" or "technologies"))
+            throw new ArgumentException("fields/where apply to prototypes and technologies only.");
+        var nodes = needsXml ? Nodes(kind) : [];
+        var matches = _data.GetProperty("catalogs").GetProperty(kind).EnumerateArray().Select((e, index) => (e, index)).Where(x =>
+        {
+            var e = x.e;
+            return Matches(e);
+        }).Where(x => conditions.All(c => Evaluate(nodes[x.index], c))).ToArray();
+        bool Matches(JsonElement e) =>
             (name.Length == 0 || Equal(e.GetProperty("name").GetString()!, name))
             && (filter.Length == 0 || SearchFields.Any(k =>
                 e.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.String
@@ -261,10 +288,15 @@ internal sealed class GameDataCatalog
             && (culture.Length == 0 || Has(e, "pantheons", culture))
             && (category.Length == 0 || category == "all" || Has(e, "categories", category))
             && (unitType.Length == 0 || Has(e, "unitTypes", unitType))
-            && (terrainType.Length == 0 || Equal(e.GetProperty("terrainType").GetString()!, terrainType)))
-            .ToArray();
-        var entries = matches.Skip(offset).Take(limit).Select(e => e.EnumerateObject()
-            .Where(v => definition || v.Name != "definition").ToDictionary(v => v.Name, v => v.Value)).ToArray();
+            && (terrainType.Length == 0 || Equal(e.GetProperty("terrainType").GetString()!, terrainType));
+        var entries = matches.Skip(offset).Take(limit).Select(x =>
+        {
+            var entry = x.e.EnumerateObject().Where(v => (definition || v.Name != "definition")
+                && !(projection.Length > 0 && v.Name is not ("name" or "source" or "displayNameId" or "explicitCulture" or "definition")))
+                .ToDictionary(v => v.Name, v => (object)v.Value);
+            if (projection.Length > 0) entry["fields"] = projection.ToDictionary(f => f, f => Project(nodes[x.index], f), StringComparer.Ordinal);
+            return entry;
+        }).ToArray();
         return new
         {
             catalog = kind,
@@ -278,6 +310,87 @@ internal sealed class GameDataCatalog
             archive = "game/data/Data.bar",
             limitation = "Static base definitions, not runtime IDs, translated labels, current-player trainability or live placement proof. Resource amounts/stats can change through techs, scripts or game modes. Pantheon links are potential associations, not exclusive availability. XML detail preserves source fields; game interprets defaults/inheritance.",
         };
+    }
+
+    internal sealed record Condition(string Field, string Op, string Value);
+
+    static string[] ParseFields(JsonElement list)
+    {
+        var fields = list.EnumerateArray().Select(f => (f.GetString() ?? "").Trim()).ToArray();
+        if (fields.Length is < 1 or > MaxFields || fields.Any(f => f.Length is 0 or > 64 || !System.Text.RegularExpressions.Regex.IsMatch(f, "^[A-Za-z0-9_]+(/[A-Za-z0-9_]+)*$")))
+            throw new ArgumentException($"fields must be 1..{MaxFields} element names (letters, digits, '_', optional 'a/b' paths).");
+        return fields.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    static Condition[] ParseWhere(JsonElement list)
+    {
+        var result = new List<Condition>();
+        foreach (var item in list.EnumerateArray())
+        {
+            Catalog.ValidateObject(item, ["field", "op", "value"]);
+            var c = new Condition(item.GetProperty("field").GetString()!.Trim(), item.GetProperty("op").GetString()!, item.GetProperty("value").GetString()!);
+            if (!WhereOps.Contains(c.Op)) throw new ArgumentException("where op must be one of " + string.Join(" ", WhereOps) + ".");
+            ParseFields(JsonSerializer.SerializeToElement(new[] { c.Field }));
+            if ((c.Op is "<" or "<=" or ">" or ">=") && !double.TryParse(c.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                throw new ArgumentException($"where op {c.Op} needs a numeric value.");
+            result.Add(c);
+        }
+        if (result.Count is < 1 or > MaxWhere) throw new ArgumentException($"where must contain 1..{MaxWhere} conditions.");
+        return [.. result];
+    }
+
+    XElement[] Nodes(string kind)
+    {
+        ref var cache = ref (kind == "prototypes" ? ref _prototypeNodes : ref _technologyNodes);
+        return cache ??= _data.GetProperty("catalogs").GetProperty(kind).EnumerateArray()
+            .Select(e => e.TryGetProperty("definition", out var d) && d.ValueKind == JsonValueKind.String ? XElement.Parse(d.GetString()!) : new XElement("none"))
+            .ToArray();
+    }
+
+    // Values of the elements at a case-insensitive child path: text, else the 'value' attribute, else all attributes.
+    internal static string[] Values(XElement root, string path)
+    {
+        IEnumerable<XElement> level = [root];
+        foreach (var part in path.Split('/'))
+            level = level.SelectMany(x => x.Elements().Where(c => c.Name.LocalName.Equals(part, StringComparison.OrdinalIgnoreCase)));
+        return level.Select(Render).ToArray();
+    }
+
+    static string Render(XElement e)
+    {
+        var text = e.HasElements ? "" : e.Value.Trim();
+        var attributes = e.Attributes().Select(a => a.Name.LocalName + "=" + a.Value).ToArray();
+        if (attributes.Length == 0) return text;
+        var value = e.Attribute("value")?.Value;
+        var typed = e.Attribute("type")?.Value ?? e.Attribute("resourcetype")?.Value;
+        if (text.Length == 0 && value is not null && typed is not null) return typed + "=" + value;
+        if (text.Length == 0 && value is not null) return value;
+        return text.Length == 0 ? string.Join(' ', attributes)
+            : (typed is not null ? typed + "=" : "") + text + (attributes.Length > 0 && typed is null ? " (" + string.Join(' ', attributes) + ")" : "");
+    }
+
+    static object? Project(XElement node, string field)
+    {
+        var values = Values(node, field);
+        return values.Length switch { 0 => null, 1 => values[0], _ => values };
+    }
+
+    static bool Evaluate(XElement node, Condition c)
+    {
+        bool Compare(string raw)
+        {
+            // Typed values such as Food=50 compare on the part after '='.
+            var candidate = raw.Contains('=') && !c.Value.Contains('=') ? raw[(raw.IndexOf('=') + 1)..] : raw;
+            if (c.Op == "contains") return raw.Contains(c.Value, StringComparison.OrdinalIgnoreCase);
+            if (double.TryParse(candidate, NumberStyles.Float, CultureInfo.InvariantCulture, out var left)
+                && double.TryParse(c.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var right))
+                return c.Op switch { "=" => left == right, "!=" => left != right, "<" => left < right, "<=" => left <= right, ">" => left > right, _ => left >= right };
+            var equal = candidate.Equals(c.Value, StringComparison.OrdinalIgnoreCase) || raw.Equals(c.Value, StringComparison.OrdinalIgnoreCase);
+            return c.Op switch { "=" => equal, "!=" => !equal, _ => false };
+        }
+        var values = Values(node, c.Field);
+        if (values.Length == 0) return false; // A missing field never matches, including !=.
+        return c.Op == "!=" ? values.All(Compare) : values.Any(Compare);
     }
 
     /// <summary>Explains direct train/build/enable/create/replacement links and shortest potential god-to-tech paths.</summary>

@@ -101,6 +101,7 @@ if (selfTest)
     ScenarioDiff.SelfTest();
     AiInstaller.SelfTest();
     XsDiagnostics.SelfTest();
+    XsConstants.SelfTest();
     PlayerSettings.SelfTest();
     StartupOrders.SelfTest();
     RuntimeProbes.SelfTest();

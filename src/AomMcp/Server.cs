@@ -1282,9 +1282,20 @@ internal sealed partial class Server(
         );
         yield return Spec(
             "editor_xs_api",
-            "Look up the XS scripting API for AI (.xs personalities), random map and trigger scripts: engine syscalls (signatures, defaults, which script kinds may call them) and shipped library functions/classes/globals/rules (rm/lib, rm/lib2, ai/core, ai/human_assist) with include path, file:line and a short summary. Official syscall help and source comments are added from the local install when present. name=exact (case-insensitive); filter=space-separated terms over names/summaries; kind=any|syscall|function|class|global|rule|aiPlanConstant; context=any|ai|randomMap|trigger; library=library id or syscall group (e.g. kbfuncs); includeLocal default true; offset>=0, limit 1..100 (default 20). Read-only, no game connection.",
-            Props(("name", "string"), ("filter", "string"), ("kind", "string"), ("context", "string"), ("library", "string"),
-                ("includeLocal", "boolean"), ("offset", "integer"), ("limit", "integer")),
+            "Look up the XS scripting API for AI (.xs personalities), random map and trigger scripts: engine syscalls (signatures, defaults, which script kinds may call them) and shipped library functions/classes/globals/rules (rm/lib, rm/lib2, ai/core, ai/human_assist) with include path, file:line and a short summary. Official syscall help and source comments are added from the local install when present. name=exact (case-insensitive); filter=space-separated terms over names/summaries; kind=any|syscall|function|class|global|rule|aiPlanConstant|constant (constant = cXxx names found as strings in the game exe by editor_generate_catalog, kept in local generated/xs_constants.json; names only, NOT verified as XS-visible); names=[...] (1..50 exact names, exclusive with name/filter/offset) returns compact records (kind, signature, include, library; detail=compact|full) plus missing[] with suggestions; context=any|ai|randomMap|trigger; library=library id or syscall group (e.g. kbfuncs); includeLocal default true; offset>=0, limit 1..100 (default 20). Read-only, no game connection.",
+            new Dictionary<string, object>
+            {
+                ["name"] = new { type = "string" },
+                ["names"] = new { type = "array", items = new { type = "string" }, minItems = 1, maxItems = 50 },
+                ["detail"] = new { type = "string", @enum = XsApi.DetailModes },
+                ["filter"] = new { type = "string" },
+                ["kind"] = new { type = "string" },
+                ["context"] = new { type = "string" },
+                ["library"] = new { type = "string" },
+                ["includeLocal"] = new { type = "boolean" },
+                ["offset"] = new { type = "integer", minimum = 0 },
+                ["limit"] = new { type = "integer", minimum = 1, maximum = 100 },
+            },
             [],
             true
         );

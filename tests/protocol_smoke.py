@@ -738,6 +738,16 @@ try:
     xs = tool('editor_xs_api', {'filter': 'forest', 'context': 'trigger', 'kind': 'function', 'includeLocal': False})
     assert xs['structuredContent']['total'] == 0, xs  # Library functions are random-map/AI only.
     assert tool('editor_xs_api', {'kind': 'bogus'})['isError']
+    batch = tool('editor_xs_api', {'names': ['kbUnitCount', 'noSuchXsFunction', 'kbunitcount'], 'includeLocal': False})
+    assert not batch['isError'], batch
+    batch = batch['structuredContent']
+    assert batch['found'] == 1 and batch['entries'][0]['signature'].startswith('int kbUnitCount(') and batch['detail'] == 'compact', batch
+    assert [m['name'] for m in batch['missing']] == ['noSuchXsFunction'] and 'officialHelp' not in batch['entries'][0], batch
+    assert 'summary' not in batch['entries'][0]
+    for bad in [{'names': []}, {'names': ['a'] * 51}, {'names': ['kbUnitCount'], 'name': 'x'}, {'names': ['x'], 'detail': 'tiny'}, {'detail': 'full'}]:
+        assert tool('editor_xs_api', bad)['isError'], bad
+    constants = tool('editor_xs_api', {'kind': 'constant', 'limit': 1})
+    assert not constants['isError'] and 'constants' in constants['structuredContent'], constants  # Local file may be absent: status says so.
     diag_spec = next(t for t in tools if t['name'] == 'editor_xs_diagnostics')
     assert diag_spec['annotations']['readOnlyHint'] and diag_spec['inputSchema']['required'] == []
     with tempfile.TemporaryDirectory() as diag_dir:
@@ -874,6 +884,16 @@ try:
     assert academy['total'] == 1 and academy['entries'][0]['costs']
     villager = tool('editor_prototypes', {'category': 'units', 'name': 'VillagerGreek'})['structuredContent']
     assert villager['entries'][0]['stats']['maxhitpoints'] == ['55.0000']
+    projected = tool('editor_prototypes', {'name': 'Hoplite', 'fields': ['maxhitpoints', 'cost', 'armor']})['structuredContent']
+    assert projected['entries'][0]['fields']['maxhitpoints'] == '115.0000' and 'Food=50.0000' in projected['entries'][0]['fields']['cost'], projected
+    assert 'stats' not in projected['entries'][0] and 'definition' not in projected['entries'][0], projected
+    fast = tool('editor_prototypes', {'category': 'units', 'fields': ['maxvelocity'],
+                                      'where': [{'field': 'maxvelocity', 'op': '>=', 'value': '6'}], 'limit': 200})['structuredContent']
+    assert 0 < fast['total'] and all(float(e['fields']['maxvelocity']) >= 6 for e in fast['entries']), fast['total']
+    for bad in [{'where': [{'field': 'maxvelocity', 'op': '~', 'value': '1'}]}, {'where': [{'field': 'x', 'op': '<', 'value': 'abc'}]},
+                {'fields': ['bad name']}, {'fields': []}, {'where': []}]:
+        assert tool('editor_prototypes', bad)['isError'], bad
+    assert tool('editor_gods', {'fields': ['name']})['isError']
     assert {'editor_dependencies', 'editor_validate_scenario'} <= set(names)
     dependencies = tool('editor_dependencies', {'proto': 'Hoplite', 'limit': 200})
     assert not dependencies['isError'], dependencies
