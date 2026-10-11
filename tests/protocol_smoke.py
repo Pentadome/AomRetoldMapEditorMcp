@@ -697,6 +697,15 @@ try:
         args = {'path': str(session_source), 'expectedSha256': hashlib.sha256(session_source.read_bytes()).hexdigest(),
                 'edits': changes}
         assert tool('editor_trigger_edit', {**args, 'edits': changes + [changes[0]]})['isError']
+        last = changes[-1]
+        assert 'duplicates' in last and 'replacements' in last, last
+        split = changes[:-1] + [{k: v for k, v in last.items() if k != 'replacements'},
+                                {k: v for k, v in last.items() if k not in ('duplicates', 'replacements')} | {'replacements': last['replacements']}]
+        merged_preview = tool('editor_trigger_edit', {**args, 'edits': split})
+        assert not merged_preview['isError'], merged_preview
+        assert merged_preview['structuredContent']['sha256'] == hashlib.sha256((session / 'edit-09.trg').read_bytes()).hexdigest(), 'merged ops must equal single op'
+        conflict = tool('editor_trigger_edit', {**args, 'edits': changes[:-1] + [last, {k: v for k, v in last.items() if k != 'duplicates'}]})
+        assert conflict['isError'] and 'both change' in json.dumps(conflict), conflict
         with tempfile.TemporaryDirectory(prefix='aom-batch-regression-') as tmp:
             output = pathlib.Path(tmp) / 'batch.trg'
             batch = tool('editor_trigger_edit', {**args, 'preview': False,

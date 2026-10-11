@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace AomMcp;
 
@@ -12,6 +13,111 @@ internal static class TriggerEdits
     static readonly UnicodeEncoding Wide = new(false, false, true);
     static readonly string[] NumericKeys = ["Player", "PlayerID", "FromPlayerID", "ToPlayerID", "EventID", "TechID", "Count", "Dist", "Status", "Value", "Duration"];
     static readonly string[] StringKeys = ["ProtoUnit", "UnitType", "Command", "QVName", "Op"];
+
+    static readonly string[] ScalarKeys = ["newName", "active", "loop"];
+    static readonly string[] ListKeys = ["replacements", "labels", "duplicates", "objectReplacements", "copyEffects"];
+    static readonly string[] IndexListKeys = ["removeEffects", "removeConditions"];
+
+    // Identity of the element/parameter an entry in a list key targets; two entries with the same identity conflict.
+    static string? Target(string key, JsonElement entry)
+    {
+        static string Part(JsonElement e, string name) => e.TryGetProperty(name, out var v) ? v.ToString() : "";
+        return key switch
+        {
+            "replacements" or "objectReplacements" => Part(entry, "copyHandle") is { Length: > 0 } h
+                ? "copy " + h + "." + Part(entry, "parameter").ToLowerInvariant()
+                : Part(entry, "kind") + "[" + Part(entry, "elementIndex") + "]." + Part(entry, "parameter").ToLowerInvariant(),
+            "labels" => Part(entry, "kind") + "[" + Part(entry, "elementIndex") + "].label",
+            "copyEffects" => "copy handle " + Part(entry, "handle"),
+            _ => null, // duplicates may legitimately repeat a source element.
+        };
+    }
+
+    /// <summary>
+    /// Merges patch operations on the same trigger into one operation (all indices stay original-numbered).
+    /// Clones are independent and pass through. Real conflicts are refused, naming both operation positions.
+    /// </summary>
+    internal static JsonElement[] Merge(JsonElement[] operations)
+    {
+        var result = new List<JsonElement>();
+        var merged = new Dictionary<int, (JsonObject Node, int First, Dictionary<string, int> Owners)>();
+        var order = new List<object>();
+        for (var i = 0; i < operations.Length; i++)
+        {
+            var op = operations[i];
+            var id = op.GetProperty("triggerId").GetInt32();
+            if (op.GetProperty("operation").GetString() != "patch") { order.Add(op); continue; }
+            if (!merged.TryGetValue(id, out var state))
+            {
+                state = ((JsonObject)JsonNode.Parse(op.GetRawText())!, i, new Dictionary<string, int>(StringComparer.Ordinal));
+                merged[id] = state;
+                order.Add(id);
+                foreach (var key in ListKeys.Where(k => op.TryGetProperty(k, out _)))
+                    foreach (var entry in op.GetProperty(key).EnumerateArray())
+                        if (Target(key, entry) is { } t) state.Owners[key + ":" + t] = i;
+                continue;
+            }
+            var node = state.Node;
+            if (op.GetProperty("expectedName").GetString() != node["expectedName"]!.GetValue<string>())
+                throw new ArgumentException($"Edits {state.First} and {i} target trigger {id} with different expectedName.");
+            foreach (var key in ScalarKeys.Where(k => op.TryGetProperty(k, out _)))
+            {
+                var value = JsonNode.Parse(op.GetProperty(key).GetRawText())!;
+                if (node.TryGetPropertyValue(key, out var existing) && existing is not null && existing.ToJsonString() != value.ToJsonString())
+                    throw new ArgumentException($"Edits {state.First} and {i} set conflicting '{key}' on trigger {id}.");
+                node[key] = value;
+            }
+            foreach (var key in ListKeys.Where(k => op.TryGetProperty(k, out _)))
+            {
+                var array = node[key] as JsonArray ?? (JsonArray)(node[key] = new JsonArray());
+                foreach (var entry in op.GetProperty(key).EnumerateArray())
+                {
+                    if (Target(key, entry) is { } t)
+                    {
+                        if (state.Owners.TryGetValue(key + ":" + t, out var owner))
+                            throw new ArgumentException($"Edits {owner} and {i} both change {t} on trigger {id}; combine them into one {key} entry.");
+                        state.Owners[key + ":" + t] = i;
+                    }
+                    array.Add(JsonNode.Parse(entry.GetRawText()));
+                }
+            }
+            foreach (var key in IndexListKeys.Where(k => op.TryGetProperty(k, out _)))
+            {
+                var array = node[key] as JsonArray ?? (JsonArray)(node[key] = new JsonArray());
+                var present = array.Select(n => n!.GetValue<int>()).ToHashSet();
+                foreach (var index in op.GetProperty(key).EnumerateArray().Select(v => v.GetInt32()))
+                    if (present.Add(index)) array.Add(index);
+            }
+            foreach (var property in op.EnumerateObject().Select(p => p.Name).Except(ScalarKeys).Except(ListKeys).Except(IndexListKeys))
+                if (property is not ("operation" or "triggerId" or "expectedName"))
+                    throw new ArgumentException($"Edit {i} sets '{property}', which cannot be merged into edit {state.First} for trigger {id}.");
+        }
+        foreach (var item in order)
+        {
+            if (item is JsonElement element) { result.Add(element); continue; }
+            var (node, first, _) = merged[(int)item];
+            result.Add(JsonDocument.Parse(node.ToJsonString()).RootElement.Clone());
+            _ = first;
+        }
+        // Removing an element while another entry (possibly from a different edit) changes it is a conflict too.
+        foreach (var op in result.Where(o => o.GetProperty("operation").GetString() == "patch"))
+        {
+            ConflictWithRemoval(op, "removeEffects", "effect");
+            ConflictWithRemoval(op, "removeConditions", "condition");
+        }
+        return [.. result];
+    }
+
+    static void ConflictWithRemoval(JsonElement op, string removalKey, string kind)
+    {
+        if (!op.TryGetProperty(removalKey, out var removals)) return;
+        var removed = removals.EnumerateArray().Select(v => v.GetInt32()).ToHashSet();
+        foreach (var key in new[] { "replacements", "labels", "objectReplacements" })
+            if (op.TryGetProperty(key, out var list))
+                foreach (var entry in list.EnumerateArray())
+                    if (entry.TryGetProperty("kind", out var k) && k.GetString() == kind && entry.TryGetProperty("elementIndex", out var index) && removed.Contains(index.GetInt32()))
+                        throw new ArgumentException($"Trigger {op.GetProperty("triggerId").GetInt32()}: {kind}[{index.GetInt32()}] is both removed and changed ({key}).");
+    }
 
     internal static void Preflight(JsonElement args)
     {
@@ -30,11 +136,15 @@ internal static class TriggerEdits
                 ValidateEdit(entry);
                 if (entry.TryGetProperty("objectReplacements", out var objectEdits)) objectTuples += objectEdits.EnumerateArray().Sum(r => r.GetProperty("objects").GetArrayLength());
                 if (objectTuples > TriggerObjects.MaxObjects) throw new ArgumentException("At most 200 replacement object tuples per batch.");
-                if (!seen.Add(entry.GetProperty("triggerId").GetInt32()))
-                    throw new ArgumentException("Each source trigger may be edited only once per batch.");
+                seen.Add(entry.GetProperty("triggerId").GetInt32());
                 if (entry.GetProperty("operation").GetString() == "clone" && !newIds.Add(entry.GetProperty("newId").GetInt32()))
                     throw new ArgumentException("Duplicate clone ID in batch.");
             }
+            var all = list.EnumerateArray().ToArray();
+            var mergedOperations = Merge(all);
+            if (all.GroupBy(o => o.GetProperty("triggerId").GetInt32()).Any(g => g.Select(o => o.GetProperty("operation").GetString()).Distinct().Count() > 1))
+                throw new ArgumentException("A trigger cannot be both patched and cloned in one batch (order-dependent); use two batches.");
+            foreach (var m in mergedOperations) ValidateEdit(m);
             if (newIds.Overlaps(seen)) throw new ArgumentException("Clone ID collides with batch source ID.");
         }
         else
@@ -481,7 +591,7 @@ internal static class TriggerEdits
             throw new WorkflowFailure("SOURCE_CHANGED", "preflight", "Source TR SHA-256 differs from expectedSha256.", false, false,
                 "Inspect export again; no write or game operation attempted.");
         var batch = args.TryGetProperty("edits", out var list);
-        var operations = batch ? list.EnumerateArray().ToArray() : [args];
+        var operations = batch ? Merge(list.EnumerateArray().ToArray()) : [args];
         var warnings = PrototypeWarnings(operations);
         var current = input;
         var details = new List<object>();
