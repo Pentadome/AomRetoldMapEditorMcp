@@ -14,7 +14,7 @@ internal static partial class XsConstants
     // Host heuristics, not game rules: identifier shape, minimum prefix family size and word length.
     const int MinFamily = 3, MinFamilyWord = 3, MaxName = 64;
     internal sealed record Family(string Prefix, int Count);
-    internal sealed record Document(string GameFileVersion, string ExeSha256, string Status, string Note, Family[] Families, string[] Names);
+    internal sealed record Document(string GameFileVersion, string ExeSha256, string Status, string Note, Family[] Families, string[] Names, string[]? SeenInShippedXs = null);
 
     [GeneratedRegex(@"^c[A-Z][A-Za-z0-9]{2,63}$")]
     private static partial Regex Shape();
@@ -51,6 +51,29 @@ internal static partial class XsConstants
         return (names, counts.OrderByDescending(c => c.Value).ThenBy(c => c.Key, StringComparer.Ordinal).Select(c => new Family(c.Key, c.Value)).ToArray());
     }
 
+    /// <summary>Names of the scanned constants that appear as identifiers in the installed game's own .xs scripts (read-only evidence).</summary>
+    static string[] ShippedTokens(string exe, string[] names)
+    {
+        var game = Path.Combine(Path.GetDirectoryName(exe)!, "game");
+        var wanted = new HashSet<string>(names, StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var sub in new[] { "ai", "random_maps" })
+        {
+            var root = Path.Combine(game, sub);
+            if (!Directory.Exists(root)) continue;
+            foreach (var file in Directory.EnumerateFiles(root, "*.xs", SearchOption.AllDirectories))
+            {
+                if (new FileInfo(file).Length > 4_000_000) continue;
+                foreach (System.Text.RegularExpressions.Match m in Token().Matches(File.ReadAllText(file)))
+                    if (wanted.Contains(m.Value)) seen.Add(m.Value);
+            }
+        }
+        return seen.Order(StringComparer.Ordinal).ToArray();
+    }
+
+    [GeneratedRegex(@"\bc[A-Z][A-Za-z0-9]{2,63}\b")]
+    private static partial Regex Token();
+
     internal static string Generate(string exe, string output)
     {
         var known = new HashSet<string>(StringComparer.Ordinal);
@@ -63,10 +86,11 @@ internal static partial class XsConstants
         }
         catch (FileNotFoundException) { } // Shipped API missing: keep every scanned name.
         var (names, families) = Select(Scan(new PeImage(exe).Bytes), known);
+        var seen = ShippedTokens(exe, names);
         var document = new Document(System.Diagnostics.FileVersionInfo.GetVersionInfo(exe).FileVersion ?? "", Layout.Hash(exe),
             "unverified",
             "Identifier strings found in the game executable (names only, no values). Not verified as visible to XS code until a live probe confirms them.",
-            families, names);
+            families, names, seen);
         var path = Path.Combine(output, FileName);
         File.WriteAllText(path, JsonSerializer.Serialize(document, XsApi.Json));
         return $"XS constants: {names.Length} names in {families.Length} families -> {path} (local only, not shipped).";

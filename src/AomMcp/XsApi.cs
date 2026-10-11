@@ -164,7 +164,7 @@ internal sealed partial class XsApi
         if (kind is "any" or "constant" && library.Length == 0 && context == "any")
             foreach (var constant in Constants().Names)
                 if (Match(constant, null))
-                    results.Add(("constant", constant, new ConstantEntry(constant, ConstantFamily(constant))));
+                    results.Add(("constant", constant, ConstantOf(constant)));
         if (local && kind is "any" or "syscall" && library.Length == 0)
         {
             var shipped = _model.Syscalls.Select(s => s.Name).ToHashSet(StringComparer.Ordinal);
@@ -197,7 +197,9 @@ internal sealed partial class XsApi
     internal sealed record ConstantEntry(string Name, string Family, string Status = "exe string; not verified as XS-visible");
 
     (string[] Names, bool Present) _constants;
+    HashSet<string> _seenInXs = new(StringComparer.Ordinal);
     bool _constantsLoaded;
+    const string SeenStatus = "exe string; also used in the game's own shipped XS scripts (name evidence only; value/semantics not verified)";
 
     (string[] Names, bool Present) Constants()
     {
@@ -207,10 +209,13 @@ internal sealed partial class XsApi
         {
             var document = XsConstants.Load(Generator.DefaultOutput());
             _constants = document is null ? ([], false) : (document.Names, true);
+            _seenInXs = new HashSet<string>(document?.SeenInShippedXs ?? [], StringComparer.Ordinal);
         }
         catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException) { _constants = ([], false); }
         return _constants;
     }
+
+    ConstantEntry ConstantOf(string name) => _seenInXs.Contains(name) ? new(name, ConstantFamily(name), SeenStatus) : new(name, ConstantFamily(name));
 
     static string ConstantFamily(string name)
     {
@@ -239,7 +244,7 @@ internal sealed partial class XsApi
         foreach (var x in _model.Globals) Add("global", x.Name, x);
         foreach (var x in _model.Rules) Add("rule", x.Name, x);
         foreach (var x in _model.AiPlanConstants) Add("aiPlanConstant", x.Name, x);
-        foreach (var x in Constants().Names) Add("constant", x, new ConstantEntry(x, ConstantFamily(x)));
+        foreach (var x in Constants().Names) Add("constant", x, ConstantOf(x));
         return _byName = map;
     }
 

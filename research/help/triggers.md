@@ -10,3 +10,7 @@ Moved verbatim from AGENTS.md; served by `editor_help topic=triggers`.
 - `editor_trigger_edit`: edits on the same trigger in one batch are merged (original numbering); only real conflicts refuse. `outputPath:"auto"` writes `<stem>.eN.trg`; the result's `next {path, expectedSha256}` chains the next edit. CodeSnippet replacements (ValueType 72) may be long and multi-line.
 - `editor_trigger_elements` looks up the condition/effect catalog and lists byte-copy exemplars (use `duplicates`/`copyEffects`); creating elements from the catalog is not supported (binary layout unproven).
 - Bulky readers accept `fields` and `saveTo` (new .json path); results over 16 KB carry a `truncationHint`.
+
+## Backups on apply
+
+`editor_triggers apply` already exports a game-written `before-trigger-import` backup and verifies it against `expectedLiveSha256` before importing, then round-trips the result; a separate `autoBackup` flag was therefore not added (it would only weaken the reviewed-live-export guard). Take the reviewed export first with `editor_triggers operation=export`.
