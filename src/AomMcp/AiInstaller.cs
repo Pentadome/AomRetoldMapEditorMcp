@@ -68,9 +68,11 @@ internal static partial class AiInstaller
     }
     internal static void Preflight(JsonElement args)
     {
-        Catalog.ValidateObject(args, ["sourcePath", "expectedSha256", "destination", "preview", "stagingPath", "receiptPath", "ownershipReceiptPath", "expectedReceiptSha256", "expectedInstalledSha256", "backupPath", "confirmWrite", "confirmDestructive", "force"]);
+        Catalog.ValidateObject(args, ["sourcePath", "expectedSha256", "destination", "preview", "stagingPath", "receiptPath", "ownershipReceiptPath", "expectedReceiptSha256", "expectedInstalledSha256", "backupPath", "confirmWrite", "confirmDestructive", "force", "destinationRoot", "lineEndings"]);
         _ = EditorFiles.LocalPath(args.GetProperty("sourcePath").GetString()!); _ = AiScripts.Relative(args.GetProperty("destination").GetString()!);
         _ = RequiredHash(args, "expectedSha256");
+        if (args.TryGetProperty("destinationRoot", out var droot) && droot.GetString() is not ("aom_mcp" or "campaign")) throw new ArgumentException("destinationRoot must be aom_mcp or campaign.");
+        if (args.TryGetProperty("lineEndings", out var le) && le.GetString() is not ("preserve" or "crlf" or "lf")) throw new ArgumentException("lineEndings must be preserve, crlf or lf.");
         if (!Preview(args))
         {
             EditorFiles.Confirm(args, "confirmWrite");
@@ -88,6 +90,20 @@ internal static partial class AiInstaller
             }
         }
     }
+    static bool Campaign(JsonElement args) => args.TryGetProperty("destinationRoot", out var r) && r.GetString() == "campaign";
+    static int Count(byte[] bytes, byte value) { var n = 0; foreach (var b in bytes) if (b == value) n++; return n; }
+    static bool IsCrlf(byte[] bytes) { var lf = Count(bytes, 10); return lf > 0 && bytes.AsSpan().Count("\r\n"u8) * 2 >= lf; }
+    /// <summary>Re-encodes line endings; returns the original bytes unchanged when no conversion is needed.</summary>
+    internal static byte[] LineEndings(byte[] source, string mode, byte[]? existing, out string applied)
+    {
+        var crlf = mode == "crlf" || mode == "preserve" && existing is not null && IsCrlf(existing);
+        applied = mode == "preserve" && existing is null ? "source" : crlf ? "crlf" : "lf";
+        if (applied == "source") return source;
+        var text = Encoding.UTF8.GetString(source).Replace("\r\n", "\n", StringComparison.Ordinal);
+        if (crlf) text = text.Replace("\n", "\r\n", StringComparison.Ordinal);
+        var result = new UTF8Encoding(source.Length >= 3 && source[0] == 0xEF && source[1] == 0xBB && source[2] == 0xBF).GetBytes(text);
+        return result.AsSpan().SequenceEqual(source) ? source : result;
+    }
     static bool Preview(JsonElement args) => !args.TryGetProperty("preview", out var p) || p.GetBoolean();
     static bool Force(JsonElement args) => args.TryGetProperty("force", out var f) && f.GetBoolean();
     static void NewBytes(string path, byte[] bytes)
@@ -97,6 +113,10 @@ internal static partial class AiInstaller
     }
     internal static void SelfTest()
     {
+        var lf = Encoding.UTF8.GetBytes("a\nb\n"); var crlfBytes = Encoding.UTF8.GetBytes("a\r\nb\r\n");
+        if (!LineEndings(lf, "preserve", crlfBytes, out _).AsSpan().SequenceEqual(crlfBytes) || !LineEndings(crlfBytes, "preserve", lf, out _).AsSpan().SequenceEqual(lf)
+            || LineEndings(lf, "preserve", null, out var origin) != lf || origin != "source" || !LineEndings(crlfBytes, "lf", null, out _).AsSpan().SequenceEqual(lf))
+            throw new InvalidOperationException("AI line-ending conversion self-test failed.");
         var directory = Path.Combine(Path.GetTempPath(), "aom-install-fixture-" + Guid.NewGuid().ToString("N"));
         var root = Path.Combine(directory, "game", "ai"); Directory.CreateDirectory(root);
         var exe = Path.Combine(directory, "fake.exe"); var source = Path.Combine(directory, "source.xs");
@@ -204,13 +224,21 @@ internal static partial class AiInstaller
     internal static object Execute(JsonElement args, string exe, Action<string>? testFault = null)
     {
         Preflight(args); var root = AiScripts.InstalledRoot(exe); if (!Directory.Exists(root)) throw new ArgumentException("Installed AI root missing.");
-        var managed = AiScripts.Contained(root, "aom_mcp"); var relative = AiScripts.Relative(args.GetProperty("destination").GetString()!);
+        var campaign = Campaign(args); var rootName = campaign ? "campaign" : "aom_mcp";
+        var managed = AiScripts.Contained(root, rootName); var receipts = AiScripts.Contained(root, "aom_mcp\\.receipts"); var relative = AiScripts.Relative(args.GetProperty("destination").GetString()!);
         if (relative.Split('\\').Any(s => s.StartsWith('.'))) throw new ArgumentException("Reserved managed destination component.");
+        if (campaign && relative.Split('\\').Length < 2) throw new ArgumentException("campaign destination must be <subdir>\\<file>.xs under game\\ai\\campaign.");
         var destination = AiScripts.Contained(managed, relative); var sourcePath = EditorFiles.LocalPath(args.GetProperty("sourcePath").GetString()!);
         if (!sourcePath.EndsWith(".xs", StringComparison.OrdinalIgnoreCase) || sourcePath.Equals(destination, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Source requires distinct .xs path.");
         var source = ReadXs(sourcePath); var sha = CheckpointDocument.Hash(source); CheckpointDocument.RequireHash(sha, args.GetProperty("expectedSha256").GetString());
-        var dependencies = Includes(root, destination, source); var update = File.Exists(destination);
+        var update = File.Exists(destination);
         if (Directory.Exists(destination)) throw new ArgumentException("Destination is directory.");
+        var dependencies = Includes(root, destination, source);
+        var mode = args.TryGetProperty("lineEndings", out var leArg) ? leArg.GetString()! : "preserve";
+        byte[]? existing = null;
+        if (update) { var fi = new FileInfo(destination); if (fi.Length > 1_000_000) throw new InvalidDataException("Installed AI exceeds byte bound."); existing = File.ReadAllBytes(destination); }
+        source = LineEndings(source, mode, existing, out var lineEndingsApplied);
+        var installedSha = CheckpointDocument.Hash(source);
         string? oldHash = null, oldReceiptPath = null;
         var force = Force(args);
         if (update && force)
@@ -230,7 +258,7 @@ internal static partial class AiInstaller
             _ = RequiredHash(args, "expectedReceiptSha256"); _ = RequiredHash(args, "expectedInstalledSha256");
             if (new FileInfo(destination).Length > 1_000_000) throw new InvalidDataException("Installed AI exceeds byte bound.");
             oldReceiptPath = EditorFiles.LocalPath(ownership.GetString()!);
-            if (!Under(oldReceiptPath, Path.Combine(managed, ".receipts")) || new FileInfo(oldReceiptPath).Length > 100_000) throw new ArgumentException("Ownership receipt must be registered within managed .receipts.");
+            if (!Under(oldReceiptPath, receipts) || new FileInfo(oldReceiptPath).Length > 100_000) throw new ArgumentException("Ownership receipt must be registered within managed .receipts.");
             CheckpointDocument.RequireHash(Layout.Hash(oldReceiptPath), args.GetProperty("expectedReceiptSha256").GetString());
             var receipt = JsonSerializer.Deserialize<Receipt>(File.ReadAllBytes(oldReceiptPath)) ?? throw new InvalidDataException("Ownership receipt missing.");
             oldHash = Layout.Hash(destination); CheckpointDocument.RequireHash(oldHash, args.GetProperty("expectedInstalledSha256").GetString());
@@ -246,13 +274,13 @@ internal static partial class AiInstaller
         if (args.TryGetProperty("receiptPath", out var rp))
         {
             receiptPath = EditorFiles.LocalPath(rp.GetString()!);
-            if (!Under(receiptPath, Path.Combine(managed, ".receipts")) || !receiptPath.EndsWith(".json", StringComparison.OrdinalIgnoreCase) || File.Exists(receiptPath) || Directory.Exists(receiptPath))
+            if (!Under(receiptPath, receipts) || !receiptPath.EndsWith(".json", StringComparison.OrdinalIgnoreCase) || File.Exists(receiptPath) || Directory.Exists(receiptPath))
                 throw new ArgumentException("New receipt must be exclusive .json under managed .receipts.");
         }
         if (staging is not null && Under(staging, root) || backup is not null && Under(backup, root)) throw new ArgumentException("Staging/backups must be outside installed AI root.");
         var paths = new[] { sourcePath, destination, staging, backup, receiptPath }.Where(p => p is not null).Cast<string>().ToArray();
         if (paths.Distinct(StringComparer.OrdinalIgnoreCase).Count() != paths.Length) throw new ArgumentException("Installer paths must be distinct.");
-        if (Preview(args)) return new { preview = true, sourcePath, sourceSha256 = sha, destinationPath = destination, aiPath = "aom_mcp\\" + relative,
+        if (Preview(args)) return new { preview = true, sourcePath, sourceSha256 = sha, destinationPath = destination, aiPath = rootName + "\\" + relative, destinationRoot = rootName, lineEndings = lineEndingsApplied, installedSha256 = installedSha,
             update, force, expectedInstalledSha256 = oldHash, stagingPath = staging, backupPath = backup, receiptPath, includes = dependencies,
             permissions = "No permission-probing writes performed; OS access checked during confirmed apply.", compilationVerified = false, runtimeVerified = false };
         if (staging is null || receiptPath is null || update && backup is null) throw new ArgumentException("Apply requires stagingPath/receiptPath; update also requires new backupPath.");
@@ -281,13 +309,13 @@ internal static partial class AiInstaller
                 using var file = new FileStream(EditorFiles.LocalPath(destination), FileMode.CreateNew, FileAccess.Write, FileShare.None);
                 file.Write(source.AsSpan(0, source.Length / 2)); testFault?.Invoke("partial-destination"); file.Write(source.AsSpan(source.Length / 2)); file.Flush(true);
             }
-            CheckpointDocument.RequireHash(Layout.Hash(EditorFiles.LocalPath(destination)), sha); testFault?.Invoke("destination-written");
+            CheckpointDocument.RequireHash(Layout.Hash(EditorFiles.LocalPath(destination)), installedSha); testFault?.Invoke("destination-written");
             phase = "receipt"; _ = EditorFiles.LocalPath(receiptPath); Directory.CreateDirectory(Path.GetDirectoryName(receiptPath)!);
-            var receipt = new Receipt(Issuer, destination, sha, oldHash, staging, backup, DateTimeOffset.UtcNow, update && force);
+            var receipt = new Receipt(Issuer, destination, installedSha, oldHash, staging, backup, DateTimeOffset.UtcNow, update && force);
             NewBytes(receiptPath, JsonSerializer.SerializeToUtf8Bytes(receipt)); testFault?.Invoke("receipt-written");
             var verified = JsonSerializer.Deserialize<Receipt>(File.ReadAllBytes(receiptPath));
             if (verified != receipt) throw new IOException("Receipt semantic readback mismatch.");
-            return new { preview = false, destinationPath = destination, sha256 = sha, aiPath = "aom_mcp\\" + relative, update, stagingPath = staging, backupPath = backup,
+            return new { preview = false, destinationPath = destination, sha256 = installedSha, sourceSha256 = sha, destinationRoot = rootName, lineEndings = lineEndingsApplied, aiPath = rootName + "\\" + relative, update, stagingPath = staging, backupPath = backup,
                 receiptPath, receiptSha256 = Layout.Hash(receiptPath), includes = dependencies, compilationVerified = false, runtimeVerified = false,
                 nextAction = "Bind managed AI separately with guarded player settings. Confirm compilation and fresh runtime evidence; no automatic apply/playtest." };
         }

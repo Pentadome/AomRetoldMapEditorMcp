@@ -140,7 +140,7 @@ internal static class ScenarioReader
         return players;
     }
 
-    internal static object Query(JsonElement args)
+    internal static object Query(JsonElement args, string? exe = null)
     {
         var snapshot = Read(args.GetProperty("path").GetString()!);
         var player = args.TryGetProperty("player", out var p) ? p.GetInt32() : -1;
@@ -155,6 +155,7 @@ internal static class ScenarioReader
         return new { snapshot.Path, snapshot.Sha256, snapshot.Format, snapshot.SuffixBytes,
             players = snapshot.Players.Where(p => player == -1 || p.Id == player)
                 .Select(p => new { p.Id, p.Name, p.DisplayName, p.AiPath,
+                    aiDetail = exe is not null && args.TryGetProperty("aiDetail", out var detail) && detail.GetBoolean() ? AiScripts.Resolve(exe, p.AiPath) : null,
                     control = p.Control switch { 0 => "Human", 1 => "Computer", 3 => "Unavailable", _ => "unknown" },
                     p.CivId, p.ColorId, p.StartAge, p.MaxAge,
                     minorGodIds = new { p.ClassicalGodId, p.HeroicGodId, p.MythicGodId },

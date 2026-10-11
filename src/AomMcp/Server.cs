@@ -568,7 +568,7 @@ internal sealed partial class Server(
         if (name == "editor_trigger_list") return CampaignTriggers.Query(args);
         if (name == "editor_trigger_player_parity") return TriggerParity.Query(args);
         if (name == "editor_trigger_edit") return TriggerEdits.Edit(args);
-        if (name == "editor_players") return ScenarioReader.Query(args);
+        if (name == "editor_players") return ScenarioReader.Query(args, exe);
         if (name == "editor_player_dependency_audit") return ScenarioAudit.Query(args, exe);
         if (name == "editor_set_diplomacy" && args.GetProperty("operation").GetString() != "apply")
             return PlayerWorkflow.Diplomacy(args, exe);
@@ -1074,6 +1074,7 @@ internal sealed partial class Server(
                 ["path"] = new { type = "string" },
                 ["player"] = new { type = "integer", minimum = 0, maximum = 12 },
                 ["raw"] = new { type = "boolean" },
+                ["aiDetail"] = new { type = "boolean", description = "Add per-player aiDetail: resolved INSTALLPATH/game/ai file, sha256, include checks." },
             }, ["path"], true);
         yield return Spec("editor_set_diplomacy",
             "Preview/verify directional stance and optional AI path from game-written checkpoints. Legacy oneWay/mutual or changes array of 1..64 directed cells; matrix apply uses RGB gates before/after each click, one final game-writer checkpoint, and diagnostic checkpoint on uncertain input. Pinned 2560×1440 or 1920×1080 with pre-opened Diplomacy dialog (alternative: Players Settings > Diplomacy; normal: Scenario > Diplomacy; auto-detected, same grid), confirmed scene, fresh checkpoint+TR backups. AI Name text entry FAILED live P5 readback; desiredAiPath apply refuses before input. Manual AI path under INSTALLPATH\\game\\ai then verify; profile ai did not work. No .mythscn edits/retry/rollback.",
