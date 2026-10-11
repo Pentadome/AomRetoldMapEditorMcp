@@ -283,6 +283,8 @@ public sealed class FocusRefusedException(int attempts = 1, string? foregroundPr
     : InvalidOperationException("Game could not receive focus after " + attempts + " attempt(s); no input sent."
         + (foregroundProcess is null ? "" : " Foreground window belongs to '" + foregroundProcess + "'; close or minimize it and retry once."))
 {
+    /// <summary>Number of activation attempts made before giving up.</summary>
     public int Attempts { get; } = attempts;
+    /// <summary>Name of the process that held the foreground when focus was refused, if known.</summary>
     public string? ForegroundProcess { get; } = foregroundProcess;
 }
