@@ -143,6 +143,7 @@ internal static class Generator
         // Forest/cliff definitions and terrain mixes (paint palette names/order) for editor_terrain_catalog.
         paths.Add("map_definitions/forest.xml.XMB");
         paths.Add("map_definitions/cliff_types.xml.XMB");
+        if (archive.Paths.Contains("trigger/trigger_data.xml.XMB")) paths.Add("trigger/trigger_data.xml.XMB");
         var mixes = archive.Paths
             .Where(p => p.StartsWith("map_definitions/mixes/", StringComparison.Ordinal) && p.EndsWith(".xml.XMB", StringComparison.Ordinal)).ToArray();
         foreach (var mix in mixes)

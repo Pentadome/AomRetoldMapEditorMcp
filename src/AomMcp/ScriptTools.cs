@@ -5,14 +5,15 @@ namespace AomMcp;
 /// <summary>Connection-free script diagnostics tools: editor_xs_diagnostics (MythLog / trigtemp.xs readers).</summary>
 internal sealed partial class Server
 {
-    static readonly HashSet<string> ScriptNames = new(StringComparer.Ordinal) { XsDiagnostics.Tool };
+    static readonly HashSet<string> ScriptNames = new(StringComparer.Ordinal) { XsDiagnostics.Tool, TriggerElements.Tool };
 
     static void PreflightScript(string name, JsonElement args)
     {
         if (name == XsDiagnostics.Tool) XsDiagnostics.Preflight(args);
+        else if (name == TriggerElements.Tool) TriggerElements.Preflight(args);
     }
 
-    object InvokeScript(string name, JsonElement args) => XsDiagnostics.Query(args, exe);
+    object InvokeScript(string name, JsonElement args) => name == TriggerElements.Tool ? TriggerElements.Query(args) : XsDiagnostics.Query(args, exe);
 
     static IEnumerable<object> ScriptExtras()
     {
@@ -36,6 +37,19 @@ internal sealed partial class Server
                 ["profileDirectory"] = new { type = "string" },
                 ["offset"] = new { type = "integer", minimum = 0 },
                 ["limit"] = new { type = "integer", minimum = 1, maximum = XsDiagnostics.MaxLimit },
+            },
+            [], true);
+        yield return Spec(TriggerElements.Tool,
+            "Look up the shipped trigger condition/effect catalog (trigger_data.xml, from editor_generate_catalog) offline: exact names, parameters with vartype, defaults, which parameters editor_trigger_edit can replace, the XS command/expression templates. With path+expectedSha256 (hash-pinned TR export) each entry also lists up to 5 existing exemplars (triggerId, elementIndex, current args) of that element type, which editor_trigger_edit can byte-copy via duplicates/copyEffects. It never builds element bytes: types absent from the export cannot be added yet. kind=any|effect|condition; name exact, filter substring; limit 1..50 (default 10), offset. Read-only, no game connection.",
+            new Dictionary<string, object>
+            {
+                ["kind"] = new { type = "string", @enum = TriggerElements.Kinds },
+                ["name"] = new { type = "string" },
+                ["filter"] = new { type = "string" },
+                ["path"] = new { type = "string" },
+                ["expectedSha256"] = new { type = "string" },
+                ["offset"] = new { type = "integer", minimum = 0 },
+                ["limit"] = new { type = "integer", minimum = 1, maximum = TriggerElements.MaxLimit },
             },
             [], true);
     }

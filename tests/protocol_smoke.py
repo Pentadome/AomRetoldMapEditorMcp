@@ -779,6 +779,13 @@ try:
         assert tool('editor_xs_api', bad)['isError'], bad
     constants = tool('editor_xs_api', {'kind': 'constant', 'limit': 1})
     assert not constants['isError'] and 'constants' in constants['structuredContent'], constants  # Local file may be absent: status says so.
+    elements_sample = root / 'research/defense-code-sample.trg'
+    assert tool('editor_trigger_elements', {'path': str(elements_sample)})['isError']  # path needs expectedSha256
+    assert tool('editor_trigger_elements', {'kind': 'bogus'})['isError']
+    if (root / 'generated/data/trigger_data.xml').is_file() and elements_sample.is_file():
+        elements = tool('editor_trigger_elements', {'name': 'XS: Code Snippet', 'kind': 'effect', 'path': str(elements_sample),
+            'expectedSha256': hashlib.sha256(elements_sample.read_bytes()).hexdigest()})
+        assert not elements['isError'] and elements['structuredContent']['entries'][0]['exemplars'][0]['elementIndex'] == 0, elements
     diag_spec = next(t for t in tools if t['name'] == 'editor_xs_diagnostics')
     assert diag_spec['annotations']['readOnlyHint'] and diag_spec['inputSchema']['required'] == []
     with tempfile.TemporaryDirectory() as diag_dir:
@@ -1036,7 +1043,7 @@ try:
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
     expected_core = (helper_names - workflow_names) | core_native
-    assert len(expected_core) == 79 and len(names) == 929
+    assert len(expected_core) == 80 and len(names) == 930
     assert {'editor_dialog_state', 'editor_dialog_act'} <= expected_core
     world_tools = {'editor_terrain_info', 'editor_live_players', 'editor_edit_mode', 'editor_paint_world', 'editor_elevation',
                    'editor_transform_unit', 'editor_terrain_catalog', 'editor_camera_frame', 'editor_overview',
