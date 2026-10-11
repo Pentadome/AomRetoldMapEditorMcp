@@ -807,6 +807,18 @@ try:
     assert clean['total'] == 0 and len(clean['filesChecked']) == 2, clean
     assert tool('editor_xs_check', {'path': str(fx / 'missing.xs')})['isError']
     assert tool('editor_xs_check', {'path': str(root / 'README.md')})['isError']
+    topics = tool('editor_help', {})['structuredContent']['topics']
+    assert {'xs', 'triggers', 'placement'} <= {t['name'] for t in topics}, topics
+    assert 'editor_xs_check' in tool('editor_help', {'topic': 'xs'})['structuredContent']['text']
+    assert tool('editor_help', {'topic': '../AGENTS'})['isError'] and tool('editor_help', {'topic': 'nope'})['isError']
+    digest_cp = root / 'research/BaseDefense.mythscn'
+    digest_tr = root / 'research/defense-code-sample.trg'
+    if digest_cp.is_file():
+        digest = tool('editor_scenario_digest', {'path': str(digest_cp), 'expectedSha256': hashlib.sha256(digest_cp.read_bytes()).hexdigest(),
+            'triggerPath': str(digest_tr), 'expectedTriggerSha256': hashlib.sha256(digest_tr.read_bytes()).hexdigest()})
+        assert not digest['isError'] and digest['structuredContent']['playerCount'] >= 1, digest
+        assert len(json.dumps(digest['structuredContent'])) < 8000
+        assert tool('editor_scenario_digest', {'path': str(digest_cp), 'expectedSha256': '0' * 64})['isError']
     elements_sample = root / 'research/defense-code-sample.trg'
     assert tool('editor_trigger_elements', {'path': str(elements_sample)})['isError']  # path needs expectedSha256
     assert tool('editor_trigger_elements', {'kind': 'bogus'})['isError']
@@ -1071,7 +1083,7 @@ try:
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
     expected_core = (helper_names - workflow_names) | core_native
-    assert len(expected_core) == 81 and len(names) == 931
+    assert len(expected_core) == 83 and len(names) == 933
     assert {'editor_dialog_state', 'editor_dialog_act'} <= expected_core
     world_tools = {'editor_terrain_info', 'editor_live_players', 'editor_edit_mode', 'editor_paint_world', 'editor_elevation',
                    'editor_transform_unit', 'editor_terrain_catalog', 'editor_camera_frame', 'editor_overview',

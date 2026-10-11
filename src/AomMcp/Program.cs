@@ -103,6 +103,7 @@ if (selfTest)
     XsDiagnostics.SelfTest();
     XsConstants.SelfTest();
             XsCheck.SelfTest();
+            HelpTools.SelfTest();
     PlayerSettings.SelfTest();
     StartupOrders.SelfTest();
     RuntimeProbes.SelfTest();

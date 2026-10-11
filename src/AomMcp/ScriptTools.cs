@@ -5,17 +5,20 @@ namespace AomMcp;
 /// <summary>Connection-free script diagnostics tools: editor_xs_diagnostics (MythLog / trigtemp.xs readers).</summary>
 internal sealed partial class Server
 {
-    static readonly HashSet<string> ScriptNames = new(StringComparer.Ordinal) { XsDiagnostics.Tool, TriggerElements.Tool, XsCheck.Tool };
+    static readonly HashSet<string> ScriptNames = new(StringComparer.Ordinal) { XsDiagnostics.Tool, TriggerElements.Tool, XsCheck.Tool, HelpTools.HelpTool, HelpTools.DigestTool };
 
     static void PreflightScript(string name, JsonElement args)
     {
         if (name == XsDiagnostics.Tool) XsDiagnostics.Preflight(args);
         else if (name == TriggerElements.Tool) TriggerElements.Preflight(args);
         else if (name == XsCheck.Tool) XsCheck.Preflight(args);
+        else if (name == HelpTools.HelpTool) HelpTools.PreflightHelp(args);
+        else if (name == HelpTools.DigestTool) HelpTools.PreflightDigest(args);
     }
 
     object InvokeScript(string name, JsonElement args) => name == TriggerElements.Tool ? TriggerElements.Query(args)
-        : name == XsCheck.Tool ? XsCheck.Query(args, exe) : XsDiagnostics.Query(args, exe);
+        : name == XsCheck.Tool ? XsCheck.Query(args, exe)
+        : name == HelpTools.HelpTool ? HelpTools.Help(args) : name == HelpTools.DigestTool ? HelpTools.Digest(args, exe) : XsDiagnostics.Query(args, exe);
 
     static IEnumerable<object> ScriptExtras()
     {
@@ -41,6 +44,19 @@ internal sealed partial class Server
                 ["limit"] = new { type = "integer", minimum = 1, maximum = XsDiagnostics.MaxLimit },
             },
             [], true);
+        yield return Spec(HelpTools.HelpTool,
+            "Topical workflow guides (no game connection). Call without arguments to list topics; topic=<name> returns the guide (catalog, dialogs, placement, triggers, players, workflows, xs, ui). Holds the detailed guidance that used to live in AGENTS.md.",
+            new Dictionary<string, object> { ["topic"] = new { type = "string" } }, [], true);
+        yield return Spec(HelpTools.DigestTool,
+            "One compact summary of a saved scenario: players (civ, control, AI path and whether it resolves, allies/enemies) and, with a hash-pinned TR export, trigger counts by group, Code Snippet and victory/defeat trigger names. Hash-pinned saved files only; no game connection, no runtime proof. Use editor_players / editor_trigger_list / editor_player_dependency_audit for detail.",
+            new Dictionary<string, object>
+            {
+                ["path"] = new { type = "string" },
+                ["expectedSha256"] = new { type = "string" },
+                ["triggerPath"] = new { type = "string" },
+                ["expectedTriggerSha256"] = new { type = "string" },
+            },
+            ["path", "expectedSha256"], true);
         yield return Spec(XsCheck.Tool,
             "HEURISTIC offline XS lint (stock-calibrated: method calls like list.size() and extern globals in includes are normal) (not a compiler; no findings proves nothing). Checks an .xs file plus its includes for unbalanced braces/parens, member access in for-loop conditions (MythLog 0172 shape), rule without active/inactive, wrong argument counts and unknown calls against editor_xs_api's model. Returns {file,line,col,rule,severity,message,mythLogCode?}. MythLog (editor_xs_diagnostics) is authoritative after the game loads the script.",
             new Dictionary<string, object>
