@@ -30,7 +30,7 @@ p = subprocess.Popen(host_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
 sequence = 0
 notifications = []
 workflow_names = {'editor_unit_notes', 'editor_scenario_diff', 'editor_install_ai', 'editor_startup_orders',
-                  'editor_runtime_probe', 'editor_runtime_report', 'editor_playtest'}
+                  'editor_runtime_probe', 'editor_runtime_report', 'editor_playtest', 'editor_build_campaign'}
 
 def send(method, params=None):
     global sequence
@@ -115,6 +115,17 @@ def assert_workflow_tools():
         ai = success('editor_install_ai', {'sourcePath': str(xs), 'expectedSha256': sha(xs), 'destination': folder.name + '.xs'})
         assert ai['preview'] and not ai['runtimeVerified'] and not ai['compilationVerified'], ai
         refusal('editor_install_ai', {'sourcePath': str(xs), 'expectedSha256': sha(xs), 'destination': '../stock.xs'})
+        camp_mods = folder / 'local'
+        camp_mods.mkdir()
+        camp = {'modsDirectory': str(camp_mods), 'modName': 'My Camp', 'campaignId': 'mycamp', 'displayName': 'My Camp', 'scenarios': [
+            {'sourcePath': str(before), 'expectedSha256': sha(before), 'title': 'One', 'premise': 'First'},
+            {'sourcePath': str(after), 'expectedSha256': sha(after), 'fileName': 'two', 'cinematic': True}]}
+        built = success('editor_build_campaign', camp)
+        assert built['preview'] and 'STR_MYCAMP_MENU_TITLE_01' in built['strings'] and '<Cinematic>1</Cinematic>' in built['xml'], built
+        assert not any(camp_mods.iterdir()), 'campaign preview wrote files'
+        refusal('editor_build_campaign', {**camp, 'scenarios': [{**camp['scenarios'][0], 'expectedSha256': '0' * 64}]})
+        refusal('editor_build_campaign', {**camp, 'preview': False})
+        refusal('editor_build_campaign', {**camp, 'modName': '..'})
         scene = folder / 'workers.mythscn'
         scene.write_bytes(checkpoint_fixture(units=[(100, 1, 'VillagerAztec', 10, 0, 20, None),
             (101, 1, 'VillagerAztec', 12, 0, 22, None), (200, 1, 'Farm', 11, 0, 21, None), (201, 1, 'Farm', 13, 0, 23, None)]))
@@ -1087,7 +1098,7 @@ try:
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
     expected_core = (helper_names - workflow_names) | core_native
-    assert len(expected_core) == 83 and len(names) == 933
+    assert len(expected_core) == 83 and len(names) == 934
     assert {'editor_dialog_state', 'editor_dialog_act'} <= expected_core
     world_tools = {'editor_terrain_info', 'editor_live_players', 'editor_edit_mode', 'editor_paint_world', 'editor_elevation',
                    'editor_transform_unit', 'editor_terrain_catalog', 'editor_camera_frame', 'editor_overview',

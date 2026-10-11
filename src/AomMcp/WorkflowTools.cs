@@ -5,9 +5,9 @@ namespace AomMcp;
 internal sealed partial class Server
 {
     readonly PlaytestWorkflow _playtest = new();
-    static readonly HashSet<string> WorkflowNames = new(StringComparer.Ordinal) { "editor_unit_notes", "editor_scenario_diff", "editor_install_ai", "editor_startup_orders", "editor_runtime_probe", "editor_runtime_report", "editor_playtest" };
+    static readonly HashSet<string> WorkflowNames = new(StringComparer.Ordinal) { "editor_unit_notes", "editor_scenario_diff", "editor_install_ai", "editor_startup_orders", "editor_runtime_probe", "editor_runtime_report", "editor_playtest", "editor_build_campaign" };
     static bool WorkflowSafeInspection(string name, JsonElement args) => name is "editor_unit_notes" or "editor_scenario_diff" or "editor_runtime_report"
-        || name is "editor_install_ai" or "editor_runtime_probe" && (!args.TryGetProperty("preview", out var p) || p.GetBoolean())
+        || name is "editor_install_ai" or "editor_runtime_probe" or "editor_build_campaign" && (!args.TryGetProperty("preview", out var p) || p.GetBoolean())
         || name == "editor_startup_orders" && args.GetProperty("operation").GetString() != "write"
         || name == "editor_playtest" && args.GetProperty("operation").GetString() is "preview" or "inspect";
     void PreflightWorkflow(string name, JsonElement args)
@@ -17,6 +17,7 @@ internal sealed partial class Server
             case "editor_unit_notes": CheckpointUnits.Preflight(args); break;
             case "editor_scenario_diff": ScenarioDiff.Preflight(args); break;
             case "editor_install_ai": AiInstaller.Preflight(args); break;
+            case "editor_build_campaign": CampaignBuilder.Preflight(args); break;
             case "editor_startup_orders": StartupOrders.Preflight(args); break;
             case "editor_runtime_probe": RuntimeProbes.Preflight(args); break;
             case "editor_runtime_report": RuntimeReport.Preflight(args); break;
@@ -26,7 +27,7 @@ internal sealed partial class Server
     object InvokeWorkflow(string name, JsonElement args) => name switch
     {
         "editor_unit_notes" => CheckpointUnits.Query(args), "editor_scenario_diff" => ScenarioDiff.Query(args),
-        "editor_install_ai" => AiInstaller.Execute(args, exe), "editor_startup_orders" => StartupOrders.Execute(args),
+        "editor_install_ai" => AiInstaller.Execute(args, exe), "editor_build_campaign" => CampaignBuilder.Execute(args), "editor_startup_orders" => StartupOrders.Execute(args),
         "editor_runtime_probe" => RuntimeProbes.Execute(args), "editor_runtime_report" => RuntimeReport.Execute(args),
         // Preview/profile/token failures never connect. Registered transitions lazily acquire query/read-only connection.
         "editor_playtest" => _playtest.Execute(args, () => new Game(exe, _layout, pid)),
@@ -54,6 +55,12 @@ internal sealed partial class Server
         var ai = WPaths("sourcePath", "expectedSha256", "destination", "stagingPath", "receiptPath", "ownershipReceiptPath", "expectedReceiptSha256", "expectedInstalledSha256", "backupPath");
         ai["preview"] = WBool(); ai["confirmWrite"] = WBool(); ai["confirmDestructive"] = WBool(); ai["force"] = WBool(); ai["destinationRoot"] = WEnum("aom_mcp", "campaign"); ai["lineEndings"] = WEnum("preserve", "crlf", "lf");
         yield return Spec("editor_install_ai", "FULL ONLY. Preview-first hash-pinned custom XS installation restricted to active-profile <Games>/Age of Mythology Retold/<id>/Game/AI/aom_mcp (default) or, with destinationRoot=campaign, <id>/Game/AI/campaign/<subdir>/<file>.xs; includes resolve from profile Game/AI, then stock INSTALLPATH/game/ai (replacing an existing campaign file is the force flow: force=true + expectedInstalledSha256 + confirmDestructive + external backupPath; receipts always go under aom_mcp/.receipts). lineEndings preserve (default; follows existing destination, else source)|crlf|lf; the installed hash may differ from expectedSha256 of the source and is reported as installedSha256. Destination relative INSIDE the root. New files exclusive; updates need ownershipReceiptPath + expectedReceiptSha256 + expectedInstalledSha256 + confirmDestructive and fresh external backupPath; force=true skips the receipt (omit ownershipReceiptPath/expectedReceiptSha256) but still needs expectedInstalledSha256, confirmDestructive, backupPath. Apply requires confirmWrite, new external stagingPath and new receiptPath under aom_mcp/.receipts. Bounded recursive root-relative includes, traversal/reparse/stock refusals, byte readback, retained unknown outcomes. No elevation, automatic binding/compile/playtest/rollback/cleanup/retry; preview writes nothing. XS syscalls/library signatures: editor_xs_api.", ai, ["sourcePath", "expectedSha256", "destination"]);
+        var scenarioEntry = WObject(new() { ["sourcePath"] = WString(), ["expectedSha256"] = WString(), ["fileName"] = WString(), ["title"] = WString(), ["premise"] = WString(),
+            ["cinematic"] = WBool(), ["backgroundImage"] = WString(), ["loadImage"] = WString(), ["pinImage"] = WString(), ["mapImage"] = WString(),
+            ["pinX"] = new { type = "number", minimum = 0, maximum = 1 }, ["pinY"] = new { type = "number", minimum = 0, maximum = 1 } }, "sourcePath", "expectedSha256");
+        var campaign = WPaths("modsDirectory", "modName", "campaignId", "displayName", "description", "motifImage", "mapImage");
+        campaign["scenarios"] = WArray(scenarioEntry, 1, 40); campaign["preview"] = WBool(); campaign["confirmWrite"] = WBool();
+        yield return Spec("editor_build_campaign", "FULL ONLY. Converts saved scenarios (game-written .mythscn, each hash-pinned) into a custom campaign shown in the Campaigns menu: creates a NEW local mod <profile>/mods/local/<modName>/game/campaign/<campaignId>/ with <campaignId>.xml (ordered CampaignNodes; each visible scenario requires the previous one; cinematic=true entries are hidden cinematic nodes), byte-identical scenario copies, and game/data/strings/english/stringmods.txt (title/premise/campaign name strings). Preview (default) returns the planned XML/strings/files; apply needs preview=false+confirmWrite=true. Refuses existing mod folders (no overwrite/cleanup/retry). Image/pin args default to stock campaign resources. Needs a game restart plus enabling the mod; appearance/progression not verified. modsDirectory optional (must end in mods/local).", campaign, ["modName", "campaignId", "displayName", "scenarios"]);
         var startup = WPaths("path", "expectedSha256", "scenarioPath", "expectedScenarioSha256", "expectedName", "outputPath");
         startup["operation"] = WEnum("audit", "plan", "write"); startup["triggerId"] = WInt(); startup["workers"] = WTuples(); startup["targets"] = WTuples();
         startup["player"] = WInt(0, 12); startup["targetPlayer"] = WInt(0, 12); startup["workerProtos"] = WArray(WString()); startup["targetProtos"] = WArray(WString());
