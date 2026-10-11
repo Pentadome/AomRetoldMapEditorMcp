@@ -575,8 +575,8 @@ try:
     assert tool('editor_trigger_edit', {**edit_args, 'expectedSha256': '0' * 64})['isError']
     # autoBackup replaces the reviewed live export: passing both, or a stale prepared hash, must refuse before any game call.
     auto_args = {'operation': 'apply', 'path': str(original), 'expectedSha256': listed['structuredContent']['sha256'], 'autoBackup': True, 'confirmDestructive': True}
-    refusal('editor_triggers', {**auto_args, 'expectedLivePath': str(original)})
-    refusal('editor_triggers', {**auto_args, 'expectedSha256': '0' * 64})
+    assert tool('editor_triggers', {**auto_args, 'expectedLivePath': str(original)})['isError']
+    assert tool('editor_triggers', {**auto_args, 'expectedSha256': '0' * 64})['isError']
     inspected = tool('editor_triggers', {'operation': 'inspect', 'path': str(original)})
     assert not inspected['isError'], inspected
     controller = inspected['structuredContent']
