@@ -61,8 +61,8 @@ internal static class HelpTools
         var players = snapshot.Players.Select(p =>
         {
             var ai = AiScripts.Resolve(exe, p.AiPath);
-            var allies = p.Diplomacy.Select((s, i) => (s, i)).Where(x => x.s == 1 && x.i != p.Id).Select(x => x.i).ToArray();
-            var enemies = p.Diplomacy.Select((s, i) => (s, i)).Where(x => x.s == 2).Select(x => x.i).ToArray();
+            var allies = p.Diplomacy.Select((s, i) => (s, i)).Where(x => x.s == 1 && x.i != p.Id && x.i < snapshot.Players.Length).Select(x => x.i).ToArray();
+            var enemies = p.Diplomacy.Select((s, i) => (s, i)).Where(x => x.s == 2 && x.i < snapshot.Players.Length).Select(x => x.i).ToArray();
             return new
             {
                 id = p.Id, name = p.DisplayName.Length > 0 ? p.DisplayName : p.Name, civId = p.CivId,
