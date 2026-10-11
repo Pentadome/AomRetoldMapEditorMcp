@@ -162,7 +162,7 @@ internal static class PlayerSettings
                 throw new WorkflowFailure("STALE_PLAYER", "preflight", $"P{player}.{field} differs from expected checkpoint value.", false, false,
                     "Inspect game-written source checkpoint; no input sent.");
             if (field == "aiPath" && !ValidAiChange(expected, desired))
-                throw new ArgumentException("AI path must be relative game\\ai path (installed .xs file required)." );
+                throw new ArgumentException("AI path must be relative to profile Game\\AI (or stock game\\ai); installed .xs file required." );
             if (observedOnly && field is not ("classicalGod" or "heroicGod" or "mythicGod"))
                 throw new ArgumentException("observedOnly limited to age-dependent minor god IDs.");
             if (!observedOnly && field is "civ" or "classicalGod" or "heroicGod" or "mythicGod" && (string.IsNullOrWhiteSpace(newLabel) || string.IsNullOrWhiteSpace(oldLabel)))
@@ -299,14 +299,15 @@ internal static class PlayerSettings
         Click(game, ui.P(ui.AiSetX), ui.Row(change.Player));
         // Load Menu file browser geometry is identical in both reviewed UIs (measured).
         Gate(game, ui.P(BrowserTitle), "Load Menu");
-        // Profile-only listing does not include INSTALLPATH game\\ai. Toggle only if campaign absent.
+        // Profile-only listing shows profile Game\\AI (custom personalities), not INSTALLPATH game\\ai.
+        // Toggle to the stock listing only if the target's first folder is not visible and campaign is absent.
+        var parts = change.Desired.Split('\\');
         var root = UiRead.Text(game, ui.P(BrowserRows));
-        if (!root.Contains("campaign", StringComparison.OrdinalIgnoreCase))
+        if (!root.Contains(parts[0], StringComparison.OrdinalIgnoreCase) && !root.Contains("campaign", StringComparison.OrdinalIgnoreCase))
         {
             Click(game, ui.P(1792), ui.P(1044));
             Gate(game, ui.P(BrowserRows), "campaign");
         }
-        var parts = change.Desired.Split('\\');
         foreach (var folder in parts[..^1]) BrowserRow(game, ui, folder, true);
         var file = parts[^1].EndsWith(".xs", StringComparison.OrdinalIgnoreCase) ? parts[^1] : parts[^1] + ".xs";
         if (!UiRead.Text(game, ui.P(BrowserRows)).Contains(file, StringComparison.OrdinalIgnoreCase))

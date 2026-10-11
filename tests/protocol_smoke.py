@@ -391,7 +391,7 @@ try:
     assert not request('tools/call', {'name': 'editor_catalog'})['isError']
     caps = tool('editor_capabilities')['structuredContent']
     assert caps['toolset'] == 'full' and caps['uiMetadataAvailable']
-    assert r'INSTALLPATH\game\ai' in caps['aiScripts'] and 'trigger directory' in caps['aiScripts']
+    assert '<id>/Game/AI'.replace('/', chr(92)) in caps['aiScripts'] and 'trigger directory' in caps['aiScripts']
     tools = []
     params = {}
     while True:

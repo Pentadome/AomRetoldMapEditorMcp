@@ -35,7 +35,7 @@ internal static partial class AiInstaller
         if (block || quoted) throw new InvalidDataException("Unterminated XS comment/string; include analysis refused.");
         return result.ToString();
     }
-    internal static Include[] Includes(string root, string virtualDestination, byte[] source)
+    internal static Include[] Includes(string[] roots, string virtualDestination, byte[] source)
     {
         var active = new HashSet<string>(StringComparer.OrdinalIgnoreCase); var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var records = new List<Include>(); long bytes = 0;
@@ -50,7 +50,10 @@ internal static partial class AiInstaller
             {
                 var trimmed = line.TrimStart(); if (!trimmed.StartsWith("include", StringComparison.Ordinal) || trimmed.Length > 7 && (char.IsLetterOrDigit(trimmed[7]) || trimmed[7] == '_')) continue;
                 var match = IncludeLine().Match(line); if (!match.Success) throw new InvalidDataException("Unreviewed XS include directive: " + line.Trim());
-                var include = AiScripts.Contained(root, AiScripts.Relative(match.Groups[1].Value));
+                var relative = AiScripts.Relative(match.Groups[1].Value);
+                // Profile Game\AI first, then stock game\ai; a missing include is reported against the profile root.
+                var include = roots.Select(r => AiScripts.Contained(r, relative)).FirstOrDefault(c => c.Equals(virtualDestination, StringComparison.OrdinalIgnoreCase) || File.Exists(c))
+                    ?? AiScripts.Contained(roots[0], relative);
                 if (active.Contains(include)) throw new InvalidDataException("Cyclic AI include: " + include);
                 if (seen.Contains(include)) continue;
                 if (seen.Count >= 128 || depth >= 32) throw new InvalidDataException("AI include graph exceeds file/depth bounds.");
@@ -111,6 +114,7 @@ internal static partial class AiInstaller
         using (var file = new FileStream(EditorFiles.LocalPath(path), FileMode.CreateNew, FileAccess.Write, FileShare.None)) { file.Write(bytes); file.Flush(true); }
         if (Layout.Hash(EditorFiles.LocalPath(path)) != CheckpointDocument.Hash(bytes)) throw new IOException("Exclusive new-file readback mismatch: " + path);
     }
+    static string? testRoot; // Self-test fixture root; production always uses the active profile Game\AI.
     internal static void SelfTest()
     {
         var lf = Encoding.UTF8.GetBytes("a\nb\n"); var crlfBytes = Encoding.UTF8.GetBytes("a\r\nb\r\n");
@@ -118,7 +122,7 @@ internal static partial class AiInstaller
             || LineEndings(lf, "preserve", null, out var origin) != lf || origin != "source" || !LineEndings(crlfBytes, "lf", null, out _).AsSpan().SequenceEqual(lf))
             throw new InvalidOperationException("AI line-ending conversion self-test failed.");
         var directory = Path.Combine(Path.GetTempPath(), "aom-install-fixture-" + Guid.NewGuid().ToString("N"));
-        var root = Path.Combine(directory, "game", "ai"); Directory.CreateDirectory(root);
+        var root = Path.Combine(directory, "Game", "AI"); Directory.CreateDirectory(root); testRoot = root;
         var exe = Path.Combine(directory, "fake.exe"); var source = Path.Combine(directory, "source.xs");
         var managed = Path.Combine(root, "aom_mcp"); var destination = Path.Combine(managed, "fixture.xs");
         static JsonElement Json(object o) => JsonSerializer.SerializeToElement(o);
@@ -182,10 +186,10 @@ internal static partial class AiInstaller
                 throw new InvalidOperationException("Forced update lost backup, bytes or forced receipt.");
             foreach (var unsafeName in new[] { "../stock.xs", "\\\\host\\file.xs", "C:\\stock.xs", "folder//name.xs", ".receipts/name.xs" })
                 Refuse(() => Execute(Json(new Dictionary<string, object>(args) { ["destination"] = unsafeName }), exe));
-            Refuse(() => Includes(root, destination, Encoding.UTF8.GetBytes("include \"missing.xs\";\n")));
-            Refuse(() => Includes(root, destination, Encoding.UTF8.GetBytes("include \"aom_mcp/fixture.xs\";\n")));
+            Refuse(() => Includes([root], destination, Encoding.UTF8.GetBytes("include \"missing.xs\";\n")));
+            Refuse(() => Includes([root], destination, Encoding.UTF8.GetBytes("include \"aom_mcp/fixture.xs\";\n")));
             File.WriteAllText(Path.Combine(root, "cycle-a.xs"), "include \"cycle-b.xs\";\n"); File.WriteAllText(Path.Combine(root, "cycle-b.xs"), "include \"cycle-a.xs\";\n");
-            Refuse(() => Includes(root, destination, Encoding.UTF8.GetBytes("include \"cycle-a.xs\";\n")));
+            Refuse(() => Includes([root], destination, Encoding.UTF8.GetBytes("include \"cycle-a.xs\";\n")));
             var partial = new Dictionary<string, object>(args) { ["destination"] = "partial.xs", ["expectedSha256"] = Layout.Hash(source),
                 ["stagingPath"] = Path.Combine(directory, "stage-partial.xs"), ["receiptPath"] = Path.Combine(managed, ".receipts", "partial.json") };
             try
@@ -218,22 +222,23 @@ internal static partial class AiInstaller
             if (Directory.Exists(Path.Combine(managed, "link"))) Refuse(() => Execute(Json(new Dictionary<string, object>(args) { ["destination"] = "link/escape.xs" }), exe));
             if (first.GetProperty("runtimeVerified").GetBoolean() || second.GetProperty("compilationVerified").GetBoolean()) throw new InvalidOperationException("AI installation claimed runtime/compilation proof.");
         }
-        finally { Directory.Delete(directory, true); } // Only this self-test's synthetic fake installation; production retains all artifacts.
+        finally { testRoot = null; Directory.Delete(directory, true); } // Only this self-test's synthetic fake installation; production retains all artifacts.
     }
 
     internal static object Execute(JsonElement args, string exe, Action<string>? testFault = null)
     {
-        Preflight(args); var root = AiScripts.InstalledRoot(exe); if (!Directory.Exists(root)) throw new ArgumentException("Installed AI root missing.");
+        Preflight(args); var root = testRoot ?? AiScripts.ProfileRoot(); if (!Directory.Exists(root)) throw new ArgumentException("Profile Game\\AI root missing.");
+        string[] includeRoots = testRoot is null ? [root, AiScripts.InstalledRoot(exe)] : [root];
         var campaign = Campaign(args); var rootName = campaign ? "campaign" : "aom_mcp";
         var managed = AiScripts.Contained(root, rootName); var receipts = AiScripts.Contained(root, "aom_mcp\\.receipts"); var relative = AiScripts.Relative(args.GetProperty("destination").GetString()!);
         if (relative.Split('\\').Any(s => s.StartsWith('.'))) throw new ArgumentException("Reserved managed destination component.");
-        if (campaign && relative.Split('\\').Length < 2) throw new ArgumentException("campaign destination must be <subdir>\\<file>.xs under game\\ai\\campaign.");
+        if (campaign && relative.Split('\\').Length < 2) throw new ArgumentException("campaign destination must be <subdir>\\<file>.xs under profile Game\\AI\\campaign.");
         var destination = AiScripts.Contained(managed, relative); var sourcePath = EditorFiles.LocalPath(args.GetProperty("sourcePath").GetString()!);
         if (!sourcePath.EndsWith(".xs", StringComparison.OrdinalIgnoreCase) || sourcePath.Equals(destination, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Source requires distinct .xs path.");
         var source = ReadXs(sourcePath); var sha = CheckpointDocument.Hash(source); CheckpointDocument.RequireHash(sha, args.GetProperty("expectedSha256").GetString());
         var update = File.Exists(destination);
         if (Directory.Exists(destination)) throw new ArgumentException("Destination is directory.");
-        var dependencies = Includes(root, destination, source);
+        var dependencies = Includes(includeRoots, destination, source);
         var mode = args.TryGetProperty("lineEndings", out var leArg) ? leArg.GetString()! : "preserve";
         byte[]? existing = null;
         if (update) { var fi = new FileInfo(destination); if (fi.Length > 1_000_000) throw new InvalidDataException("Installed AI exceeds byte bound."); existing = File.ReadAllBytes(destination); }
@@ -277,7 +282,7 @@ internal static partial class AiInstaller
             if (!Under(receiptPath, receipts) || !receiptPath.EndsWith(".json", StringComparison.OrdinalIgnoreCase) || File.Exists(receiptPath) || Directory.Exists(receiptPath))
                 throw new ArgumentException("New receipt must be exclusive .json under managed .receipts.");
         }
-        if (staging is not null && Under(staging, root) || backup is not null && Under(backup, root)) throw new ArgumentException("Staging/backups must be outside installed AI root.");
+        if (staging is not null && Under(staging, root) || backup is not null && Under(backup, root)) throw new ArgumentException("Staging/backups must be outside the AI root.");
         var paths = new[] { sourcePath, destination, staging, backup, receiptPath }.Where(p => p is not null).Cast<string>().ToArray();
         if (paths.Distinct(StringComparer.OrdinalIgnoreCase).Count() != paths.Length) throw new ArgumentException("Installer paths must be distinct.");
         if (Preview(args)) return new { preview = true, sourcePath, sourceSha256 = sha, destinationPath = destination, aiPath = rootName + "\\" + relative, destinationRoot = rootName, lineEndings = lineEndingsApplied, installedSha256 = installedSha,

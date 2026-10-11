@@ -67,7 +67,7 @@ internal static partial class XsCheck
         var offset = args.TryGetProperty("offset", out var o) ? o.GetInt32() : 0;
         var limit = args.TryGetProperty("limit", out var l) ? l.GetInt32() : 50;
         var bytes = File.ReadAllBytes(path);
-        var aiRoot = AiScripts.InstalledRoot(exe);
+        var aiRoots = AiScripts.SearchRoots(exe);
         var findings = new List<Finding>();
         XsApi.Model? model = null;
         try { model = XsApi.LoadModel(); } catch (Exception e) when (e is IOException or FileNotFoundException or JsonException or InvalidOperationException) { }
@@ -93,13 +93,12 @@ internal static partial class XsCheck
                 if (!Path.IsPathRooted(rel) && !rel.Contains(':') && rel.Split('\\').All(s => s is not ("" or "." or "..")))
                 {
                     var near = Path.Combine(Path.GetDirectoryName(current)!, rel);
-                    var rooted = Path.Combine(aiRoot, rel);
-                    found = File.Exists(near) ? near : File.Exists(rooted) ? rooted : null;
+                    found = File.Exists(near) ? near : aiRoots.Select(r => Path.Combine(r, rel)).FirstOrDefault(File.Exists);
                 }
                 if (found is null || new FileInfo(found).Length > MaxBytes)
                 {
                     var (ln, col) = Position(stripped, m.Index);
-                    findings.Add(new(current, ln, col, "include-not-found", "warning", $"include \"{m.Groups["path"].Value}\" not found beside the file or under the installed AI root."));
+                    findings.Add(new(current, ln, col, "include-not-found", "warning", $"include \"{m.Groups["path"].Value}\" not found beside the file, under profile Game\\AI or under INSTALLPATH\\game\\ai."));
                 }
                 else if (depth < 8 && seen.Count + queue.Count < MaxIncludes) queue.Enqueue((EditorFiles.LocalPath(found), false, depth + 1));
             }

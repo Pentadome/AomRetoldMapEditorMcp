@@ -78,7 +78,7 @@ internal static class ScenarioAudit
             {
                 "Exported files may not be current live state. Existing triggers can override player settings at runtime.",
                 "Wave AI needs a valid personality, gameplay-start call, eligible units/buildings, and victory/objective updates; static references do not prove waves spawn.",
-                "Player-relative AI personality must be under INSTALLPATH\\game\\ai; active-profile ai folder did not work. Trigger exports/imports use active-profile trigger directory.",
+                "Player-relative custom AI personality must be under active-profile <id>\\Game\\AI (stock under INSTALLPATH\\game\\ai). Trigger exports/imports use active-profile trigger directory.",
             },
         };
     }

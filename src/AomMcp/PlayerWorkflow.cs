@@ -154,7 +154,7 @@ internal static class PlayerWorkflow
             requested = new { stance = desired, direction = mutual ? "mutual" : "oneWay", reverseStance = mutual ? (int?)newReverse : null, aiPath = ai },
             sourceSha256 = snapshot.Sha256, aiResolution, liveAutomationAvailable = !changeAi,
             limitation = "Pinned diplomacy grid (2560×1440 and 1920×1080; same half-frame cells) observed live in alternative (Players Settings > Diplomacy) and normal (Scenario > Diplomacy; same cell grid/colors) UI. Apply requires the pre-opened dialog, isolated scene confirmation, game-writer checkpoint+trigger backups and screenshot pixel gates at every click; other UI layouts fail closed. AI Name text replacement FAILED live P5 verification; manual input + verify only.",
-            aiLocation = "Computer-player .xs: INSTALLPATH\\game\\ai. Active-profile ai folder did NOT work; trigger scripts: active-profile trigger directory." };
+            aiLocation = "Computer-player .xs: active-profile Games\\Age of Mythology Retold\\<id>\\Game\\AI (stock scripts in INSTALLPATH\\game\\ai); trigger scripts: active-profile trigger directory." };
     }
 
     /// <summary>Apply arguments naming new backups, verification directory and profile directories.</summary>
@@ -168,7 +168,7 @@ internal static class PlayerWorkflow
         if (args.TryGetProperty("desiredAiPath", out _))
             throw new WorkflowFailure("AI_TEXT_UNVERIFIED", "ui-preflight",
                 "Alternative UI AI Name Unicode text entry returned acknowledgement but saved P5 AI path stayed unchanged in isolated-scene test. No input sent by this tool.",
-                false, false, "Set AI Name manually in Players Settings; install personality under INSTALLPATH\\game\\ai (profile ai did not work). Export checkpoint and call verify.");
+                false, false, "Set AI Name manually in Players Settings; install personality under active-profile <id>\\Game\\AI. Export checkpoint and call verify.");
         var missing = ApplyPathFields
             .Where(f => !args.TryGetProperty(f, out var v) || v.ValueKind != JsonValueKind.String).ToArray();
         if (missing.Length > 0)
@@ -313,7 +313,7 @@ internal static class PlayerWorkflow
         var profile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Games", "Age of Mythology Retold");
         if (output.StartsWith(installed + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
             || output.StartsWith(profile + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException("XS staging cannot write to installed game or nonworking active-profile ai directories.");
+            throw new ArgumentException("XS staging cannot write to installed game or active-profile directories.");
         var text = Encoding.UTF8.GetString(bytes);
         var includes = text.Split('\n').Where(l => l.TrimStart().StartsWith("include ", StringComparison.Ordinal))
             .Select(l => l.Trim()).Take(100).ToArray();
@@ -329,7 +329,7 @@ internal static class PlayerWorkflow
         else if (args.TryGetProperty("confirmWrite", out _))
             throw new ArgumentException("Preview does not accept confirmWrite (no write).");
         return new { preview, path = preview ? null : output, expectedOutputPath = output, sha256 = hash, includes,
-            installedAiRoot = installed, gameResolved = false,
-            limitation = "Staging copy is NOT usable AI installation. Manual reviewed install into INSTALLPATH\\game\\ai and game playtest required; active-profile ai did NOT work." };
+            installedAiRoot = AiScripts.SafeProfileRoot() ?? installed, gameResolved = false,
+            limitation = "Staging copy is NOT usable AI installation. Reviewed install into active-profile <id>\\Game\\AI (editor_install_ai) and game playtest required." };
     }
 }

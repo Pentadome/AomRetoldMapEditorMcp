@@ -207,7 +207,8 @@ internal static partial class XsDiagnostics
             (selected, selection) = ([model.Loads[index]], index.ToString(CultureInfo.InvariantCulture));
         }
         var diagnostics = selected.SelectMany(l => l.Diagnostics.Select(d => (Load: l.Index, D: d))).ToArray();
-        var aiRoot = SafeAiRoot(exe);
+        var aiRoot = AiScripts.SafeProfileRoot();
+        var stockAiRoot = SafeAiRoot(exe);
         var triggerRoot = SafeTriggerRoot(args);
         var page = diagnostics.Skip(offset).Take(limit).Select(x => new
         {
@@ -216,7 +217,7 @@ internal static partial class XsDiagnostics
             chain = x.D.Chain, compiledFiles = x.D.CompiledFiles.ToArray(), players = x.D.Players.ToArray(),
             occurrences = x.D.Occurrences, logLine = x.D.LogLine,
             hint = Hint(x.D.Code),
-            source = Source(x.D.File, x.D.Line, context, aiRoot, triggerRoot, written),
+            source = Source(x.D.File, x.D.Line, context, aiRoot, stockAiRoot, triggerRoot, written),
         }).ToArray();
         return new
         {
@@ -256,9 +257,9 @@ internal static partial class XsDiagnostics
         catch (Exception e) when (e is ArgumentException or InvalidDataException) { return null; }
     }
 
-    static object Source(string file, int line, int context, string? aiRoot, string? triggerRoot, DateTime logWritten)
+    static object Source(string file, int line, int context, string? aiRoot, string? stockAiRoot, string? triggerRoot, DateTime logWritten)
     {
-        foreach (var (root, kind) in new[] { (aiRoot, "ai"), (triggerRoot, "trigger") })
+        foreach (var (root, kind) in new[] { (aiRoot, "ai"), (stockAiRoot, "stockAi"), (triggerRoot, "trigger") })
         {
             if (root is null) continue;
             string path;
@@ -273,7 +274,7 @@ internal static partial class XsDiagnostics
             return new { path, root = kind, resolved = true, modifiedAfterLog = info.LastWriteTimeUtc > logWritten,
                 lastWriteUtc = info.LastWriteTimeUtc.ToString("O", CultureInfo.InvariantCulture), excerpt };
         }
-        return new { path = (string?)null, root = (string?)null, resolved = false, note = "Not found under INSTALLPATH\\game\\ai or the active profile trigger directory." };
+        return new { path = (string?)null, root = (string?)null, resolved = false, note = "Not found under active profile Game\\AI, INSTALLPATH\\game\\ai or the active profile trigger directory." };
     }
 
     internal sealed record Rule(string Name, int Line, int EndLine, string[] Flags);
