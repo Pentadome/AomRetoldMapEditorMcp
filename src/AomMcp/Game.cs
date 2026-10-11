@@ -196,6 +196,43 @@ internal sealed class Game : IDisposable
             _ = Win.ShowWindow(Window, 9); // winuser.h SW_RESTORE=9; returns previous visibility, not success.
         if (Win.GetForegroundWindow() == Window)
             return;
+        TryForeground();
+        // Host activation budget: 25 polls x 20 ms = 500 ms; chosen for queued WM_ACTIVATE,
+        // not a guarantee that Windows will grant foreground access (live focus tests).
+        for (var i = 0; i < 25 && Win.GetForegroundWindow() != Window; i++)
+            System.Threading.Thread.Sleep(20); // WM_ACTIVATE can arrive after SetForegroundWindow returns.
+        // Bounded backoff (total extra wait < 1 s) before any input is sent; two more activation attempts.
+        var attempts = 1;
+        foreach (var backoff in FocusBackoffMs)
+        {
+            if (Win.GetForegroundWindow() == Window) break;
+            attempts++;
+            TryForeground();
+            for (var waited = 0; waited < backoff && Win.GetForegroundWindow() != Window; waited += 20)
+                System.Threading.Thread.Sleep(20);
+        }
+        if (Win.GetForegroundWindow() != Window)
+            throw new FocusRefusedException(attempts, ForegroundProcessName());
+    }
+
+    static readonly int[] FocusBackoffMs = [150, 400];
+
+    static string? ForegroundProcessName()
+    {
+        try
+        {
+            _ = Win.GetWindowThreadProcessId(Win.GetForegroundWindow(), out var pid);
+            using var other = Process.GetProcessById((int)pid);
+            return other.ProcessName;
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return null;
+        }
+    }
+
+    void TryForeground()
+    {
         if (!Win.SetForegroundWindow(Window))
         {
             // Host buffer 64 bytes covers AMD64 MSG (48); HWND/filter zeros mean all thread messages,
@@ -217,12 +254,6 @@ internal sealed class Game : IDisposable
                     Win.Check(Win.AttachThreadInput(own, foreground, false), "Detach focus queues");
             }
         }
-        // Host activation budget: 25 polls x 20 ms = 500 ms; chosen for queued WM_ACTIVATE,
-        // not a guarantee that Windows will grant foreground access (live focus tests).
-        for (var i = 0; i < 25 && Win.GetForegroundWindow() != Window; i++)
-            System.Threading.Thread.Sleep(20); // WM_ACTIVATE can arrive after SetForegroundWindow returns.
-        if (Win.GetForegroundWindow() != Window)
-            throw new FocusRefusedException();
     }
 
     /// <summary>Focuses the editor and moves the pointer within its client rectangle.</summary>
@@ -248,4 +279,10 @@ internal sealed class Game : IDisposable
 }
 
 /// <summary>Game window did not become foreground; thrown before any input or native dispatch.</summary>
-public sealed class FocusRefusedException() : InvalidOperationException("Game could not receive focus; no input sent.");
+public sealed class FocusRefusedException(int attempts = 1, string? foregroundProcess = null)
+    : InvalidOperationException("Game could not receive focus after " + attempts + " attempt(s); no input sent."
+        + (foregroundProcess is null ? "" : " Foreground window belongs to '" + foregroundProcess + "'; close or minimize it and retry once."))
+{
+    public int Attempts { get; } = attempts;
+    public string? ForegroundProcess { get; } = foregroundProcess;
+}
