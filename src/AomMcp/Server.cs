@@ -1216,6 +1216,7 @@ internal sealed partial class Server(
                 ["expectedSha256"] = new { type = "string" },
                 ["expectedLiveSha256"] = new { type = "string" },
                 ["expectedLivePath"] = new { type = "string" },
+                ["autoBackup"] = new { type = "boolean" },
             }, ["operation", "path"]);
         yield return Spec("editor_inspect_selection",
             "Read actual selection records and selected objects' live prototype/player/world position/current-max health. Not command acknowledgements; includes unresolved and non-unit selection kinds. Editor only; no focus/input/game calls. Requires reviewed unit+selection fields. Paging offset>=0, limit1..200/default100; changing selection refuses.",

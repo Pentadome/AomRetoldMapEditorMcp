@@ -13,4 +13,7 @@ Moved verbatim from AGENTS.md; served by `editor_help topic=triggers`.
 
 ## Backups on apply
 
-`editor_triggers apply` already exports a game-written `before-trigger-import` backup and verifies it against `expectedLiveSha256` before importing, then round-trips the result; a separate `autoBackup` flag was therefore not added (it would only weaken the reviewed-live-export guard). Take the reviewed export first with `editor_triggers operation=export`.
+`editor_triggers apply` exports a game-written `before-trigger-import` backup, imports, then round-trips and compares. Two ways to pin the original:
+
+- Reviewed: pass `expectedLivePath` + `expectedLiveSha256` (a live export you inspected); the backup must match it semantically.
+- `autoBackup=true`: omit both. The host takes the game-written export immediately before the import, retains it, and returns `backupPath`/`backupSha256`. Only `expectedSha256` of the prepared file stays required; passing `expectedLive*` together with `autoBackup` is refused. It trades the human-reviewed live export for convenience; the retained backup is the restore source (apply it back with `autoBackup=true` too). Live-verified: apply and restore of an empty set round-tripped exactly.

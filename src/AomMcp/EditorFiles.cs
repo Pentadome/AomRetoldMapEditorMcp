@@ -123,7 +123,7 @@ internal static class EditorFiles
             "inspect" or "validate" => ["operation", "path"],
             "patch" => ["operation", "path", "outputPath", "name", "active", "loop", "code", "confirmWrite"],
             "export" => ["operation", "path", "profileDirectory", "confirmWrite"],
-            "apply" => ["operation", "path", "profileDirectory", "expectedSha256", "expectedLiveSha256", "expectedLivePath", "confirmDestructive"],
+            "apply" => ["operation", "path", "profileDirectory", "expectedSha256", "expectedLiveSha256", "expectedLivePath", "autoBackup", "confirmDestructive"],
             _ => throw new ArgumentException("Unknown trigger operation."),
         };
         Catalog.ValidateObject(args, allowed);
@@ -150,6 +150,18 @@ internal static class EditorFiles
             {
                 Confirm(args, "confirmDestructive");
                 _ = ProfileDirectory(args, "trigger");
+                var auto = args.TryGetProperty("autoBackup", out var autoFlag) && autoFlag.GetBoolean();
+                if (auto && (args.TryGetProperty("expectedLivePath", out _) || args.TryGetProperty("expectedLiveSha256", out _)))
+                    throw new ArgumentException("autoBackup replaces the reviewed live export: do not pass expectedLivePath/expectedLiveSha256 with it.");
+                if (auto)
+                {
+                    if (args.GetProperty("expectedSha256").GetString() is not { Length: 64 } prepared || !prepared.All(Uri.IsHexDigit))
+                        throw new ArgumentException("expectedSha256 must be 64-digit SHA-256 from inspected prepared file.");
+                    if (!Layout.Hash(path).Equals(prepared, StringComparison.OrdinalIgnoreCase))
+                        throw new WorkflowFailure("SOURCE_CHANGED", "preflight", "Prepared TR SHA-256 differs from expected value.", false, false,
+                            "Inspect the prepared file again before attempting apply; no native command dispatched.");
+                    return;
+                }
                 foreach (var key in ApplyHashes)
                     if (!args.TryGetProperty(key, out var hash) || hash.GetString() is not { Length: 64 } sha || !sha.All(Uri.IsHexDigit))
                         throw new ArgumentException(key + " must be 64-digit SHA-256 from inspected files.");
@@ -338,9 +350,10 @@ internal static class EditorFiles
         var directory = ProfileDirectory(args, "trigger");
         var desired = TriggerCodec.ReadFile(path);
         _ = CampaignTriggers.Parse(desired);
-        var expectedLive = TriggerCodec.ReadFile(args.GetProperty("expectedLivePath").GetString()!);
+        var auto = args.TryGetProperty("autoBackup", out var autoFlag) && autoFlag.GetBoolean();
+        var expectedLive = auto ? [] : TriggerCodec.ReadFile(args.GetProperty("expectedLivePath").GetString()!);
         if (!Convert.ToHexStringLower(SHA256.HashData(desired)).Equals(args.GetProperty("expectedSha256").GetString(), StringComparison.OrdinalIgnoreCase)
-            || !Convert.ToHexStringLower(SHA256.HashData(expectedLive)).Equals(args.GetProperty("expectedLiveSha256").GetString(), StringComparison.OrdinalIgnoreCase))
+            || (!auto && !Convert.ToHexStringLower(SHA256.HashData(expectedLive)).Equals(args.GetProperty("expectedLiveSha256").GetString(), StringComparison.OrdinalIgnoreCase)))
             throw new WorkflowFailure("SOURCE_CHANGED", "preflight", "Prepared TR changed since preview.", false, false,
                 "Inspect/preview TR again. No game command dispatched.", destinationPath: path);
         var backup = Scratch(directory, "before-trigger-import", ".trg");
@@ -350,7 +363,8 @@ internal static class EditorFiles
         try
         {
             var original = Export(backup, false, native, Guard);
-            if (!CampaignTriggers.EquivalentGameExport(expectedLive, original, out var liveCheck))
+            var liveCheck = "autoBackup: game-written export taken immediately before import is the retained original (no separately reviewed live export).";
+            if (!auto && !CampaignTriggers.EquivalentGameExport(expectedLive, original, out liveCheck))
                 throw new WorkflowFailure("LIVE_SOURCE_CHANGED", "backup", "Game-written original differs from reviewed live export: " + liveCheck,
                     true, false, "Backup retained; inspect live editor/exports. No import dispatched.", backup, path);
             using (var file = new FileStream(staged, FileMode.CreateNew, FileAccess.Write, FileShare.None)) file.Write(desired);
@@ -360,7 +374,7 @@ internal static class EditorFiles
             if (!CampaignTriggers.EquivalentGameExport(desired, observed, out var semanticCheck))
                 throw new WorkflowFailure("ROUNDTRIP_MISMATCH", "verify", semanticCheck, true, true,
                     "Review staged, backup and observed files. Do not retry/rollback automatically.", backup, roundtrip);
-            return new { inputPath = path, backupPath = backup, stagedPath = staged, roundTripPath = roundtrip,
+            return new { inputPath = path, backupPath = backup, backupSha256 = Layout.Hash(backup), autoBackup = auto, liveSourceCheck = liveCheck, stagedPath = staged, roundTripPath = roundtrip,
                 roundTripVerified = true, semanticCheck, sha256 = Layout.Hash(roundtrip),
                 triggerCount = CampaignTriggers.Parse(observed).Triggers.Length,
                 limitation = "Whole trigger set replaced. Backup retained; XS compile/effects and scenario persistence unverified. No automatic rollback/retry." };

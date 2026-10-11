@@ -573,6 +573,10 @@ try:
     assert not edit_preview['isError'] and edit_preview['structuredContent']['preview'], edit_preview
     assert edit_preview['structuredContent']['diff'] and edit_preview['structuredContent']['path'] is None
     assert tool('editor_trigger_edit', {**edit_args, 'expectedSha256': '0' * 64})['isError']
+    # autoBackup replaces the reviewed live export: passing both, or a stale prepared hash, must refuse before any game call.
+    auto_args = {'operation': 'apply', 'path': str(original), 'expectedSha256': listed['structuredContent']['sha256'], 'autoBackup': True, 'confirmDestructive': True}
+    refusal('editor_triggers', {**auto_args, 'expectedLivePath': str(original)})
+    refusal('editor_triggers', {**auto_args, 'expectedSha256': '0' * 64})
     inspected = tool('editor_triggers', {'operation': 'inspect', 'path': str(original)})
     assert not inspected['isError'], inspected
     controller = inspected['structuredContent']
