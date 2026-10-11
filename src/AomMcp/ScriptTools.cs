@@ -5,15 +5,17 @@ namespace AomMcp;
 /// <summary>Connection-free script diagnostics tools: editor_xs_diagnostics (MythLog / trigtemp.xs readers).</summary>
 internal sealed partial class Server
 {
-    static readonly HashSet<string> ScriptNames = new(StringComparer.Ordinal) { XsDiagnostics.Tool, TriggerElements.Tool };
+    static readonly HashSet<string> ScriptNames = new(StringComparer.Ordinal) { XsDiagnostics.Tool, TriggerElements.Tool, XsCheck.Tool };
 
     static void PreflightScript(string name, JsonElement args)
     {
         if (name == XsDiagnostics.Tool) XsDiagnostics.Preflight(args);
         else if (name == TriggerElements.Tool) TriggerElements.Preflight(args);
+        else if (name == XsCheck.Tool) XsCheck.Preflight(args);
     }
 
-    object InvokeScript(string name, JsonElement args) => name == TriggerElements.Tool ? TriggerElements.Query(args) : XsDiagnostics.Query(args, exe);
+    object InvokeScript(string name, JsonElement args) => name == TriggerElements.Tool ? TriggerElements.Query(args)
+        : name == XsCheck.Tool ? XsCheck.Query(args, exe) : XsDiagnostics.Query(args, exe);
 
     static IEnumerable<object> ScriptExtras()
     {
@@ -39,6 +41,15 @@ internal sealed partial class Server
                 ["limit"] = new { type = "integer", minimum = 1, maximum = XsDiagnostics.MaxLimit },
             },
             [], true);
+        yield return Spec(XsCheck.Tool,
+            "HEURISTIC offline XS lint (stock-calibrated: method calls like list.size() and extern globals in includes are normal) (not a compiler; no findings proves nothing). Checks an .xs file plus its includes for unbalanced braces/parens, member access in for-loop conditions (MythLog 0172 shape), rule without active/inactive, wrong argument counts and unknown calls against editor_xs_api's model. Returns {file,line,col,rule,severity,message,mythLogCode?}. MythLog (editor_xs_diagnostics) is authoritative after the game loads the script.",
+            new Dictionary<string, object>
+            {
+                ["path"] = new { type = "string" },
+                ["offset"] = new { type = "integer", minimum = 0 },
+                ["limit"] = new { type = "integer", minimum = 1, maximum = XsCheck.MaxLimit },
+            },
+            ["path"], true);
         yield return Spec(TriggerElements.Tool,
             "Look up the shipped trigger condition/effect catalog (trigger_data.xml, from editor_generate_catalog) offline: exact names, parameters with vartype, defaults, which parameters editor_trigger_edit can replace, the XS command/expression templates. With path+expectedSha256 (hash-pinned TR export) each entry also lists up to 5 existing exemplars (triggerId, elementIndex, current args) of that element type, which editor_trigger_edit can byte-copy via duplicates/copyEffects. It never builds element bytes: types absent from the export cannot be added yet. kind=any|effect|condition; name exact, filter substring; limit 1..50 (default 10), offset. Read-only, no game connection.",
             new Dictionary<string, object>

@@ -19,7 +19,7 @@ internal static partial class AiInstaller
         var info = new FileInfo(EditorFiles.LocalPath(path)); if (!info.Exists || info.Length is < 1 or > 1_000_000) throw new InvalidDataException("XS missing/empty/over 1 MB: " + path);
         return File.ReadAllBytes(info.FullName);
     }
-    static string StripComments(string source)
+    internal static string StripComments(string source)
     {
         var result = new StringBuilder(); var quoted = false; var block = false; var line = false;
         for (var i = 0; i < source.Length; i++)

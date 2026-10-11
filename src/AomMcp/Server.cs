@@ -442,7 +442,7 @@ internal sealed partial class Server(
 
     static bool ConnectionFree(string name, JsonElement args) => name == CallToolName
         ? CallTarget(args) is var (target, targetArgs) && ConnectionFree(target, targetArgs)
-        : WorkflowNames.Contains(name) || name is "editor_toolset" or "editor_search_tools" or "editor_catalog" or "editor_capabilities" or "editor_export_recovery" or "editor_trigger_list" or "editor_trigger_player_parity" or "editor_trigger_edit" or "editor_players" or "editor_player_dependency_audit" or "editor_stage_ai" or "editor_pantheon" or "editor_dependencies" or "editor_generate_catalog" or "editor_xs_api" or "editor_dialogs" or "editor_xs_diagnostics" or "editor_trigger_elements"
+        : WorkflowNames.Contains(name) || name is "editor_toolset" or "editor_search_tools" or "editor_catalog" or "editor_capabilities" or "editor_export_recovery" or "editor_trigger_list" or "editor_trigger_player_parity" or "editor_trigger_edit" or "editor_players" or "editor_player_dependency_audit" or "editor_stage_ai" or "editor_pantheon" or "editor_dependencies" or "editor_generate_catalog" or "editor_xs_api" or "editor_dialogs" or "editor_xs_diagnostics" or "editor_trigger_elements" or "editor_xs_check"
         || GameDataCatalog.ToolKinds.ContainsKey(name)
         || (name == "editor_terrain_catalog" && args.TryGetProperty("kind", out var catalogKind) && catalogKind.GetString() is "mixes" or "editModes")
         || (name is "editor_set_diplomacy" or "editor_player_settings" && (args.GetProperty("operation").GetString() is "preview" or "verify"))

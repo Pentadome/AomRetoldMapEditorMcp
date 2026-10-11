@@ -796,6 +796,17 @@ try:
         assert len(json.loads(target.read_text(encoding='utf-8'))['entries']) == 100
         assert tool('editor_xs_api', {'filter': 'kb', 'saveTo': str(target)})['isError']  # never overwrite
         assert tool('editor_prototypes', {'name': 'Hoplite', 'fields': ['cost'], 'saveTo': str(pathlib.Path(save_dir) / 'p.json')})['structuredContent']['bytes'] > 0
+    fx = root / 'tests/fixtures/xs'
+    check = tool('editor_xs_check', {'path': str(fx / 'for_member_access.xs')})
+    assert not check['isError'] and check['structuredContent']['heuristic'] is True, check
+    rules = {d['rule']: d for d in check['structuredContent']['diagnostics']}
+    assert rules['for-condition-member-access']['mythLogCode'] == '0172', rules
+    check = tool('editor_xs_check', {'path': str(fx / 'rule_and_braces.xs')})['structuredContent']['diagnostics']
+    assert {'rule-no-state', 'unbalanced', 'unknown-call'} <= {d['rule'] for d in check}, check
+    clean = tool('editor_xs_check', {'path': str(fx / 'clean_with_extern_include.xs')})['structuredContent']
+    assert clean['total'] == 0 and len(clean['filesChecked']) == 2, clean
+    assert tool('editor_xs_check', {'path': str(fx / 'missing.xs')})['isError']
+    assert tool('editor_xs_check', {'path': str(root / 'README.md')})['isError']
     elements_sample = root / 'research/defense-code-sample.trg'
     assert tool('editor_trigger_elements', {'path': str(elements_sample)})['isError']  # path needs expectedSha256
     assert tool('editor_trigger_elements', {'kind': 'bogus'})['isError']
@@ -1060,7 +1071,7 @@ try:
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
     expected_core = (helper_names - workflow_names) | core_native
-    assert len(expected_core) == 80 and len(names) == 930
+    assert len(expected_core) == 81 and len(names) == 931
     assert {'editor_dialog_state', 'editor_dialog_act'} <= expected_core
     world_tools = {'editor_terrain_info', 'editor_live_players', 'editor_edit_mode', 'editor_paint_world', 'editor_elevation',
                    'editor_transform_unit', 'editor_terrain_catalog', 'editor_camera_frame', 'editor_overview',

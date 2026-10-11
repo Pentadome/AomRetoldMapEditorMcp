@@ -102,6 +102,7 @@ if (selfTest)
     AiInstaller.SelfTest();
     XsDiagnostics.SelfTest();
     XsConstants.SelfTest();
+            XsCheck.SelfTest();
     PlayerSettings.SelfTest();
     StartupOrders.SelfTest();
     RuntimeProbes.SelfTest();
