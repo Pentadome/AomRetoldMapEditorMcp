@@ -50,6 +50,24 @@ internal static class EditorFiles
         return path;
     }
 
+    /// <summary>
+    /// Resolves outputPath "auto" to the first unused "&lt;stem&gt;.e&lt;N&gt;&lt;extension&gt;" beside the source (an existing ".eN" suffix is replaced);
+    /// any other value is returned unchanged. The result still goes through <see cref="ApprovedNewPath"/>.
+    /// </summary>
+    internal static string ResolveOutput(string output, string sourcePath, string extension)
+    {
+        if (!output.Equals("auto", StringComparison.Ordinal)) return output;
+        var source = LocalPath(sourcePath);
+        var stem = System.Text.RegularExpressions.Regex.Replace(Path.GetFileNameWithoutExtension(source), @"\.e\d+$", "");
+        var directory = Path.GetDirectoryName(source)!;
+        for (var n = 1; n < 10_000; n++)
+        {
+            var candidate = Path.Combine(directory, stem + ".e" + n + extension);
+            if (!File.Exists(candidate) && !Directory.Exists(candidate)) return candidate;
+        }
+        throw new ArgumentException("No free .eN output name beside the source; supply an explicit outputPath.");
+    }
+
     internal static string ApprovedNewPath(string path, string extension)
     {
         path = LocalPath(path);

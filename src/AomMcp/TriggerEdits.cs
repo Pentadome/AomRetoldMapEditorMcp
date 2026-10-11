@@ -161,7 +161,7 @@ internal static class TriggerEdits
         {
             EditorFiles.Confirm(args, "confirmWrite");
             if (!args.TryGetProperty("outputPath", out var path)) throw new ArgumentException("Non-preview edit requires outputPath.");
-            EditorFiles.ApprovedNewPath(path.GetString()!, ".trg");
+            EditorFiles.ApprovedNewPath(EditorFiles.ResolveOutput(path.GetString()!, args.GetProperty("path").GetString()!, ".trg"), ".trg");
         }
     }
 
@@ -182,16 +182,21 @@ internal static class TriggerEdits
 
     static bool Preview(JsonElement args) => !args.TryGetProperty("preview", out var p) || p.GetBoolean();
 
-    static byte[] Text(string value, int max = 128)
+    // Verified in game exports: the XS Code Snippet effect parameter has value type 72. Other long-text types are unproven.
+    const uint SnippetValueType = 72;
+
+    static byte[] Text(string value, int max = 128, string field = "trigger text", bool multiline = false)
     {
-        if (value.Length is < 1 || value.Length > max || value.Any(char.IsControl))
-            throw new ArgumentException("Trigger text outside reviewed bounds.");
+        if (value.Length < 1 || value.Length > max)
+            throw new ArgumentException($"{field}: length {value.Length} is outside the reviewed 1..{max} characters.");
+        if (value.Any(c => char.IsControl(c) && !(multiline && c is '\n' or '\r' or '\t')))
+            throw new ArgumentException($"{field}: control characters are not allowed{(multiline ? " (only tab and line breaks)" : "")}.");
         return Wide.GetBytes(value);
     }
 
-    static byte[] WideField(string value, int max = 128)
+    static byte[] WideField(string value, int max = 128, string field = "trigger text", bool multiline = false)
     {
-        var text = Text(value, max);
+        var text = Text(value, max, field, multiline);
         var result = new byte[4 + text.Length];
         BinaryPrimitives.WriteInt32LittleEndian(result, value.Length);
         text.CopyTo(result, 4);
@@ -224,12 +229,15 @@ internal static class TriggerEdits
     {
         var key = replacement.GetProperty("parameter").GetString()!;
         var numeric = NumericKeys.Contains(key, StringComparer.OrdinalIgnoreCase);
-        if (!numeric && !StringKeys.Contains(key, StringComparer.OrdinalIgnoreCase))
-            throw new ArgumentException("Parameter not in reviewed numeric/string allowlist.");
+        var snippet = key.Equals("CodeSnippet", StringComparison.OrdinalIgnoreCase);
+        if (!numeric && !snippet && !StringKeys.Contains(key, StringComparer.OrdinalIgnoreCase))
+            throw new ArgumentException($"Parameter '{key}' is not in the reviewed allowlist (numeric: {string.Join(", ", NumericKeys)}; text: {string.Join(", ", StringKeys)}, CodeSnippet).");
         var found = element.Args.Where(a => a.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).ToArray();
         if (found.Length != 1 || found[0].Values.Length != 1 || found[0].ValueType is 4 or 7 or 22 or 42 or 43 or 50)
             throw new InvalidDataException("Parameter encoding ambiguous/unsupported; no write.");
         var arg = found[0];
+        if (snippet && arg.ValueType != SnippetValueType)
+            throw new ArgumentException($"CodeSnippet has value type {arg.ValueType}, not the verified snippet type {SnippetValueType}; refusing.");
         var before = replacement.GetProperty("expected").GetString()!;
         var after = replacement.GetProperty("value").GetString()!;
         if (arg.Values[0] != before) throw new ArgumentException("Parameter expected value differs from source.");
@@ -242,15 +250,15 @@ internal static class TriggerEdits
             if (key.Equals("EventID", StringComparison.OrdinalIgnoreCase) && (!int.TryParse(after, out var eventId) || eventId < 0)
                 || (key.Equals("Player", StringComparison.OrdinalIgnoreCase) || key.EndsWith("PlayerID", StringComparison.OrdinalIgnoreCase))
                     && (!int.TryParse(after, out var player) || player is < 0 or > 12))
-                throw new ArgumentException("EventID/player outside reviewed bounds.");
+                throw new ArgumentException($"{key}: value '{after}' is outside the reviewed range (EventID >= 0; player fields 0..12).");
         }
-        else _ = Text(after);
+        else _ = Text(after, snippet ? CampaignTriggers.MaxChars : 128, key, snippet);
         var valueLength = arg.ValueEnd - arg.ValueStart;
         var trailing = arg.ValueType is 2 or 5 or 8 or 56 ? 1 : 0;
         var originalChars = BinaryPrimitives.ReadInt32LittleEndian(source.AsSpan(arg.ValueStart + 4));
         if (originalChars < 0 || 8 + originalChars * 2 + trailing != valueLength)
             throw new InvalidDataException("Unreviewed numeric argument structure; no write.");
-        return new(arg.ValueStart + 4 - localBase, 4 + originalChars * 2, WideField(after, numeric ? 32 : 128));
+        return new(arg.ValueStart + 4 - localBase, 4 + originalChars * 2, WideField(after, numeric ? 32 : snippet ? CampaignTriggers.MaxChars : 128, key, snippet));
     }
 
     /// <summary>Source element indexes of requested duplicates per kind, in creation order (appended after originals).</summary>
@@ -583,6 +591,9 @@ internal static class TriggerEdits
         return names.Where(name => !known.Contains(name)).Select(name => "Prototype not found in source catalog: " + name).ToArray();
     }
 
+    // Chain the next edit onto the file just written: pass these as path/expectedSha256 (a preview has nothing to chain).
+    static object? Next(string? written, string sha256) => written is null ? null : new { path = written, expectedSha256 = sha256 };
+
     internal static object Edit(JsonElement args)
     {
         Preflight(args);
@@ -618,7 +629,7 @@ internal static class TriggerEdits
         string? written = null;
         if (!Preview(args))
         {
-            written = EditorFiles.ApprovedNewPath(args.GetProperty("outputPath").GetString()!, ".trg");
+            written = EditorFiles.ApprovedNewPath(EditorFiles.ResolveOutput(args.GetProperty("outputPath").GetString()!, args.GetProperty("path").GetString()!, ".trg"), ".trg");
             using (var file = new FileStream(written, FileMode.CreateNew, FileAccess.Write, FileShare.None)) file.Write(current.Original);
             if (Layout.Hash(written) != resultSha) throw new IOException("New TR output copy verification failed.");
         }
@@ -626,11 +637,11 @@ internal static class TriggerEdits
         var detail = (JsonElement)JsonSerializer.SerializeToElement(details[0]);
         return batch
             ? new { preview = Preview(args), path = written, sourceSha256 = input.Sha256, sha256 = resultSha,
-                edits = details, warnings, originalBytes = input.Original.Length, outputBytes = current.Original.Length,
+                next = Next(written, resultSha), edits = details, warnings, originalBytes = input.Original.Length, outputBytes = current.Original.Length,
                 suffixBytesPreserved = input.SuffixBytes,
                 limitation = "Prepared TR file only. No scenario edits; game import and XS effects unverified." }
             : (object)new { preview = Preview(args), path = written, sourceSha256 = input.Sha256, sha256 = resultSha,
-                operation = detail.GetProperty("operation").GetString(), sourceId = detail.GetProperty("sourceId").GetUInt32(),
+                next = Next(written, resultSha), operation = detail.GetProperty("operation").GetString(), sourceId = detail.GetProperty("sourceId").GetUInt32(),
                 targetId = detail.GetProperty("targetId").GetUInt32(), targetName = detail.GetProperty("targetName").GetString(),
                 diff = detail.GetProperty("diff"), warnings, originalRecordSha256 = detail.GetProperty("originalRecordSha256").GetString(),
                 editedRecordSha256 = detail.GetProperty("editedRecordSha256").GetString(),

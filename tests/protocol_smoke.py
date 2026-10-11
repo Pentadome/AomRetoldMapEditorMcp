@@ -666,6 +666,28 @@ try:
                 'expected': '2', 'value': '6'}]})
         assert not cloned['isError'] and cloned['structuredContent']['preview'] and cloned['structuredContent']['suffixBytesPreserved'] == 216, cloned
         assert hashlib.sha256(campaign_tr.read_bytes()).hexdigest() == source_digest
+    snippet_source = root / 'research/defense-code-sample.trg'
+    if snippet_source.is_file():
+        with tempfile.TemporaryDirectory(prefix='aom-snippet-') as tmp:
+            copy = pathlib.Path(tmp) / 'sample.trg'
+            copy.write_bytes(snippet_source.read_bytes())
+            digest = hashlib.sha256(copy.read_bytes()).hexdigest()
+            code = 'int x = 1;' + chr(13) + chr(10) + '// ok' + chr(9) + 'a' * 600
+            snippet_args = {'operation': 'patch', 'path': str(copy), 'expectedSha256': digest, 'triggerId': 0,
+                'expectedName': 'Trigger_0Defense_Init', 'replacements': [{'kind': 'effect', 'elementIndex': 0,
+                'parameter': 'CodeSnippet', 'expected': '', 'value': code}]}
+            snippet = tool('editor_trigger_edit', snippet_args)
+            assert not snippet['isError'] and snippet['structuredContent']['next'] is None, snippet
+            written = tool('editor_trigger_edit', {**snippet_args, 'preview': False, 'outputPath': 'auto', 'confirmWrite': True})
+            assert not written['isError'], written
+            first = written['structuredContent']
+            assert pathlib.Path(first['path']).name == 'sample.e1.trg' and first['next']['path'] == first['path'], first
+            assert first['next']['expectedSha256'] == hashlib.sha256(pathlib.Path(first['path']).read_bytes()).hexdigest()
+            chained = tool('editor_trigger_edit', {**snippet_args, 'path': first['next']['path'], 'expectedSha256': first['next']['expectedSha256'],
+                'replacements': [{**snippet_args['replacements'][0], 'expected': code, 'value': 'x'}], 'preview': False, 'outputPath': 'auto', 'confirmWrite': True})
+            assert not chained['isError'] and pathlib.Path(chained['structuredContent']['path']).name == 'sample.e2.trg', chained
+            too_long = tool('editor_trigger_edit', {**snippet_args, 'replacements': [{**snippet_args['replacements'][0], 'value': 'a' * 250001}]})
+            assert too_long['isError'] and 'CodeSnippet' in json.dumps(too_long) and '250000' in json.dumps(too_long), too_long
     session = root / '.tmp/agent'
     if (session / 'orig-01.trg').is_file() and (session / 'edit-09.trg').is_file():
         # Read-only sources; all nine campaign edits must collapse to one byte-identical NEW output.

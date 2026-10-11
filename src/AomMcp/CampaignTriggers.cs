@@ -8,7 +8,8 @@ namespace AomMcp;
 /// <summary>Bounded parser for read-only campaign TR records; retains every original byte for later guarded edits.</summary>
 internal static class CampaignTriggers
 {
-    const int MaxTriggers = 10_000, MaxChars = 250_000;
+    internal const int MaxChars = 250_000;
+    const int MaxTriggers = 10_000;
     internal const int MaxItems = 20_000;
     static readonly UnicodeEncoding Utf16 = new(false, false, true);
     internal sealed record ObjectRef(uint UnitId, uint Player, string Proto);
