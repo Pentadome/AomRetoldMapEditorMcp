@@ -1,10 +1,22 @@
 # Complete Age of Mythology Retold editor MCP tool reference
 
-**Current full: 928 tools = 76 helpers + 434 native commands + 418 shipped editor actions. Default core: 78 = 69 core helpers + nine essential native commands; `editor_call` reaches every other tool from core.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Twelve world editing helpers (core): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
+**Current full: 933 tools = 81 helpers + 434 native commands + 418 shipped editor actions. Default core: 83 = 74 core helpers + nine essential native commands; `editor_call` reaches every other tool from core.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Twelve world editing helpers (core): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
 
 Authoritative source: production `aom-retold-editor` `0.1.0` `tools/list` with `--toolset full`, protocol `2025-11-25`. Executable SHA-256: `dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff`.
 
 The catalog below is a historical generated reference from an earlier 28-helper snapshot; it does **not** list newer helpers or their latest schemas. Query live `tools/list` or narrow `editor_catalog` for authoritative signatures. Current additions: `editor_search_tools`, `editor_call`, `editor_trigger_player_parity`, `editor_ui_read`, `editor_player_settings`; existing `editor_trigger_edit` adds batched edits/labels/values/condition removal; `editor_set_diplomacy` adds matrix changes, `editor_players` richer checkpoint fields, `editor_screenshot` region/scale. See [workflow limits](research/WORKFLOW-TOOLS.md). `editor_toolset` switches core/full mid-session; actual changes emit `notifications/tools/list_changed`. Clients must refresh tools/list without old cursor. The 40 core helpers are in both sets; seven new [session workflow helpers](research/SESSION-WORKFLOWS.md), most native commands and every shipped action require full mode. Playtest has one reviewed English alternative-UI 2560×1440 Player1/Standard profile; authorized public start/inspect/token-bound Quit passed. Other UI states and runtime memory telemetry remain unsupported. XS probes/supplied transcripts do not establish compiler/runtime proof. Mode operations are standalone-only. Hidden direct calls/batch steps refuse before game connection; core is not a permissions sandbox. Native/action exposure does **not** establish semantic/live validation of every command. Native acknowledgements are not getter values or proof of effects. See [README.md](README.md), [workflow limits](research/WORKFLOW-TOOLS.md) and [live evidence](research/LIVE-MUTATIONS.md).
+
+## Recent additions (see live `tools/list` for schemas)
+
+- `editor_xs_diagnostics`: reads MythLog.txt XS compile errors (load segmentation, de-duplicated) and the trigtemp.xs rule index.
+- `editor_xs_check`: heuristic offline XS lint (not a compiler).
+- `editor_xs_api`: `names[]` batch lookup, `kind=constant` (exe-scanned names, unverified), `detail`.
+- `editor_prototypes` / `editor_technologies`: `fields` and `where` projection/filter.
+- `editor_trigger_edit`: same-trigger edits merge, `outputPath:"auto"` with `next`, long CodeSnippet replacements, field-naming errors.
+- `editor_trigger_elements`: trigger condition/effect catalog plus byte-copy exemplars.
+- `editor_install_ai`: `destinationRoot=campaign`, `lineEndings`. `editor_players`: `aiDetail`.
+- Bulky readers: `fields`, `saveTo`, `truncationHint`.
+- `editor_help` (topic guides) and `editor_scenario_digest` (compact saved-scenario summary).
 
 ## Current helper: `editor_search_tools`
 
