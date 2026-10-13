@@ -31,6 +31,7 @@ sequence = 0
 notifications = []
 workflow_names = {'editor_unit_notes', 'editor_scenario_diff', 'editor_install_ai', 'editor_startup_orders',
                   'editor_runtime_probe', 'editor_runtime_report', 'editor_playtest', 'editor_build_campaign'}
+core_workflow = {'editor_unit_notes'}  # workflow helpers also exposed in the core toolset
 
 def send(method, params=None):
     global sequence
@@ -85,7 +86,7 @@ def assert_workflow_tools():
 
     def refusal(name, args):
         response = tool(name, args)
-        assert response['isError'] and 'Process with an Id' not in str(response), response
+        assert response['isError'] and 'GAME_NOT_RUNNING' not in str(response), response
         return response
 
     with tempfile.TemporaryDirectory(prefix='aom-workflow-protocol-') as tmp:
@@ -101,6 +102,11 @@ def assert_workflow_tools():
         assert notes['total'] == 1 and notes['units'][0]['note'] == '塔 — Δέντρο 🌴', notes
         assert success('editor_unit_notes', {**notes_args, 'offset': 999})['units'] == []
         refusal('editor_unit_notes', {**notes_args, 'expectedSha256': '0' * 64})
+        unpinned = success('editor_unit_notes', {k: v for k, v in notes_args.items() if k != 'expectedSha256'})
+        assert unpinned['sha256'] == sha(before) and unpinned['resolvedFrom'] is None and unpinned['modifiedUtc'], unpinned
+        assert unpinned['noteGroups'] and unpinned['noteGroups'][0]['count'] == 1 and unpinned['liveSummary'] is None, unpinned
+        live = tool('editor_unit_notes', {**notes_args, 'liveMatch': True})  # impossible PID: typed connect failure, no guessing
+        assert live['isError'] and 'GAME_NOT_RUNNING' in str(live), live
         unsupported = folder / 'unsupported.mythscn'
         unsupported.write_bytes(checkpoint_fixture(world_header=999))
         refusal('editor_unit_notes', {'scenarioPath': str(unsupported), 'expectedSha256': sha(unsupported)})
@@ -108,6 +114,9 @@ def assert_workflow_tools():
                       'afterPath': str(after), 'expectedAfterSha256': sha(after), 'offset': 999, 'limit': 1,
                       'assertions': [{'scope': 'entities', 'policy': 'preserve', 'fields': ['note']}]}
         diff = success('editor_scenario_diff', comparison)
+        unpinned_diff = success('editor_scenario_diff', {k: v for k, v in comparison.items() if not k.startswith('expected')})
+        assert unpinned_diff['after']['sha256'] == sha(after) and unpinned_diff['assertions'] == diff['assertions'], unpinned_diff
+        refusal('editor_scenario_diff', {**comparison, 'beforePath': 'latest', 'afterPath': 'latest'})
         assert not diff['universalUnchangedVerified'] and not diff['decodingComplete'], diff
         assert 'fail' in str(diff['assertions']), diff
         xs = folder / 'source.xs'
@@ -122,7 +131,13 @@ def assert_workflow_tools():
             {'sourcePath': str(after), 'expectedSha256': sha(after), 'fileName': 'two', 'cinematic': True}]}
         built = success('editor_build_campaign', camp)
         assert built['preview'] and 'STR_MYCAMP_MENU_TITLE_01' in built['strings'] and '<Cinematic>1</Cinematic>' in built['xml'], built
+        # Fixture has no decodable PL/TR: dependencies unknown, not a refusal.
+        assert built['selfContained'] is None and built['warnings'] and {f['action'] for f in built['files']} == {'create'}, built
+        assert built['applyArgs']['scenarios'][1]['expectedSha256'] == sha(after) and 'preview' not in built['applyArgs'], built
         assert not any(camp_mods.iterdir()), 'campaign preview wrote files'
+        refusal('editor_build_campaign', {**camp, 'operation': 'update'})
+        refusal('editor_build_campaign', {**camp, 'confirmDestructive': True})
+        refusal('editor_build_campaign', {**camp, 'scenarios': [{'sourcePath': 'latest'}], 'preview': False, 'confirmWrite': True})
         refusal('editor_build_campaign', {**camp, 'scenarios': [{**camp['scenarios'][0], 'expectedSha256': '0' * 64}]})
         refusal('editor_build_campaign', {**camp, 'preview': False})
         refusal('editor_build_campaign', {**camp, 'modName': '..'})
@@ -176,7 +191,7 @@ def assert_workflow_tools():
             assert success('editor_playtest', {'operation': 'preview', 'profilePath': str(other), 'expectedProfileSha256': registered['expectedProfileSha256']})['reviewed'], registered
         refusal('editor_playtest', {'operation': 'quit', 'token': 'foreign_host', 'confirmQuit': True})
         caps = success('editor_capabilities', {})['workflowTools']
-        assert set(caps['names']) == workflow_names and caps['playtest']['available'] and caps['playtest']['profileCount'] == 4 and not caps['telemetry']['available'], caps
+        assert set(caps['names']) == workflow_names - core_workflow and caps['alsoInCore'] == sorted(core_workflow) and caps['playtest']['available'] and caps['playtest']['profileCount'] == 4 and not caps['telemetry']['available'], caps
 
 
 def assert_tool_search(full_specs, expected_core, mode):
@@ -267,7 +282,7 @@ def assert_search_validation():
         # An invalid later search must stop whole batch before earlier game-backed step.
         for refused in (tool('editor_search_tools', arguments), tool('editor_batch', {'steps': [
                 {'name': 'editor_status'}, {'name': 'editor_search_tools', 'arguments': arguments}]})):
-            assert refused['isError'] and 'Process with an Id' not in str(refused), refused
+            assert refused['isError'] and 'GAME_NOT_RUNNING' not in str(refused), refused
             assert refused['structuredContent']['code'] == 'INVALID_ARGUMENT', refused
             assert refused['structuredContent']['nativeDispatched'] is False, refused
     for arguments in ({'query': 'x' * 256}, {'query': 'no_such_tool_0174babe'},
@@ -351,12 +366,17 @@ def assert_call_proxy(full_specs):
         for refused in (tool('editor_call', arguments), tool('editor_batch', {'steps': [
                 {'name': 'editor_status'}, {'name': 'editor_call', 'arguments': arguments}]})):
             assert refused['isError'] and message in str(refused), (arguments, refused)
-            assert 'Process with an Id' not in str(refused), refused
+            assert 'GAME_NOT_RUNNING' not in str(refused), refused
             assert refused['structuredContent']['code'] == 'INVALID_ARGUMENT', refused
             assert refused['structuredContent']['nativeDispatched'] is False, refused
     # Valid hidden native target passes preflight and fails only at the impossible-PID connection.
     reached = tool('editor_call', {'name': 'editor_gadgetReal', 'arguments': {'name': 'BrushSettingsDialog'}})
-    assert reached['isError'] and 'Process with an Id' in str(reached), reached
+    assert reached['isError'] and 'GAME_NOT_RUNNING' in str(reached), reached
+    # Connection refusals are typed: nothing dispatched, safe to retry once the game runs.
+    gone = reached['structuredContent']
+    assert gone['code'] == 'GAME_NOT_RUNNING' and gone['phase'] == 'connect' and gone['retrySafe'] is True         and gone['nativeDispatched'] is False and gone['outcomeUnknown'] is False and '--pid' in gone['message'], gone
+    hint = tool('editor_scenario_digest', {'outputPath': 'x'})
+    assert hint['isError'] and 'Did you mean path?' in str(hint) and 'Valid arguments:' in str(hint), hint
     # Connection-free targets stay connection-free, standalone and as batch steps.
     direct = tool('editor_search_tools', {'query': 'gadgetReal'})
     proxied = tool('editor_call', {'name': 'editor_search_tools', 'arguments': {'query': 'gadgetReal'}})
@@ -377,7 +397,7 @@ def assert_removed_loader():
                 {'name': 'editor_uiClearSelection'},
                 {'name': 'editor_loadScenario', 'arguments': arguments}]})):
             assert refused['isError'] and 'Native loadScenario tool removed' in str(refused), refused
-            assert 'Process with an Id' not in str(refused), refused
+            assert 'GAME_NOT_RUNNING' not in str(refused), refused
             if refused.get('structuredContent') is not None:
                 assert refused['structuredContent']['nativeDispatched'] is False, refused
     assert 'Native loadScenario tool removed' in str(tool('editor_LOADSCENARIO', {
@@ -388,6 +408,8 @@ try:
     assert init['protocolVersion'] == '2025-11-25'
     assert init['serverInfo']['name'] == 'aom-retold-editor'
     assert 'editor_search_tools' in init['instructions'], init
+    # Doc coverage: every workflow helper is routed from the server instructions.
+    assert all(n in init['instructions'] for n in workflow_names), [n for n in workflow_names if n not in init['instructions']]
     assert init['capabilities']['tools']['listChanged'] is True
     notify('notifications/initialized')
     assert request('ping') == {}
@@ -426,12 +448,12 @@ try:
         assert schema['properties']['confirmDestructive']['const'] is True
         for arguments in ({'filename': 'fixture'}, {'filename': 'fixture', 'confirmDestructive': False}):
             refused = tool(native, arguments)
-            assert refused['isError'] and 'Process with an Id' not in str(refused), refused
+            assert refused['isError'] and 'GAME_NOT_RUNNING' not in str(refused), refused
         refused = tool('editor_batch', {'steps': [
             {'name': 'editor_uiClearSelection'},
             {'name': native, 'arguments': {'filename': 'fixture'}},
         ]})
-        assert refused['isError'] and 'Process with an Id' not in str(refused), refused
+        assert refused['isError'] and 'GAME_NOT_RUNNING' not in str(refused), refused
     assert tool('nonexistent_tool')['isError']
     assert 'editor_batch' in names and 'editor_pantheon' in names and 'editor_units' in names
     assert {'editor_place_formation', 'editor_save_checkpoint'} <= set(names)
@@ -454,7 +476,7 @@ try:
                     formation | {'preview': False}, formation | {'columns': 5},
                     formation | {'shape': 'ring'}, formation | {'proto': ''}):
         result = tool('editor_place_formation', invalid)
-        assert result['isError'] and 'Process with an Id' not in str(result), result
+        assert result['isError'] and 'GAME_NOT_RUNNING' not in str(result), result
     with tempfile.TemporaryDirectory(prefix='aom-checkpoint-test-') as temporary:
         directory = pathlib.Path(temporary)
         profile = directory / 'scenario'
@@ -469,7 +491,7 @@ try:
             {'path': str(directory / 'wrong.trg'), 'confirmWrite': True, 'profileDirectory': str(profile)},
         ):
             result = tool('editor_save_checkpoint', invalid)
-            assert result['isError'] and 'Process with an Id' not in str(result), result
+            assert result['isError'] and 'GAME_NOT_RUNNING' not in str(result), result
         refused = tool('editor_batch', {'steps': [
             {'name': 'editor_uiClearSelection'},
             {'name': 'editor_save_checkpoint', 'arguments': {'path': str(existing), 'confirmWrite': True, 'profileDirectory': str(profile)}},
@@ -481,7 +503,7 @@ try:
         slashed = tool('editor_save_checkpoint', {
             'path': str(directory / 'new.mythscn').replace('\\', '/'),
             'confirmWrite': True, 'profileDirectory': str(profile).replace('\\', '/')})
-        assert slashed['isError'] and 'Process with an Id' in str(slashed), slashed
+        assert slashed['isError'] and 'GAME_NOT_RUNNING' in str(slashed), slashed
         assert not (directory / 'new.mythscn').exists()
     with tempfile.TemporaryDirectory(prefix='aom-recovery-test-') as temporary:
         directory = pathlib.Path(temporary)
@@ -515,7 +537,7 @@ try:
                     {'area': {'x': 0, 'z': 0, 'radius': -1}},
                     {'area': {'x': 0, 'z': 0, 'radius': 1, 'y': 4}}):
         result = tool('editor_units', invalid)
-        assert result['isError'] and 'Process with an Id' not in str(result), result
+        assert result['isError'] and 'GAME_NOT_RUNNING' not in str(result), result
     refused_units_batch = tool('editor_batch', {'steps': [
         {'name': 'editor_uiClearSelection'},
         {'name': 'editor_units', 'arguments': {'area': {'x': 0, 'z': 0, 'radius': -1}}},
@@ -532,7 +554,7 @@ try:
         spec = next(t for t in tools if t['name'] == name)
         assert spec['annotations']['readOnlyHint'] and not spec['annotations']['destructiveHint']
         result = tool(name, invalid)
-        assert result['isError'] and 'Process with an Id' not in str(result), result
+        assert result['isError'] and 'GAME_NOT_RUNNING' not in str(result), result
     # Trigger inspection/patching uses temp copies only, with impossible PID proving no Game connection.
     assert 'editor_triggers' in names
     original = root / 'research/BaseDefense.trg'
@@ -583,15 +605,28 @@ try:
     edit_preview = tool('editor_trigger_edit', edit_args)
     assert not edit_preview['isError'] and edit_preview['structuredContent']['preview'], edit_preview
     assert edit_preview['structuredContent']['diff'] and edit_preview['structuredContent']['path'] is None
+    assert edit_preview['structuredContent']['renderedXs'] == [], edit_preview  # no parameter replaced, nothing rendered
+    assert not tool('editor_trigger_edit', {**edit_args, 'allowRawXsInjection': True})['isError']
+    per_edit = {k: v for k, v in edit_args.items() if k not in ('path', 'expectedSha256')}
+    assert tool('editor_trigger_edit', {'path': edit_args['path'], 'expectedSha256': edit_args['expectedSha256'],
+                                        'edits': [{**per_edit, 'allowRawXsInjection': True}]})['isError']  # top-level only
     assert tool('editor_trigger_edit', {**edit_args, 'expectedSha256': '0' * 64})['isError']
     # autoBackup replaces the reviewed live export: passing both, or a stale prepared hash, must refuse before any game call.
     auto_args = {'operation': 'apply', 'path': str(original), 'expectedSha256': listed['structuredContent']['sha256'], 'autoBackup': True, 'confirmDestructive': True}
     assert tool('editor_triggers', {**auto_args, 'expectedLivePath': str(original)})['isError']
     assert tool('editor_triggers', {**auto_args, 'expectedSha256': '0' * 64})['isError']
+    # Lost-update check: base pins go together, only with autoBackup, and a stale base hash refuses before any game call.
+    base_pin = {'expectedBasePath': str(original), 'expectedBaseSha256': listed['structuredContent']['sha256']}
+    assert tool('editor_triggers', {**auto_args, 'expectedBasePath': str(original)})['isError']
+    assert tool('editor_triggers', {**auto_args, **base_pin, 'expectedBaseSha256': '0' * 64})['isError']
+    no_auto = {k: v for k, v in auto_args.items() if k != 'autoBackup'}
+    assert 'autoBackup' in json.dumps(tool('editor_triggers', {**no_auto, **base_pin, 'expectedLivePath': str(original), 'expectedLiveSha256': '0' * 64}))
     inspected = tool('editor_triggers', {'operation': 'inspect', 'path': str(original)})
     assert not inspected['isError'], inspected
     controller = inspected['structuredContent']
     assert controller['serializationRoundTripVerified']
+    xs_scripts = controller['xsScripts']  # import resets Triggers->XS Scripts; lastKnown depends on the local profile
+    assert 'resets' in xs_scripts['warning'] and xs_scripts['reAdd'] and isinstance(xs_scripts['lastKnown'], list) and xs_scripts['sources'], xs_scripts
     assert controller['triggers'][0]['name'] == 'Defense_Controller'
     with tempfile.TemporaryDirectory(prefix='aom-trigger-test-') as temporary:
         output = pathlib.Path(temporary) / 'patched.trg'
@@ -632,6 +667,21 @@ try:
         assert object_detail['effects'][1]['args'][0]['objects'][0]['unitId'] == 100
         assert object_detail['effects'][0]['args'][0]['selectionFlag'] == 1 and object_detail['effects'][0]['args'][0]['trailer'] == 127
         assert object_detail['effects'][0]['extras'] == object_detail['effects'][1]['extras']
+        # Cross-file copy: source is another hash-pinned file; copyValues needs the exemplar index proofs.
+        cross_target = pathlib.Path(temporary) / 'cross.trg'
+        cross_target.write_bytes(trigger_fixture())
+        cross_copy = {**object_edit['copyEffects'][0], 'sourcePath': str(object_source), 'sourceSha256': object_sha}
+        cross_args = {'path': str(cross_target), 'expectedSha256': hashlib.sha256(cross_target.read_bytes()).hexdigest(),
+            'operation': 'patch', 'triggerId': 704, 'expectedName': 'Startup', 'copyEffects': [cross_copy]}
+        cross = tool('editor_trigger_edit', cross_args)
+        assert not cross['isError'] and cross['structuredContent']['effectCount'] == 2, cross
+        assert any(r.get('copyHandle') == 'east' for r in cross['structuredContent']['renderedXs']), cross
+        assert tool('editor_trigger_edit', {**cross_args, 'copyEffects': [{**cross_copy, 'sourceSha256': '0' * 64}]})['isError']
+        assert tool('editor_trigger_edit', {**cross_args, 'copyEffects': [{k: v for k, v in cross_copy.items() if k != 'sourceSha256'}]})['isError']
+        assert tool('editor_trigger_edit', {**cross_args, 'copyValues': [{'copyHandle': 'nope', 'parameter': 'EventID', 'expected': '-1', 'value': '5'}]})['isError']
+        if (root / 'generated/trigger_exemplars.json').is_file():
+            cross_value = tool('editor_trigger_edit', {**cross_args, 'copyValues': [{'copyHandle': 'east', 'parameter': 'EventID', 'expected': '-1', 'value': '5'}]})
+            assert not cross_value['isError'] and any('copy:east.EventID' == d.get('field') for d in cross_value['structuredContent']['diff']), cross_value
         wrong_owner = {**object_edit, 'objectReplacements': [{**object_edit['objectReplacements'][0],
             'expected': [{**tuple_old, 'player': 2}]}]}
         assert tool('editor_trigger_edit', {**object_args, **wrong_owner})['isError']
@@ -698,9 +748,14 @@ try:
             first = written['structuredContent']
             assert pathlib.Path(first['path']).name == 'sample.e1.trg' and first['next']['path'] == first['path'], first
             assert first['next']['expectedSha256'] == hashlib.sha256(pathlib.Path(first['path']).read_bytes()).hexdigest()
+            assert first['next']['basePath'] == str(copy) and first['next']['baseSha256'] == digest == first['baseSha256'], first
+            assert tool('editor_trigger_edit', {**snippet_args, 'basePath': str(copy)})['isError']  # pins go together
+            assert tool('editor_trigger_edit', {**snippet_args, 'basePath': str(copy), 'baseSha256': '0' * 64})['isError']
             chained = tool('editor_trigger_edit', {**snippet_args, 'path': first['next']['path'], 'expectedSha256': first['next']['expectedSha256'],
+                'basePath': first['next']['basePath'], 'baseSha256': first['next']['baseSha256'],
                 'replacements': [{**snippet_args['replacements'][0], 'expected': code, 'value': 'x'}], 'preview': False, 'outputPath': 'auto', 'confirmWrite': True})
             assert not chained['isError'] and pathlib.Path(chained['structuredContent']['path']).name == 'sample.e2.trg', chained
+            assert chained['structuredContent']['next']['basePath'] == str(copy), chained  # lineage survives the chain
             too_long = tool('editor_trigger_edit', {**snippet_args, 'replacements': [{**snippet_args['replacements'][0], 'value': 'a' * 250001}]})
             assert too_long['isError'] and 'CodeSnippet' in json.dumps(too_long) and '250000' in json.dumps(too_long), too_long
     session = root / '.tmp/agent'
@@ -759,7 +814,7 @@ try:
         {'operation': 'export', 'path': 'relative.trg', 'confirmWrite': True},
     ):
         result = tool('editor_triggers', invalid)
-        assert result['isError'] and 'Process with an Id' not in str(result), result
+        assert result['isError'] and 'GAME_NOT_RUNNING' not in str(result), result
     refused_trigger_batch = tool('editor_batch', {'steps': [
         {'name': 'editor_uiClearSelection'},
         {'name': 'editor_triggers', 'arguments': {'operation': 'apply', 'path': str(original)}},
@@ -790,8 +845,12 @@ try:
     assert batch['found'] == 1 and batch['entries'][0]['signature'].startswith('int kbUnitCount(') and batch['detail'] == 'compact', batch
     assert [m['name'] for m in batch['missing']] == ['noSuchXsFunction'] and 'officialHelp' not in batch['entries'][0], batch
     assert 'summary' not in batch['entries'][0]
-    for bad in [{'names': []}, {'names': ['a'] * 51}, {'names': ['kbUnitCount'], 'name': 'x'}, {'names': ['x'], 'detail': 'tiny'}, {'detail': 'full'}]:
+    for bad in [{'names': []}, {'names': ['a'] * 51}, {'names': ['kbUnitCount'], 'name': 'x'}, {'names': ['x'], 'detail': 'tiny'}, {'filter': 'kb', 'detail': 'tiny'}]:
         assert tool('editor_xs_api', bad)['isError'], bad
+    compact_search = tool('editor_xs_api', {'filter': 'kbUnitCount', 'detail': 'compact', 'includeLocal': False})  # detail now works with filter
+    assert not compact_search['isError'] and 'officialHelp' not in json.dumps(compact_search['structuredContent']['entries']), compact_search
+    typo = tool('editor_xs_api', {'filter': 'kbUnit', 'limit': 2, 'includeLocal': False, 'fields': ['name', 'signatur']})['structuredContent']
+    assert typo['unknownFields'] == ['signatur'] and 'signature' in typo['didYouMean']['signatur'] and 'signature' in typo['validFields'], typo
     constants = tool('editor_xs_api', {'kind': 'constant', 'limit': 1})
     assert not constants['isError'] and 'constants' in constants['structuredContent'], constants  # Local file may be absent: status says so.
     shaped = tool('editor_xs_api', {'filter': 'kbUnit', 'limit': 5, 'includeLocal': False, 'fields': ['name', 'signature']})
@@ -819,12 +878,47 @@ try:
     check = tool('editor_xs_check', {'path': str(fx / 'rule_and_braces.xs')})['structuredContent']['diagnostics']
     assert {'rule-no-state', 'unbalanced', 'unknown-call'} <= {d['rule'] for d in check}, check
     clean = tool('editor_xs_check', {'path': str(fx / 'clean_with_extern_include.xs')})['structuredContent']
-    assert clean['total'] == 0 and len(clean['filesChecked']) == 2, clean
+    assert clean['total'] == 0 and len(clean['target']['filesChecked']) == 2, clean
     assert tool('editor_xs_check', {'path': str(fx / 'missing.xs')})['isError']
     assert tool('editor_xs_check', {'path': str(root / 'README.md')})['isError']
+    with tempfile.TemporaryDirectory(prefix='aom-xs-') as xs_dir:
+        trig = pathlib.Path(xs_dir) / 'trigger' / 'demo'
+        trig.mkdir(parents=True)
+        (trig / 'a.xs').write_text('include "demo/helperz.xs";\nvoid f() { for (int i = 0; < 3) { } aiPlanCreate("x", 1); }\n', encoding='utf-8')
+        (trig / 'helper.xs').write_text('void g() { }\n', encoding='utf-8')
+        lint = tool('editor_xs_check', {'path': str(trig / 'a.xs')})
+        assert not lint['isError'], lint
+        lint = lint['structuredContent']
+        assert lint['target']['context'] == 'trigger' and len(lint['target']['sha256']) == 64, lint['target']
+        by_rule = {d['rule']: d for d in lint['diagnostics']}
+        assert by_rule['for-loop-form']['severity'] == 'error' and 'for (int i = 0; i < 3; i++)' in by_rule['for-loop-form']['message'], by_rule
+        assert lint['diagnostics'][0]['severity'] == 'error'  # errors first
+        missing = by_rule['include-not-found']['detail']
+        assert str(pathlib.Path(xs_dir) / 'trigger') in missing['resolvedAgainst'] and 'demo' + chr(92) + 'helper.xs' in missing['suggestions'], missing
+        if lint['target']['apiModel'] == 'loaded':
+            assert 'syscall-wrong-context' in by_rule, by_rule
+            as_ai = tool('editor_xs_check', {'path': str(trig / 'a.xs'), 'context': 'ai'})['structuredContent']
+            assert as_ai['target']['context'] == 'ai' and 'syscall-wrong-context' not in {d['rule'] for d in as_ai['diagnostics']}
+    def xs_refusal(args):
+        bad = tool('editor_xs_check', args)
+        assert bad['isError'] and bad['structuredContent']['code'] == 'INVALID_ARGUMENT', (args, bad)
+    xs_refusal({})
+    xs_refusal({'path': str(fx / 'clean_with_extern_include.xs'), 'scenarioPath': 'latest'})
+    xs_refusal({'scenarioPath': 'x.trg'})
+    xs_refusal({'scenarioPath': 'latest', 'context': 'ai'})
+    xs_refusal({'path': str(fx / 'clean_with_extern_include.xs'), 'context': 'rm'})
+    with tempfile.TemporaryDirectory(prefix='aom-xs-scn-') as scn_dir:
+        scn = pathlib.Path(scn_dir) / 'deps.mythscn'
+        scn.write_bytes(checkpoint_fixture())
+        scn_lint = tool('editor_xs_check', {'scenarioPath': str(scn), 'expectedSha256': hashlib.sha256(scn.read_bytes()).hexdigest()})
+        assert not scn_lint['isError'] and scn_lint['structuredContent']['target']['sha256'] == hashlib.sha256(scn.read_bytes()).hexdigest(), scn_lint
+        assert tool('editor_xs_check', {'scenarioPath': str(scn), 'expectedSha256': '0' * 64})['isError']
     topics = tool('editor_help', {})['structuredContent']['topics']
     assert {'xs', 'triggers', 'placement'} <= {t['name'] for t in topics}, topics
     assert 'editor_xs_check' in tool('editor_help', {'topic': 'xs'})['structuredContent']['text']
+    help_text = ''.join(tool('editor_help', {'topic': t['name']})['structuredContent']['text'] for t in topics)
+    assert all(n in help_text for n in workflow_names), [n for n in workflow_names if n not in help_text]
+    assert 'campaign' in {t['name'] for t in topics}, topics
     assert tool('editor_help', {'topic': '../AGENTS'})['isError'] and tool('editor_help', {'topic': 'nope'})['isError']
     digest_cp = root / 'research/BaseDefense.mythscn'
     digest_tr = root / 'research/defense-code-sample.trg'
@@ -834,6 +928,9 @@ try:
         assert not digest['isError'] and digest['structuredContent']['playerCount'] >= 1, digest
         assert len(json.dumps(digest['structuredContent'])) < 8000
         assert tool('editor_scenario_digest', {'path': str(digest_cp), 'expectedSha256': '0' * 64})['isError']
+        embedded = tool('editor_scenario_digest', {'path': str(digest_cp)})['structuredContent']  # unpinned: hash echoed
+        assert embedded['sha256'] == hashlib.sha256(digest_cp.read_bytes()).hexdigest() and 'xsScripts' in embedded, embedded
+        assert embedded['triggers'] is None or embedded['triggers']['source'] == 'embedded', embedded
     elements_sample = root / 'research/defense-code-sample.trg'
     assert tool('editor_trigger_elements', {'path': str(elements_sample)})['isError']  # path needs expectedSha256
     assert tool('editor_trigger_elements', {'kind': 'bogus'})['isError']
@@ -841,6 +938,17 @@ try:
         elements = tool('editor_trigger_elements', {'name': 'XS: Code Snippet', 'kind': 'effect', 'path': str(elements_sample),
             'expectedSha256': hashlib.sha256(elements_sample.read_bytes()).hexdigest()})
         assert not elements['isError'] and elements['structuredContent']['entries'][0]['exemplars'][0]['elementIndex'] == 0, elements
+    assert tool('editor_trigger_elements', {'name': 'x', 'library': 'yes'})['isError']
+    if (root / 'generated/trigger_exemplars.json').is_file():
+        library = tool('editor_trigger_elements', {'name': 'Chat: Send Chat', 'kind': 'effect', 'library': True})
+        assert not library['isError'], library
+        library = library['structuredContent']
+        assert library['librarySource']['root'] == 'game' and 'fresh' in library['librarySource'], library
+        entry = library['entries'][0]
+        assert all(isinstance(p['encodingProven'], bool) for p in entry['parameters']) and 'count' in entry['library'], entry
+        for location in entry['library'].get('locations', []):
+            assert len(location['sourceSha256']) == 64 and location['file'].lower().endswith('.mythscn'), location
+            assert location['sourcePath'].lower().endswith(location['file'].lower()), location
     diag_spec = next(t for t in tools if t['name'] == 'editor_xs_diagnostics')
     assert diag_spec['annotations']['readOnlyHint'] and diag_spec['inputSchema']['required'] == []
     with tempfile.TemporaryDirectory() as diag_dir:
@@ -931,10 +1039,10 @@ try:
                           ({'gadget': 'VictoryConditionsGadget', 'action': 'toggle', 'control': 'x'}, 'confirmDestructive'),
                           ({'gadget': 'G', 'action': 'bogus'}, ''), ({'action': 'open'}, ''), ({'gadget': 'G', 'action': 'open', 'timeout': 1}, '')]:
         refused = tool('editor_dialog_act', args)
-        assert refused['isError'] and message in str(refused) and 'Process with an Id' not in str(refused), (args, refused)
+        assert refused['isError'] and message in str(refused) and 'GAME_NOT_RUNNING' not in str(refused), (args, refused)
     for args in [{'limit': 0}, {'limit': 201}, {'offset': -1}, {'read': 'yes'}, {'unexpected': True}]:
         refused = tool('editor_dialog_state', args)
-        assert refused['isError'] and 'Process with an Id' not in str(refused), (args, refused)
+        assert refused['isError'] and 'GAME_NOT_RUNNING' not in str(refused), (args, refused)
     dialog_batch = tool('editor_batch', {'steps': [
         {'name': 'editor_dialogs', 'arguments': {'name': 'VictoryConditionsGadget', 'ui': 'normal'}},
         {'name': 'editor_pantheon', 'arguments': {'pantheon': 'Greeks'}}]})
@@ -1012,7 +1120,7 @@ try:
     for invalid in ({'requiredUnitIds': [-1]}, {'requiredUnitIds': ['0']},
                     {'requireTownCenterPlayers': [13]}, {'limit': 201}, {'triggerPath': 'relative.trg'}):
         result = tool('editor_validate_scenario', invalid)
-        assert result['isError'] and 'Process with an Id' not in str(result), result
+        assert result['isError'] and 'GAME_NOT_RUNNING' not in str(result), result
     objects = tool('editor_prototypes', {'category': 'objects', 'limit': 1})['structuredContent']
     assert objects['total'] > 100
     zeus = tool('editor_gods', {'category': 'major', 'pantheon': 'Greek', 'name': 'Zeus'})['structuredContent']
@@ -1091,14 +1199,14 @@ try:
     assert full_catalog['toolset'] == 'full' and full_catalog['exposedToolCount'] == len(names)
     native_names = {'editor_' + command['name'] for command in full_catalog['commands']}
     helper_names = {name for name in names if name not in native_names and not name.startswith('action_')}
-    # Core stays unchanged; new workflow helpers are full-only.
+    # New workflow helpers are full-only unless listed in core_workflow.
     assert workflow_names <= helper_names
     assert_workflow_tools()
     core_native = {'editor_undo', 'editor_redo', 'editor_uiClearSelection', 'editor_uiSelectType',
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
-    expected_core = (helper_names - workflow_names) | core_native
-    assert len(expected_core) == 83 and len(names) == 934
+    expected_core = (helper_names - (workflow_names - core_workflow)) | core_native
+    assert len(expected_core) == 84 and len(names) == 934
     assert {'editor_dialog_state', 'editor_dialog_act'} <= expected_core
     world_tools = {'editor_terrain_info', 'editor_live_players', 'editor_edit_mode', 'editor_paint_world', 'editor_elevation',
                    'editor_transform_unit', 'editor_terrain_catalog', 'editor_camera_frame', 'editor_overview',
@@ -1131,7 +1239,7 @@ try:
     preflight_refusal('editor_apply_layout', {'formation': {'proto': 'Hoplite', 'shape': 'ring', 'count': 3, 'spacing': 2,
                                                             'x': 5, 'z': 5, 'columns': 2}}, 'INVALID_ARGUMENT')
     preflight_refusal('editor_terrain_grid', {'minX': 5, 'minZ': 0, 'maxX': 5, 'maxZ': 9}, 'INVALID_ARGUMENT')
-    preflight_refusal('editor_terrain_grid', {'minX': 0, 'minZ': 0, 'maxX': 5, 'maxZ': 9, 'flatSize': 4}, 'INVALID_ARGUMENT')
+    preflight_refusal('editor_terrain_grid', {'minX': 0, 'minZ': 0, 'maxX': 5, 'maxZ': 9, 'maxDelta': 1}, 'INVALID_ARGUMENT')
     preflight_refusal('editor_place_at_world', {'proto': 'Hopilte', 'x': 5, 'z': 5}, 'UNKNOWN_PROTO')
     assert 'Hoplite' in tool('editor_place_at_world', {'proto': 'Hopilte', 'x': 5, 'z': 5})['structuredContent']['message']
     preflight_refusal('editor_apply_layout', {'items': [{'proto': 'TownCentre', 'x': 5, 'z': 5}]}, 'UNKNOWN_PROTO')
@@ -1169,13 +1277,13 @@ try:
             assert tool('editor_catalog', {'filter': 'uiPlaceAtPointer'})['structuredContent']['commands'] == []
             preview = tool('editor_place_formation', formation)
             assert not preview['isError'] and preview['structuredContent']['attempted'] == 0, preview
-            for hidden in (*sorted(workflow_names), 'editor_uiPlaceAtPointer', next(n for n in names if n.startswith('action_'))):
+            for hidden in (*sorted(workflow_names - core_workflow), 'editor_uiPlaceAtPointer', next(n for n in names if n.startswith('action_'))):
                 for refused in (tool(hidden), tool('editor_batch', {'steps': [
                         {'name': 'editor_search_tools', 'arguments': {'query': hidden}},
                         {'name': 'editor_status'}, {'name': hidden}]})):
                     assert refused['isError'] and 'unexposed tool' in str(refused), refused
                     assert '--toolset full' in str(refused) and 'editor_call' in str(refused), refused
-                    assert 'Process with an Id' not in str(refused), refused
+                    assert 'GAME_NOT_RUNNING' not in str(refused), refused
             assert_call_proxy(full_specs)
             refused = tool('editor_saveScenario', {'fname': 'do-not-save'})
             assert refused['isError'] and 'confirmDestructive' in str(refused), refused
@@ -1207,7 +1315,7 @@ try:
                 assert_removed_loader()
                 standalone = tool('editor_batch', {'steps': [
                     {'name': 'editor_status'}, {'name': 'editor_toolset', 'arguments': {'mode': mode}}]})
-                assert standalone['isError'] and 'standalone' in str(standalone) and 'Process with an Id' not in str(standalone), standalone
+                assert standalone['isError'] and 'standalone' in str(standalone) and 'GAME_NOT_RUNNING' not in str(standalone), standalone
                 assert not tool('editor_toolset', {'mode': mode})['structuredContent']['changed']
                 assert len(notifications) == before
             assert tool('editor_uiPlaceAtPointer')['isError']

@@ -1,6 +1,6 @@
 # Complete Age of Mythology Retold editor MCP tool reference
 
-**Current full: 934 tools = 82 helpers + 434 native commands + 418 shipped editor actions. Default core: 83 = 74 core helpers + nine essential native commands; `editor_call` reaches every other tool from core.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Twelve world editing helpers (core): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
+**Current full: 934 tools = 82 helpers + 434 native commands + 418 shipped editor actions. Default core: 84 = 75 core helpers (incl. `editor_unit_notes`) + nine essential native commands; `editor_call` reaches every other tool from core.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Twelve world editing helpers (core): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
 
 Authoritative source: production `aom-retold-editor` `0.1.0` `tools/list` with `--toolset full`, protocol `2025-11-25`. Executable SHA-256: `dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff`.
 
@@ -9,7 +9,13 @@ The catalog below is a historical generated reference from an earlier 28-helper 
 ## Recent additions (see live `tools/list` for schemas)
 
 - `editor_xs_diagnostics`: reads MythLog.txt XS compile errors (load segmentation, de-duplicated) and the trigtemp.xs rule index.
-- `editor_xs_check`: heuristic offline XS lint (not a compiler).
+- Saved-file readers `editor_unit_notes` (now also core), `editor_scenario_diff`, `editor_players`, `editor_scenario_digest` accept `"latest"` with optional hash pins (echoed with `modifiedUtc`). `editor_unit_notes`: `noteGroups`, `liveMatch`, `fields`/`saveTo`. `editor_scenario_digest`: XS Scripts list, per-player `missingIncludes`, embedded-TR trigger summary.
+- Trigger library: `editor_generate_catalog` also writes `generated/trigger_exemplars.json` (install campaign scenarios, TR v12 only); `editor_trigger_elements library=true` lists those locations (with `sourcePath`/`sourceSha256`) and `encodingProven` per parameter. `editor_trigger_edit` `copyEffects` accepts `sourcePath`+`sourceSha256` (other `.trg` or TR v12 `.mythscn`), and `copyValues` sets proven single-value parameters of copied effects (`UNPROVEN_VARTYPE` otherwise).
+- Polish: shaped `fields` typos return `didYouMean` + `validFields`; `editor_check_footprints` reports helper/marker overlaps as `info`; `editor_xs_api` accepts `detail` with `filter`.
+- `editor_trigger_edit` results and `next` carry `basePath`/`baseSha256`; `editor_triggers apply autoBackup` takes them as `expectedBasePath`/`expectedBaseSha256` (lost-update check, `LIVE_SOURCE_CHANGED` lists differing triggers; `lostUpdateCheck` verified/skipped).
+- `editor_trigger_edit`: `renderedXs` per touched element (+ balance check). String-literal params refuse quotes/backslashes/newlines (`STRING_PARAM_NOT_CODE`); code in bare slots like `Op` needs top-level `allowRawXsInjection=true` (`RAW_XS_INJECTION`).
+- `editor_triggers` inspect/validate/apply: `xsScripts` {warning, lastKnown, sources, reAdd}. Import resets the scenario's Triggers->XS Scripts list (`.trg` carries none); `lastKnown` = `trigger\trigtemp.xs` includes + TR scripts of the newest profile save.
+- `editor_xs_check`: heuristic offline XS lint (not a compiler). `scenarioPath` (`.mythscn` or `"latest"`, optional `expectedSha256`) lints every player AI and TR XS Scripts entry as the game resolves them (`scenario-script-missing` errors with similar names); `context=auto|ai|trigger` flags `syscall-wrong-context`; `for-loop-form` errors on legacy `for (i = 0; < n)` headers with a C-style rewrite; `include-not-found` carries `detail.resolvedAgainst`/`detail.suggestions`; result header moved to `target` (`filesChecked`, `sha256`, `context`).
 - `editor_xs_api`: `names[]` batch lookup, `kind=constant` (exe-scanned names, unverified), `detail`.
 - `editor_prototypes` / `editor_technologies`: `fields` and `where` projection/filter.
 - `editor_trigger_edit`: same-trigger edits merge, `outputPath:"auto"` with `next`, long CodeSnippet replacements, field-naming errors.
@@ -17,6 +23,8 @@ The catalog below is a historical generated reference from an earlier 28-helper 
 - `editor_install_ai`: `destinationRoot=campaign`, `lineEndings`. `editor_players`: `aiDetail`.
 - Bulky readers: `fields`, `saveTo`, `truncationHint`.
 - `editor_help` (topic guides) and `editor_scenario_digest` (compact saved-scenario summary).
+- Connection failures are typed: `GAME_NOT_RUNNING` / `GAME_MISMATCH`, phase `connect`, `nativeDispatched:false`, `retrySafe:true`. Unknown arguments name the closest valid one (`Did you mean path?`) and list the valid arguments.
+- `editor_build_campaign`: `bundleXs` (default on: player AI + TR XS Scripts with include closures copied to `game\ai\` / `trigger\`), `selfContained`/`missingFromMod` (apply refuses `MOD_NOT_SELF_CONTAINED` unless `allowIncomplete`), `sourcePath:"latest"` (preview only) with name defaults and `applyArgs`, `operation=update` with `expectedInstalled` + `confirmDestructive` + `backupDirectory`; `editor_help topic=campaign`.
 
 ## Current helper: `editor_search_tools`
 

@@ -8,16 +8,22 @@ internal sealed class Game : IDisposable
 {
     /// <summary>Gets the connected game process.</summary>
     public Process Process { get; }
+
     /// <summary>Gets the process handle with query and memory-read access only.</summary>
     public SafeProcessHandle Handle { get; }
+
     /// <summary>Gets the main module's runtime base address.</summary>
     public nint Base { get; }
+
     /// <summary>Gets the game window handle.</summary>
     public nint Window { get; }
+
     /// <summary>Gets the thread ID that owns the game window.</summary>
     public uint Thread { get; }
+
     /// <summary>Gets the connected process ID.</summary>
     public uint Pid => checked((uint)Process.Id);
+
     /// <summary>Gets the accepted build-specific addresses and guards.</summary>
     public Layout Layout { get; }
 
@@ -27,12 +33,26 @@ internal sealed class Game : IDisposable
     /// <param name="pid">Explicit process ID, or null to require exactly one running game.</param>
     public Game(string exe, Layout layout, int? pid = null)
     {
-        Process = pid.HasValue ? Process.GetProcessById(pid.Value) : FindProcess();
+        try
+        {
+            Process = pid.HasValue ? Process.GetProcessById(pid.Value) : FindProcess();
+        }
+        catch (ArgumentException)
+        {
+            throw new GameConnectionException(
+                "GAME_NOT_RUNNING",
+                $"No process with --pid {pid}; no operation executed.",
+                "Start the offline scenario editor and restart the MCP server with the right --pid (or without --pid), then retry."
+            );
+        }
         try
         {
             var image =
                 Process.MainModule?.FileName
-                ?? throw new InvalidOperationException("Game main module unavailable.");
+                ?? throw new GameConnectionException(
+                    "GAME_NOT_RUNNING",
+                    "Game main module unavailable; no operation executed."
+                );
             if (
                 !string.Equals(
                     Path.GetFullPath(image),
@@ -40,11 +60,17 @@ internal sealed class Game : IDisposable
                     StringComparison.OrdinalIgnoreCase
                 )
             )
-                throw new InvalidOperationException(
-                    "Process does not match configured game executable."
+                throw new GameConnectionException(
+                    "GAME_MISMATCH",
+                    "Process does not match configured game executable; no operation executed.",
+                    "Start the configured game executable or pass --exe/--pid for the running one, then retry."
                 );
             if (Layout.Hash(image) != layout.ExeSha256)
-                throw new InvalidOperationException("Game build changed; regenerate layout.");
+                throw new GameConnectionException(
+                    "GAME_MISMATCH",
+                    "Game build changed; regenerate layout. No operation executed.",
+                    "Regenerate layout/catalog for this game build (see README), then retry."
+                );
             Layout = layout;
             Base = Process.MainModule!.BaseAddress;
             // Windows SDK: PROCESS_QUERY_INFORMATION (0x400) | PROCESS_VM_READ (0x10).
@@ -52,7 +78,11 @@ internal sealed class Game : IDisposable
             if (Handle.IsInvalid)
             {
                 Handle.Dispose();
-                throw new InvalidOperationException("Cannot query/read game.");
+                throw new GameConnectionException(
+                    "GAME_NOT_RUNNING",
+                    "Cannot query/read game; no operation executed.",
+                    "Run the MCP server at the same privilege level as the game, then retry."
+                );
             }
             nint window = 0;
             uint thread = 0;
@@ -77,7 +107,10 @@ internal sealed class Game : IDisposable
             if (window == 0)
             {
                 Handle.Dispose();
-                throw new InvalidOperationException("Game window not found.");
+                throw new GameConnectionException(
+                    "GAME_NOT_RUNNING",
+                    "Game window not found (still starting or closing?); no operation executed."
+                );
             }
             Window = window;
             Thread = thread;
@@ -88,8 +121,10 @@ internal sealed class Game : IDisposable
             )
             {
                 Handle.Dispose();
-                throw new InvalidOperationException(
-                    "Runtime dispatcher signature mismatch; regenerate layout."
+                throw new GameConnectionException(
+                    "GAME_MISMATCH",
+                    "Runtime dispatcher signature mismatch; regenerate layout. No operation executed.",
+                    "Regenerate layout/catalog for this game build (see README), then retry."
                 );
             }
         }
@@ -108,8 +143,14 @@ internal sealed class Game : IDisposable
             return candidates[0];
         foreach (var p in candidates)
             p.Dispose();
-        throw new InvalidOperationException(
-            "Expected one running game. Start offline scenario editor, or specify --pid."
+        throw new GameConnectionException(
+            "GAME_NOT_RUNNING",
+            candidates.Length == 0
+                ? "No running game (AoMRT_s) found; no operation executed."
+                : $"{candidates.Length} running games found, expected one; no operation executed.",
+            candidates.Length == 0
+                ? null
+                : "Close the extra game instances or restart the MCP server with --pid, then retry."
         );
     }
 
@@ -187,9 +228,14 @@ internal sealed class Game : IDisposable
     /// <exception cref="InvalidOperationException">Window identity, mode, or foreground activation is invalid.</exception>
     public void Focus(bool requireEditor = true)
     {
-        if (Process.HasExited || Win.GetWindowThreadProcessId(Window, out var owner) != Thread
-            || owner != Pid)
-            throw new InvalidOperationException("Game window/process changed; no operation executed.");
+        if (
+            Process.HasExited
+            || Win.GetWindowThreadProcessId(Window, out var owner) != Thread
+            || owner != Pid
+        )
+            throw new InvalidOperationException(
+                "Game window/process changed; no operation executed."
+            );
         if (requireEditor)
             _ = Editor();
         if (Win.IsIconic(Window))
@@ -205,10 +251,15 @@ internal sealed class Game : IDisposable
         var attempts = 1;
         foreach (var backoff in FocusBackoffMs)
         {
-            if (Win.GetForegroundWindow() == Window) break;
+            if (Win.GetForegroundWindow() == Window)
+                break;
             attempts++;
             TryForeground();
-            for (var waited = 0; waited < backoff && Win.GetForegroundWindow() != Window; waited += 20)
+            for (
+                var waited = 0;
+                waited < backoff && Win.GetForegroundWindow() != Window;
+                waited += 20
+            )
                 System.Threading.Thread.Sleep(20);
         }
         if (Win.GetForegroundWindow() != Window)
@@ -225,7 +276,12 @@ internal sealed class Game : IDisposable
             using var other = Process.GetProcessById((int)pid);
             return other.ProcessName;
         }
-        catch (Exception e) when (e is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (Exception e)
+            when (e
+                    is ArgumentException
+                        or InvalidOperationException
+                        or System.ComponentModel.Win32Exception
+            )
         {
             return null;
         }
@@ -278,13 +334,36 @@ internal sealed class Game : IDisposable
     }
 }
 
+/// <summary>Connecting to the game failed before any input or native dispatch (no/ambiguous process, wrong build, no window).</summary>
+public sealed class GameConnectionException(string code, string message, string? nextAction = null)
+    : InvalidOperationException(message)
+{
+    /// <summary>Stable failure code: GAME_NOT_RUNNING or GAME_MISMATCH.</summary>
+    public string Code { get; } = code;
+
+    /// <summary>What the caller should do before retrying.</summary>
+    public string NextAction { get; } =
+        nextAction ?? "Start the offline scenario editor (or pass --pid), then retry.";
+}
+
 /// <summary>Game window did not become foreground; thrown before any input or native dispatch.</summary>
 public sealed class FocusRefusedException(int attempts = 1, string? foregroundProcess = null)
-    : InvalidOperationException("Game could not receive focus after " + attempts + " attempt(s); no input sent."
-        + (foregroundProcess is null ? "" : " Foreground window belongs to '" + foregroundProcess + "'; close or minimize it and retry once."))
+    : InvalidOperationException(
+        "Game could not receive focus after "
+            + attempts
+            + " attempt(s); no input sent."
+            + (
+                foregroundProcess is null
+                    ? ""
+                    : " Foreground window belongs to '"
+                        + foregroundProcess
+                        + "'; close or minimize it and retry once."
+            )
+    )
 {
     /// <summary>Number of activation attempts made before giving up.</summary>
     public int Attempts { get; } = attempts;
+
     /// <summary>Name of the process that held the foreground when focus was refused, if known.</summary>
     public string? ForegroundProcess { get; } = foregroundProcess;
 }

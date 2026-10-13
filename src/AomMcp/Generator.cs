@@ -7,7 +7,15 @@ namespace AomMcp;
 internal static class Generator
 {
     /// <summary>Counts of files written by <see cref="GenerateMetadata"/>.</summary>
-    internal sealed record MetadataResult(string Output, int UiFiles, int DataFiles, int MixFiles, int GodPowerFiles, int DialogWindows);
+    internal sealed record MetadataResult(
+        string Output,
+        int UiFiles,
+        int DataFiles,
+        int MixFiles,
+        int GodPowerFiles,
+        int DialogWindows,
+        object TriggerExemplars
+    );
 
     /// <summary>Writes a catalog and attempts passive layout discovery without activating candidates.</summary>
     /// <param name="exe">Installed game executable path.</param>
@@ -26,7 +34,11 @@ internal static class Generator
             }
             catch (Exception e)
             {
-                Console.WriteLine("Editor UI XML unavailable: " + e.Message + ". Supply --ui with decoded editor XML to generate menu/dialog action tools.");
+                Console.WriteLine(
+                    "Editor UI XML unavailable: "
+                        + e.Message
+                        + ". Supply --ui with decoded editor XML to generate menu/dialog action tools."
+                );
             }
         }
         var catalog = WriteCommandCatalog(exe, output, ui);
@@ -40,12 +52,28 @@ internal static class Generator
         }
         try
         {
+            var census = TriggerExemplars.Export(exe, Layout.Hash(exe), output);
+            Console.WriteLine(
+                $"Trigger exemplars: {census.WithTriggers} TR v12 of {census.Files} campaign scenarios."
+            );
+        }
+        catch (Exception e)
+            when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            Console.WriteLine("Trigger exemplar index unavailable: " + e.Message);
+        }
+        try
+        {
             var directories = new Dictionary<string, string>(StringComparer.Ordinal);
             if (ui != null)
                 directories["normal"] = ui;
-            var (_, archive, directory) = DialogCatalog.Interfaces.Single(i => i.Ui == "alternative");
+            var (_, archive, directory) = DialogCatalog.Interfaces.Single(i =>
+                i.Ui == "alternative"
+            );
             directories["alternative"] = ExportUi(exe, output, archive, directory);
-            Console.WriteLine($"Dialog catalog: {DialogCatalog.Generate(exe, output, catalog.Commands, directories)} editor windows.");
+            Console.WriteLine(
+                $"Dialog catalog: {DialogCatalog.Generate(exe, output, catalog.Commands, directories)} editor windows."
+            );
         }
         catch (Exception e)
         {
@@ -82,12 +110,44 @@ internal static class Generator
     internal static MetadataResult GenerateMetadata(string exe, string output)
     {
         Directory.CreateDirectory(output);
-        var directories = DialogCatalog.Interfaces.ToDictionary(i => i.Ui, i => ExportUi(exe, output, i.Archive, i.Directory), StringComparer.Ordinal);
+        var directories = DialogCatalog.Interfaces.ToDictionary(
+            i => i.Ui,
+            i => ExportUi(exe, output, i.Archive, i.Directory),
+            StringComparer.Ordinal
+        );
         var ui = directories["normal"];
         var catalog = WriteCommandCatalog(exe, output, ui);
         var (data, mixes, powers) = ExportGameData(exe, output);
         var dialogs = DialogCatalog.Generate(exe, output, catalog.Commands, directories);
-        return new(output, directories.Values.Sum(d => Directory.GetFiles(d, "*", SearchOption.AllDirectories).Length), data, mixes, powers, dialogs);
+        return new(
+            output,
+            directories.Values.Sum(d =>
+                Directory.GetFiles(d, "*", SearchOption.AllDirectories).Length
+            ),
+            data,
+            mixes,
+            powers,
+            dialogs,
+            ExportExemplars(exe, Layout.Hash(exe), output)
+        );
+    }
+
+    /// <summary>Writes the trigger exemplar index (<see cref="TriggerExemplars"/>) and returns its summary counts.</summary>
+    /// <param name="exe">Installed game executable path.</param>
+    /// <param name="hash">Executable SHA-256 the index is keyed on.</param>
+    /// <param name="output">Generated metadata directory.</param>
+    internal static object ExportExemplars(string exe, string hash, string output)
+    {
+        var census = TriggerExemplars.Export(exe, hash, output);
+        return new
+        {
+            file = TriggerExemplars.ExemplarsName,
+            scenarios = census.Files,
+            trV12 = census.WithTriggers,
+            skipped = census.Failures.Length,
+            provenVartypes = census.ProvenVartypes.Length,
+            unprovenVartypes = census.UnprovenVartypes,
+        };
     }
 
     /// <summary>Existing repository/runtime generated directory, else one beside the executable (release setup.ps1 convention).</summary>
@@ -130,34 +190,59 @@ internal static class Generator
         // Exact shipped definition paths; resource nodes are in proto, not map CRC resources.xml.
         var paths = new List<string>
         {
-            "gameplay/proto.xml.XMB", "gameplay/techtree.xml.XMB",
-            "gameplay/major_gods.xml.XMB", "gameplay/minor_gods.xml.XMB",
-            "map_definitions/terrain_types.xml.XMB", "map_definitions/water_bodies.xml.XMB",
+            "gameplay/proto.xml.XMB",
+            "gameplay/techtree.xml.XMB",
+            "gameplay/major_gods.xml.XMB",
+            "gameplay/minor_gods.xml.XMB",
+            "map_definitions/terrain_types.xml.XMB",
+            "map_definitions/water_bodies.xml.XMB",
         };
-        var powers = archive.Paths
-            .Where(p => p.StartsWith("gameplay/god_powers/", StringComparison.Ordinal)
-                && p.EndsWith(".godpowers.XMB", StringComparison.Ordinal)).ToArray();
+        var powers = archive
+            .Paths.Where(p =>
+                p.StartsWith("gameplay/god_powers/", StringComparison.Ordinal)
+                && p.EndsWith(".godpowers.XMB", StringComparison.Ordinal)
+            )
+            .ToArray();
         if (powers.Length == 0)
             throw new InvalidDataException("No shipped godpower definitions found.");
         paths.AddRange(powers);
         // Forest/cliff definitions and terrain mixes (paint palette names/order) for editor_terrain_catalog.
         paths.Add("map_definitions/forest.xml.XMB");
         paths.Add("map_definitions/cliff_types.xml.XMB");
-        if (archive.Paths.Contains("trigger/trigger_data.xml.XMB")) paths.Add("trigger/trigger_data.xml.XMB");
-        var mixes = archive.Paths
-            .Where(p => p.StartsWith("map_definitions/mixes/", StringComparison.Ordinal) && p.EndsWith(".xml.XMB", StringComparison.Ordinal)).ToArray();
+        if (archive.Paths.Contains("trigger/trigger_data.xml.XMB"))
+            paths.Add("trigger/trigger_data.xml.XMB");
+        var mixes = archive
+            .Paths.Where(p =>
+                p.StartsWith("map_definitions/mixes/", StringComparison.Ordinal)
+                && p.EndsWith(".xml.XMB", StringComparison.Ordinal)
+            )
+            .ToArray();
         foreach (var mix in mixes)
             archive.ExportXml(mix, Path.Combine(data, "mixes", Path.GetFileName(mix)[..^4]));
         foreach (var path in paths)
             archive.ExportXml(path, Path.Combine(data, Path.GetFileName(path)[..^4])); // Remove .XMB after decoding.
-        GameDataCatalog.Generate(exe, output, data, powers.Select(p => Path.GetFileName(p)[..^4]).ToArray());
-        try { _ = XsConstants.Generate(exe, output); } // Silent: this also runs inside the MCP host, where stdout is the protocol stream.
-        catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException) { } // editor_xs_api reports constants as unavailable.
+        GameDataCatalog.Generate(
+            exe,
+            output,
+            data,
+            powers.Select(p => Path.GetFileName(p)[..^4]).ToArray()
+        );
+        try
+        {
+            _ = XsConstants.Generate(exe, output);
+        } // Silent: this also runs inside the MCP host, where stdout is the protocol stream.
+        catch (Exception e)
+            when (e is IOException or InvalidDataException or UnauthorizedAccessException) { } // editor_xs_api reports constants as unavailable.
         return (paths.Count, mixes.Length, powers.Length);
     }
 
     // Normal editor UI by default; DialogCatalog.Interfaces names the alternative archive/directory.
-    static string ExportUi(string exe, string output, string archiveName = "UIDefaultEditor.bar", string directoryName = "ui")
+    static string ExportUi(
+        string exe,
+        string output,
+        string archiveName = "UIDefaultEditor.bar",
+        string directoryName = "ui"
+    )
     {
         // Installed editor UI archives and .xml.XMB suffixes come from game/ui, not a public SDK.
         using var archive = new BarArchive(DialogCatalog.ArchivePath(exe, archiveName));

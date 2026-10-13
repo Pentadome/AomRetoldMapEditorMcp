@@ -11,43 +11,123 @@ internal static class CampaignTriggers
     internal const int MaxChars = 250_000;
     const int MaxTriggers = 10_000;
     internal const int MaxItems = 20_000;
+
+    /// <summary>Highest argument value type read as a plain single value. 99 = Protounit: Modify Spawn Data / Event
+    /// (vartype spawneventtype) in shipped campaign\om\om09.mythscn; higher values stay refused as unreviewed.</summary>
+    const uint MaxValueType = 99;
     static readonly UnicodeEncoding Utf16 = new(false, false, true);
+
     internal sealed record ObjectRef(uint UnitId, uint Player, string Proto);
+
     internal sealed record Extra(string Expression, byte Flag, string[] Strings);
-    internal sealed record Arg(string Key, string Label, uint ValueType, string[] Values,
-        int Start, int ValueStart, int ValueEnd, int End, ObjectRef[]? Objects = null, byte? SelectionFlag = null, byte Trailer = 0, byte? ValueFlag = null, uint Magic = 1);
-    internal sealed record Element(string Name, string Kind, Arg[] Args, string Command, int Start, int End, int LabelOffset, int LabelBytes,
-        Extra[]? Extras = null, byte[]? Trailer = null);
-    internal sealed record Trigger(uint Id, uint Group, uint Priority, string Name, string Note,
-        byte[] Flags, int Start, int End, int IdOffset, int FlagsOffset, int NameOffset, int NameChars,
-        int EffectsCountOffset, Element[] Conditions, Element[] Effects);
+
+    internal sealed record Arg(
+        string Key,
+        string Label,
+        uint ValueType,
+        string[] Values,
+        int Start,
+        int ValueStart,
+        int ValueEnd,
+        int End,
+        ObjectRef[]? Objects = null,
+        byte? SelectionFlag = null,
+        byte Trailer = 0,
+        byte? ValueFlag = null,
+        uint Magic = 1
+    );
+
+    internal sealed record Element(
+        string Name,
+        string Kind,
+        Arg[] Args,
+        string Command,
+        int Start,
+        int End,
+        int LabelOffset,
+        int LabelBytes,
+        Extra[]? Extras = null,
+        byte[]? Trailer = null
+    );
+
+    internal sealed record Trigger(
+        uint Id,
+        uint Group,
+        uint Priority,
+        string Name,
+        string Note,
+        byte[] Flags,
+        int Start,
+        int End,
+        int IdOffset,
+        int FlagsOffset,
+        int NameOffset,
+        int NameChars,
+        int EffectsCountOffset,
+        Element[] Conditions,
+        Element[] Effects
+    );
+
     internal sealed record Group(uint Id, string Name, uint[] Indexes, int Start, int End);
-    internal sealed record Document(byte[] Original, byte[] Body, Trigger[] Triggers, Group[] Groups,
-        int CountOffset, int GroupsStart, int SuffixBytes, string Format, string Sha256);
+
+    /// <summary>Scenario Triggers → XS Scripts entry: profile/mod trigger\&lt;Name&gt; reference, or a body embedded in the scenario.</summary>
+    internal sealed record Script(string Name, bool Embedded, string[] Lines);
+
+    /// <summary>Scripts is null for standalone .trg exports: that format carries no XS Scripts list.</summary>
+    internal sealed record Document(
+        byte[] Original,
+        byte[] Body,
+        Trigger[] Triggers,
+        Group[] Groups,
+        int CountOffset,
+        int GroupsStart,
+        int SuffixBytes,
+        string Format,
+        string Sha256,
+        Script[]? Scripts = null
+    );
 
     internal sealed class Cursor(byte[] data, int offset = 0)
     {
         internal int Offset { get; set; } = offset;
         internal int Length => data.Length;
+
         internal ReadOnlySpan<byte> Take(int count)
         {
-            if (count < 0 || count > data.Length - Offset) throw new InvalidDataException("TR field exceeds bounded payload at " + Offset + ".");
-            var span = data.AsSpan(Offset, count); Offset += count; return span;
+            if (count < 0 || count > data.Length - Offset)
+                throw new InvalidDataException(
+                    "TR field exceeds bounded payload at " + Offset + "."
+                );
+            var span = data.AsSpan(Offset, count);
+            Offset += count;
+            return span;
         }
+
         internal uint U32() => BinaryPrimitives.ReadUInt32LittleEndian(Take(4));
+
         internal byte Byte() => Take(1)[0];
+
         internal int Count(int bound, string label)
         {
             var n = U32();
-            if (n > bound) throw new InvalidDataException("TR " + label + " exceeds host bound.");
+            if (n > bound)
+                throw new InvalidDataException("TR " + label + " exceeds host bound.");
             return (int)n;
         }
+
         internal string Wide()
         {
             var n = Count(MaxChars, "UTF-16 string");
-            try { return Utf16.GetString(Take(checked(n * 2))).TrimEnd('\0'); }
-            catch (DecoderFallbackException e) { throw new InvalidDataException("Invalid TR UTF-16.", e); }
+            try
+            {
+                return Utf16.GetString(Take(checked(n * 2))).TrimEnd('\0');
+            }
+            catch (DecoderFallbackException e)
+            {
+                throw new InvalidDataException("Invalid TR UTF-16.", e);
+            }
         }
+
         internal string Narrow()
         {
             var n = Count(MaxChars, "narrow string");
@@ -64,61 +144,126 @@ internal static class CampaignTriggers
     internal static Document Parse(byte[] bytes)
     {
         var shape = ExportFormats.Trigger(bytes);
-        if (!shape.Valid) throw new InvalidDataException(shape.Reason);
+        if (!shape.Valid)
+            throw new InvalidDataException(shape.Reason);
         var size = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(2));
         var body = bytes.AsSpan(6, size).ToArray();
         var doc = ParseBody(body, standalone: true);
-        return new(bytes, body, doc.Triggers, doc.Groups, doc.CountOffset, doc.GroupsStart,
-            shape.SuffixBytes, shape.Format, Convert.ToHexStringLower(SHA256.HashData(bytes)));
+        return new(
+            bytes,
+            body,
+            doc.Triggers,
+            doc.Groups,
+            doc.CountOffset,
+            doc.GroupsStart,
+            shape.SuffixBytes,
+            shape.Format,
+            Convert.ToHexStringLower(SHA256.HashData(bytes))
+        );
     }
 
     internal static Document ParseScenarioSection(byte[] body)
     {
         var doc = ParseBody(body, standalone: false);
-        return new(body, body, doc.Triggers, doc.Groups, doc.CountOffset, doc.GroupsStart,
-            0, "TR v12 scenario section", Convert.ToHexStringLower(SHA256.HashData(body)));
+        return new(
+            body,
+            body,
+            doc.Triggers,
+            doc.Groups,
+            doc.CountOffset,
+            doc.GroupsStart,
+            0,
+            "TR v12 scenario section",
+            Convert.ToHexStringLower(SHA256.HashData(body)),
+            doc.Scripts
+        );
+    }
+
+    /// <summary>Reads only the scenario-embedded XS Scripts list (TR v12 header), without parsing trigger records.</summary>
+    internal static Script[] ScenarioScripts(byte[] body)
+    {
+        var r = new Cursor(body);
+        if (r.U32() != 12)
+            throw new InvalidDataException("Only TR v12 body inspection reviewed.");
+        return ReadScripts(r);
+    }
+
+    static Script[] ReadScripts(Cursor r)
+    {
+        var count = r.Count(1000, "script count");
+        var scripts = new Script[count];
+        var lastHadBody = false;
+        for (var i = 0; i < count; i++)
+        {
+            var name = r.Wide();
+            lastHadBody = r.Byte() switch
+            {
+                0 => false,
+                1 => true,
+                _ => throw new InvalidDataException("Invalid script flag."),
+            };
+            var lines = lastHadBody ? new string[r.Count(100_000, "script lines")] : [];
+            for (var j = 0; j < lines.Length; j++)
+                lines[j] = r.Wide();
+            scripts[i] = new(name, lastHadBody, lines);
+        }
+        if (!lastHadBody)
+            _ = r.U32(); // Scenario-only separator.
+        return scripts;
     }
 
     static Document ParseBody(byte[] body, bool standalone)
     {
-        if (body.Length > ExportFormats.MaxStoredBytes) throw new InvalidDataException("TR payload exceeds host bound.");
+        if (body.Length > ExportFormats.MaxStoredBytes)
+            throw new InvalidDataException("TR payload exceeds host bound.");
         var r = new Cursor(body);
-        if (r.U32() != 12) throw new InvalidDataException("Only TR v12 body inspection reviewed.");
-        if (!standalone)
-        {
-            var scripts = r.Count(1000, "script count");
-            var lastHadBody = false;
-            for (var i = 0; i < scripts; i++)
-            {
-                _ = r.Wide(); lastHadBody = r.Byte() switch { 0 => false, 1 => true, _ => throw new InvalidDataException("Invalid script flag.") };
-                if (lastHadBody)
-                    for (var j = r.Count(100_000, "script lines"); j > 0; j--) _ = r.Wide();
-            }
-            if (!lastHadBody) _ = r.U32(); // Scenario-only separator.
-        }
-        _ = r.U32(); _ = r.U32(); _ = r.U32(); // Retain opaque header words unchanged.
+        if (r.U32() != 12)
+            throw new InvalidDataException("Only TR v12 body inspection reviewed.");
+        var scripts = standalone ? null : ReadScripts(r);
+        _ = r.U32();
+        _ = r.U32();
+        _ = r.U32(); // Retain opaque header words unchanged.
         var countOffset = r.Offset;
         var triggerCount = r.Count(MaxTriggers, "trigger count");
         var triggers = new Trigger[triggerCount];
         for (var i = 0; i < triggerCount; i++)
         {
             var start = r.Offset;
-            if (r.U32() != 9) throw new InvalidDataException("Unsupported trigger record magic.");
+            if (r.U32() != 9)
+                throw new InvalidDataException("Unsupported trigger record magic.");
             var idOffset = r.Offset;
-            var id = r.U32(); var group = r.U32(); var priority = r.U32();
+            var id = r.U32();
+            var group = r.U32();
+            var priority = r.U32();
             var nameOffset = r.Offset;
             var name = r.Wide();
             var nameChars = checked((r.Offset - nameOffset - 4) / 2);
             _ = r.U32();
             var flagOffset = r.Offset;
             var flags = r.Take(5).ToArray();
-            if (flags[0] > 1 || flags[1] > 1) throw new InvalidDataException("Invalid trigger loop/active flags.");
+            if (flags[0] > 1 || flags[1] > 1)
+                throw new InvalidDataException("Invalid trigger loop/active flags.");
             var note = r.Wide();
             var conditions = ReadElements(r);
             var effectsCountOffset = r.Offset;
             var effects = ReadElements(r);
-            triggers[i] = new(id, group, priority, name, note, flags, start, r.Offset,
-                idOffset, flagOffset, nameOffset, nameChars, effectsCountOffset, conditions, effects);
+            triggers[i] = new(
+                id,
+                group,
+                priority,
+                name,
+                note,
+                flags,
+                start,
+                r.Offset,
+                idOffset,
+                flagOffset,
+                nameOffset,
+                nameChars,
+                effectsCountOffset,
+                conditions,
+                effects
+            );
         }
         var groupsStart = r.Offset;
         var groupCount = r.Count(MaxTriggers, "group count");
@@ -126,18 +271,32 @@ internal static class CampaignTriggers
         for (var i = 0; i < groupCount; i++)
         {
             var start = r.Offset;
-            if (r.U32() != 1) throw new InvalidDataException("Unsupported TR group magic.");
-            var id = r.U32(); var name = r.Narrow();
+            if (r.U32() != 1)
+                throw new InvalidDataException("Unsupported TR group magic.");
+            var id = r.U32();
+            var name = r.Narrow();
             var count = r.Count(MaxTriggers, "group member count");
             var indexes = new uint[count];
-            for (var j = 0; j < count; j++) indexes[j] = r.U32();
+            for (var j = 0; j < count; j++)
+                indexes[j] = r.U32();
             groups[i] = new(id, name, indexes, start, r.Offset);
         }
-        if (r.Offset != r.Length) throw new InvalidDataException("TR payload contains unparsed trailing bytes.");
+        if (r.Offset != r.Length)
+            throw new InvalidDataException("TR payload contains unparsed trailing bytes.");
         if (triggers.Select(t => t.Id).Distinct().Count() != triggers.Length)
             throw new InvalidDataException("Duplicate trigger IDs; indexing unsafe.");
-        return new(body, body, triggers, groups, countOffset, groupsStart, 0,
-            "TR v12 body", Convert.ToHexStringLower(SHA256.HashData(body)));
+        return new(
+            body,
+            body,
+            triggers,
+            groups,
+            countOffset,
+            groupsStart,
+            0,
+            "TR v12 body",
+            Convert.ToHexStringLower(SHA256.HashData(body)),
+            scripts
+        );
     }
 
     static Element[] ReadElements(Cursor r)
@@ -147,56 +306,108 @@ internal static class CampaignTriggers
         for (var i = 0; i < count; i++)
         {
             var start = r.Offset;
-            if (r.U32() != 6) throw new InvalidDataException("Unsupported condition/effect magic.");
-            var name = r.Narrow(); var labelOffset = r.Offset; var kind = r.Narrow();
+            if (r.U32() != 6)
+                throw new InvalidDataException("Unsupported condition/effect magic.");
+            var name = r.Narrow();
+            var labelOffset = r.Offset;
+            var kind = r.Narrow();
             var labelBytes = r.Offset - labelOffset;
             var argc = r.Count(512, "argument count");
             var args = new Arg[argc];
             for (var j = 0; j < argc; j++)
             {
                 var argStart = r.Offset;
-                var magic = r.U32(); var key = r.Narrow(); var label = r.Narrow(); var type = r.U32();
+                var magic = r.U32();
+                var key = r.Narrow();
+                var label = r.Narrow();
+                var type = r.U32();
                 var valueStart = r.Offset;
                 string[] values;
-                ObjectRef[]? objects = null; byte? selectionFlag = null, valueFlag = null;
+                ObjectRef[]? objects = null;
+                byte? selectionFlag = null,
+                    valueFlag = null;
                 switch (type)
                 {
                     case 4:
                         values = WideList(r);
                         objects = new ObjectRef[r.Count(512, "proto list")];
-                        for (var k = 0; k < objects.Length; k++) objects[k] = new(r.U32(), r.U32(), r.Wide());
-                        selectionFlag = r.Byte(); break;
-                    case 7: values = WideList(r); break;
+                        for (var k = 0; k < objects.Length; k++)
+                            objects[k] = new(r.U32(), r.U32(), r.Wide());
+                        selectionFlag = r.Byte();
+                        break;
+                    case 7:
+                        values = WideList(r);
+                        break;
                     case 22:
-                        var n = r.Count(512, "string-id count"); _ = r.U32();
-                        values = new string[n]; for (var k = 0; k < n; k++) values[k] = r.Wide();
+                        var n = r.Count(512, "string-id count");
+                        _ = r.U32();
+                        values = new string[n];
+                        for (var k = 0; k < n; k++)
+                            values[k] = r.Wide();
                         break;
                     case 42 or 43 or 50:
                         _ = r.U32();
-                        values = new string[type == 42 ? 3 : type == 43 ? 4 : 2];
-                        for (var k = 0; k < values.Length; k++) values[k] = r.Wide();
+                        values = new string[
+                            type == 42 ? 3
+                            : type == 43 ? 4
+                            : 2
+                        ];
+                        for (var k = 0; k < values.Length; k++)
+                            values[k] = r.Wide();
                         break;
                     default:
-                        if (type > 82) throw new InvalidDataException("Unsupported TR argument value type " + type + ".");
-                        _ = r.U32(); values = [r.Wide()];
-                        if (type is 2 or 5 or 8 or 56) valueFlag = r.Byte();
+                        if (type > MaxValueType)
+                            throw new InvalidDataException(
+                                "Unsupported TR argument value type " + type + "."
+                            );
+                        _ = r.U32();
+                        values = [r.Wide()];
+                        if (type is 2 or 5 or 8 or 56)
+                            valueFlag = r.Byte();
                         break;
                 }
                 var valueEnd = r.Offset;
                 var trailer = r.Byte(); // TR v12 argument trailer, preserved.
-                args[j] = new(key, label, type, values, argStart, valueStart, valueEnd, r.Offset, objects, selectionFlag, trailer, valueFlag, magic);
+                args[j] = new(
+                    key,
+                    label,
+                    type,
+                    values,
+                    argStart,
+                    valueStart,
+                    valueEnd,
+                    r.Offset,
+                    objects,
+                    selectionFlag,
+                    trailer,
+                    valueFlag,
+                    magic
+                );
             }
             var cmd = r.Narrow();
             var extras = new Extra[r.Count(512, "extra expression count")];
             for (var j = 0; j < extras.Length; j++)
             {
-                var expression = r.Narrow(); var flag = r.Byte();
+                var expression = r.Narrow();
+                var flag = r.Byte();
                 var strings = new string[r.Count(512, "extra string count")];
-                for (var k = 0; k < strings.Length; k++) strings[k] = r.Narrow();
+                for (var k = 0; k < strings.Length; k++)
+                    strings[k] = r.Narrow();
                 extras[j] = new(expression, flag, strings);
             }
             var elementTrailer = r.Take(2).ToArray();
-            elements[i] = new(name, kind, args, cmd, start, r.Offset, labelOffset, labelBytes, extras, elementTrailer);
+            elements[i] = new(
+                name,
+                kind,
+                args,
+                cmd,
+                start,
+                r.Offset,
+                labelOffset,
+                labelBytes,
+                extras,
+                elementTrailer
+            );
         }
         return elements;
     }
@@ -205,33 +416,71 @@ internal static class CampaignTriggers
     {
         var count = r.Count(512, "value count");
         var values = new string[count];
-        for (var i = 0; i < count; i++) values[i] = r.Wide();
+        for (var i = 0; i < count; i++)
+            values[i] = r.Wide();
         return values;
     }
 
     internal static bool EquivalentGameExport(byte[] desired, byte[] observed, out string reason)
     {
-        var left = Parse(desired); var right = Parse(observed);
+        var left = Parse(desired);
+        var right = Parse(observed);
         if (!left.Body.AsSpan().SequenceEqual(right.Body))
         {
-            reason = "TR body differs; unreviewed trigger/header data changed."; return false;
+            reason = "TR body differs; unreviewed trigger/header data changed.";
+            return false;
         }
         if (left.Format != right.Format)
         {
-            reason = "TR suffix format changed."; return false;
+            reason = "TR suffix format changed.";
+            return false;
         }
         if (left.Format != "TR v12 cameras")
         {
-            var equal = desired.AsSpan(desired.Length - left.SuffixBytes)
+            var equal = desired
+                .AsSpan(desired.Length - left.SuffixBytes)
                 .SequenceEqual(observed.AsSpan(observed.Length - right.SuffixBytes));
             reason = equal ? "Exact TR body and sentinel verified." : "TR suffix differs.";
             return equal;
         }
-        var names = CameraNames(left); var other = CameraNames(right);
+        var names = CameraNames(left);
+        var other = CameraNames(right);
         var equivalent = names.Length == other.Length && names.Skip(1).SequenceEqual(other.Skip(1));
-        reason = equivalent ? "Exact TR body/camera entries verified; export-basename camera header ignored."
+        reason = equivalent
+            ? "Exact TR body/camera entries verified; export-basename camera header ignored."
             : "Camera count/names differ beyond export-basename header.";
         return equivalent;
+    }
+
+    /// <summary>Human-readable trigger-level differences (added/removed/changed records by id and name) between two TR exports, capped.</summary>
+    internal static string[] DifferingTriggers(byte[] before, byte[] after, int max = 40)
+    {
+        var left = Parse(before);
+        var right = Parse(after);
+        var a = left.Triggers.ToDictionary(t => t.Id);
+        var b = right.Triggers.ToDictionary(t => t.Id);
+        var changes = new List<string>();
+        foreach (var t in left.Triggers)
+            if (!b.TryGetValue(t.Id, out var other))
+                changes.Add($"removed {t.Id} '{t.Name}'");
+            else if (
+                !left
+                    .Body.AsSpan(t.Start, t.End - t.Start)
+                    .SequenceEqual(right.Body.AsSpan(other.Start, other.End - other.Start))
+            )
+                changes.Add(
+                    t.Name == other.Name
+                        ? $"changed {t.Id} '{t.Name}'"
+                        : $"changed {t.Id} '{t.Name}' -> '{other.Name}'"
+                );
+        changes.AddRange(
+            right.Triggers.Where(t => !a.ContainsKey(t.Id)).Select(t => $"added {t.Id} '{t.Name}'")
+        );
+        if (changes.Count == 0)
+            changes.Add("trigger records identical; groups/header/cameras differ");
+        return changes.Count > max
+            ? [.. changes.Take(max), $"... {changes.Count - max} more"]
+            : changes.ToArray();
     }
 
     static string[] CameraNames(Document doc)
@@ -242,8 +491,10 @@ internal static class CampaignTriggers
         var names = new string[count + 1];
         for (var i = 0; i < names.Length; i++)
         {
-            var chars = BinaryPrimitives.ReadInt32LittleEndian(bytes[offset..]); offset += 4;
-            names[i] = Utf16.GetString(bytes.Slice(offset, chars * 2)); offset += chars * 2;
+            var chars = BinaryPrimitives.ReadInt32LittleEndian(bytes[offset..]);
+            offset += 4;
+            names[i] = Utf16.GetString(bytes.Slice(offset, chars * 2));
+            offset += chars * 2;
         }
         return names;
     }
@@ -251,12 +502,19 @@ internal static class CampaignTriggers
     internal static void SelfTest()
     {
         var typed = Parse(WorkflowFixtures.Trigger(2)).Triggers.Single().Effects.Single();
-        if (typed.Args[0].Objects is not { Length: 2 } || typed.Args[0].Objects![1] != new ObjectRef(101, 1, "VillagerAztec")
-            || typed.Args[0].SelectionFlag != 0 || typed.Args[0].Trailer != 0
-            || typed.Extras is not { Length: 3 } || typed.Extras[1].Strings.Single() != "SrcObject"
-            || typed.Extras[2].Expression != "trUnitDoWorkOnUnit(%DstObject%, %EventID%);")
+        if (
+            typed.Args[0].Objects is not { Length: 2 }
+            || typed.Args[0].Objects![1] != new ObjectRef(101, 1, "VillagerAztec")
+            || typed.Args[0].SelectionFlag != 0
+            || typed.Args[0].Trailer != 0
+            || typed.Extras is not { Length: 3 }
+            || typed.Extras[1].Strings.Single() != "SrcObject"
+            || typed.Extras[2].Expression != "trUnitDoWorkOnUnit(%DstObject%, %EventID%);"
+        )
             throw new InvalidOperationException("Typed TR metadata/expression fixture failed.");
-        var controller = TriggerCodec.ReadFile(Path.Combine(AppContext.BaseDirectory, "trigger-controller-template.trg"));
+        var controller = TriggerCodec.ReadFile(
+            Path.Combine(AppContext.BaseDirectory, "trigger-controller-template.trg")
+        );
         var bodyOnly = controller.AsSpan(0, controller.Length - 4).ToArray(); // Reviewed sentinel fixture.
         byte[] WithCameras(string exportName, string cameraName)
         {
@@ -265,16 +523,30 @@ internal static class CampaignTriggers
             stream.Write(BitConverter.GetBytes(1));
             foreach (var name in new[] { exportName, cameraName })
             {
-                stream.Write(BitConverter.GetBytes(name.Length)); stream.Write(Utf16.GetBytes(name));
+                stream.Write(BitConverter.GetBytes(name.Length));
+                stream.Write(Utf16.GetBytes(name));
             }
             return stream.ToArray();
         }
         var first = WithCameras("export-before", "Intro");
         var second = WithCameras("AomMcp-trigger-roundtrip-abcdef", "Intro");
         var tampered = WithCameras("export-after", "Other");
-        if (!EquivalentGameExport(first, second, out _) || EquivalentGameExport(first, tampered, out _)
-            || !EquivalentGameExport(controller, controller, out _))
-            throw new InvalidOperationException("TR semantic comparison camera-basename fixture failed.");
+        if (
+            !EquivalentGameExport(first, second, out _)
+            || EquivalentGameExport(first, tampered, out _)
+            || !EquivalentGameExport(controller, controller, out _)
+        )
+            throw new InvalidOperationException(
+                "TR semantic comparison camera-basename fixture failed."
+            );
+        if (
+            DifferingTriggers(first, tampered)
+                is not ["trigger records identical; groups/header/cameras differ"]
+            || DifferingTriggers(WorkflowFixtures.Trigger(1), WorkflowFixtures.Trigger(2))
+                is not [var changed]
+            || !changed.StartsWith("changed ", StringComparison.Ordinal)
+        )
+            throw new InvalidOperationException("TR trigger difference listing fixture failed.");
     }
 
     internal static object Query(JsonElement args)
@@ -283,19 +555,34 @@ internal static class CampaignTriggers
         var filter = args.TryGetProperty("filter", out var f) ? f.GetString() ?? "" : "";
         var offset = args.TryGetProperty("offset", out var o) ? o.GetInt32() : 0;
         var limit = args.TryGetProperty("limit", out var l) ? l.GetInt32() : 20;
-        var candidates = doc.Triggers.Where(t => t.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
-            || t.Conditions.Concat(t.Effects).Any(e => e.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
-                || e.Kind.Contains(filter, StringComparison.OrdinalIgnoreCase))).ToArray();
-        var search = args.TryGetProperty("player", out _) || args.TryGetProperty("arg", out _) || args.TryGetProperty("references", out _);
+        var candidates = doc
+            .Triggers.Where(t =>
+                t.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                || t.Conditions.Concat(t.Effects)
+                    .Any(e =>
+                        e.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                        || e.Kind.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                    )
+            )
+            .ToArray();
+        var search =
+            args.TryGetProperty("player", out _)
+            || args.TryGetProperty("arg", out _)
+            || args.TryGetProperty("references", out _);
         if (search)
         {
-            var player = args.TryGetProperty("player", out var p) ? p.GetInt32().ToString(System.Globalization.CultureInfo.InvariantCulture) : null;
-            string? key = null, value = null;
+            var player = args.TryGetProperty("player", out var p)
+                ? p.GetInt32().ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : null;
+            string? key = null,
+                value = null;
             if (args.TryGetProperty("arg", out var match))
             {
                 Catalog.ValidateObject(match, ["key", "value"]);
-                key = match.GetProperty("key").GetString(); value = match.GetProperty("value").GetString();
-                if (string.IsNullOrWhiteSpace(key) || value is null) throw new ArgumentException("arg requires key/value strings.");
+                key = match.GetProperty("key").GetString();
+                value = match.GetProperty("value").GetString();
+                if (string.IsNullOrWhiteSpace(key) || value is null)
+                    throw new ArgumentException("arg requires key/value strings.");
             }
             uint? references = args.TryGetProperty("references", out var r) ? r.GetUInt32() : null;
             if (references is not null && !doc.Triggers.Any(t => t.Id == references))
@@ -303,67 +590,186 @@ internal static class CampaignTriggers
             var matches = new List<object>();
             foreach (var t in candidates)
             {
-                if (args.TryGetProperty("triggerId", out var triggerFilter) && t.Id != triggerFilter.GetUInt32()) continue;
-                foreach (var (kind, elements) in new[] { ("condition", t.Conditions), ("effect", t.Effects) })
+                if (
+                    args.TryGetProperty("triggerId", out var triggerFilter)
+                    && t.Id != triggerFilter.GetUInt32()
+                )
+                    continue;
+                foreach (
+                    var (kind, elements) in new[]
+                    {
+                        ("condition", t.Conditions),
+                        ("effect", t.Effects),
+                    }
+                )
                     for (var index = 0; index < elements.Length; index++)
                     {
                         var e = elements[index];
-                        var hasPlayer = player is null || e.Args.Any(a => a.Key is "Player" or "PlayerID" or "FromPlayerID" or "ToPlayerID"
-                            && a.Values.Contains(player));
-                        var matchedArgs = e.Args.Where(a => key is not null
-                            ? a.Key.Equals(key, StringComparison.OrdinalIgnoreCase) && a.Values.Contains(value!, StringComparer.Ordinal)
-                            : player is null || a.Key is "Player" or "PlayerID" or "FromPlayerID" or "ToPlayerID"
-                                && a.Values.Contains(player)).ToArray();
-                        if (!hasPlayer || matchedArgs.Length == 0) continue;
+                        var hasPlayer =
+                            player is null
+                            || e.Args.Any(a =>
+                                a.Key is "Player" or "PlayerID" or "FromPlayerID" or "ToPlayerID"
+                                && a.Values.Contains(player)
+                            );
+                        var matchedArgs = e
+                            .Args.Where(a =>
+                                key is not null
+                                    ? a.Key.Equals(key, StringComparison.OrdinalIgnoreCase)
+                                        && a.Values.Contains(value!, StringComparer.Ordinal)
+                                    : player is null
+                                        || a.Key
+                                            is "Player"
+                                                or "PlayerID"
+                                                or "FromPlayerID"
+                                                or "ToPlayerID"
+                                            && a.Values.Contains(player)
+                            )
+                            .ToArray();
+                        if (!hasPlayer || matchedArgs.Length == 0)
+                            continue;
                         if (references is not null)
                         {
-                            if (!e.Name.StartsWith("Trigger:", StringComparison.OrdinalIgnoreCase)) continue;
+                            if (!e.Name.StartsWith("Trigger:", StringComparison.OrdinalIgnoreCase))
+                                continue;
                             matchedArgs = matchedArgs.Where(a => a.Key == "EventID").ToArray();
                         }
                         foreach (var a in matchedArgs)
-                            foreach (var v in a.Values.Where(v => key is null || v == value))
-                            {
-                                if (references is not null && (!uint.TryParse(v, out var target) || t.Id != references && target != references)) continue;
-                                matches.Add(new { triggerId = t.Id, triggerName = t.Name, active = t.Flags[1] != 0,
-                                    kind, elementIndex = index, elementName = e.Name, label = e.Kind, key = a.Key, value = Clip(v),
-                                    direction = references is null ? null : t.Id == references ? "outgoing" : "incoming" });
-                            }
+                        foreach (var v in a.Values.Where(v => key is null || v == value))
+                        {
+                            if (
+                                references is not null
+                                && (
+                                    !uint.TryParse(v, out var target)
+                                    || t.Id != references && target != references
+                                )
+                            )
+                                continue;
+                            matches.Add(
+                                new
+                                {
+                                    triggerId = t.Id,
+                                    triggerName = t.Name,
+                                    active = t.Flags[1] != 0,
+                                    kind,
+                                    elementIndex = index,
+                                    elementName = e.Name,
+                                    label = e.Kind,
+                                    key = a.Key,
+                                    value = Clip(v),
+                                    direction = references is null ? null
+                                    : t.Id == references ? "outgoing"
+                                    : "incoming",
+                                }
+                            );
+                        }
                     }
             }
-            return new { doc.Sha256, doc.Format, doc.SuffixBytes, total = matches.Count, offset, limit,
+            return new
+            {
+                doc.Sha256,
+                doc.Format,
+                doc.SuffixBytes,
+                total = matches.Count,
+                offset,
+                limit,
                 nextOffset = offset + limit < matches.Count ? (int?)(offset + limit) : null,
                 matches = matches.Skip(offset).Take(limit).ToArray(),
-                limitation = "Exported TR snapshot only. Reference graph uses Trigger:* EventID links; no runtime proof." };
+                limitation = "Exported TR snapshot only. Reference graph uses Trigger:* EventID links; no runtime proof.",
+            };
         }
         if (args.TryGetProperty("triggerId", out var wanted))
         {
             var id = wanted.GetUInt32();
-            var t = doc.Triggers.SingleOrDefault(t => t.Id == id)
+            var t =
+                doc.Triggers.SingleOrDefault(t => t.Id == id)
                 ?? throw new ArgumentException("Unknown trigger ID in supplied export.");
-            return new { doc.Sha256, doc.Format, doc.SuffixBytes, trigger = Describe(t, true),
-                limitation = "Read-only exported snapshot. Unknown XS/AI runtime references not evaluated." };
+            return new
+            {
+                doc.Sha256,
+                doc.Format,
+                doc.SuffixBytes,
+                trigger = Describe(t, true),
+                limitation = "Read-only exported snapshot. Unknown XS/AI runtime references not evaluated.",
+            };
         }
-        return new { doc.Sha256, doc.Format, doc.SuffixBytes, total = candidates.Length, offset, limit,
+        return new
+        {
+            doc.Sha256,
+            doc.Format,
+            doc.SuffixBytes,
+            total = candidates.Length,
+            offset,
+            limit,
             nextOffset = offset + limit < candidates.Length ? (int?)(offset + limit) : null,
-            triggers = candidates.Skip(offset).Take(limit).Select(t => Describe(t, false)).ToArray(),
-            limitation = "Exported snapshot only; names/IDs and parameters not proof of live trigger execution." };
+            triggers = candidates
+                .Skip(offset)
+                .Take(limit)
+                .Select(t => Describe(t, false))
+                .ToArray(),
+            limitation = "Exported snapshot only; names/IDs and parameters not proof of live trigger execution.",
+        };
     }
 
     static string Clip(string value) => value.Length <= 240 ? value : value[..240] + "…";
-    static object Describe(Trigger t, bool full) => new
-    {
-        t.Id, t.Name, t.Group, t.Priority, active = t.Flags[1] != 0, loop = t.Flags[0] != 0,
-        conditions = full ? t.Conditions.Select(DescribeElement).ToArray() : t.Conditions.Select(e => new { e.Name }).Cast<object>().ToArray(),
-        effects = full ? t.Effects.Select(DescribeElement).ToArray() : t.Effects.Select(e => new { e.Name }).Cast<object>().ToArray(),
-        note = full ? Clip(t.Note) : null,
-    };
-    static object DescribeElement(Element e) => new
-    {
-        e.Name, e.Kind, command = Clip(e.Command), args = e.Args.Select(a => new { a.Key, a.Label, a.ValueType,
-            values = a.Values.Take(20).Select(Clip).ToArray(), totalValues = a.Values.Length,
-            objects = a.Objects?.Take(200).Select(o => new { unitId = o.UnitId, player = o.Player, proto = o.Proto }).ToArray(),
-            totalObjects = a.Objects?.Length, a.SelectionFlag, a.Trailer, a.ValueFlag, a.Magic }).ToArray(),
-        extras = e.Extras?.Take(20).Select(x => new { expression = Clip(x.Expression), x.Flag, strings = x.Strings.Take(20).Select(Clip).ToArray() }).ToArray(),
-        totalExtras = e.Extras?.Length, e.Trailer,
-    };
+
+    static object Describe(Trigger t, bool full) =>
+        new
+        {
+            t.Id,
+            t.Name,
+            t.Group,
+            t.Priority,
+            active = t.Flags[1] != 0,
+            loop = t.Flags[0] != 0,
+            conditions = full
+                ? t.Conditions.Select(DescribeElement).ToArray()
+                : t.Conditions.Select(e => new { e.Name }).Cast<object>().ToArray(),
+            effects = full
+                ? t.Effects.Select(DescribeElement).ToArray()
+                : t.Effects.Select(e => new { e.Name }).Cast<object>().ToArray(),
+            note = full ? Clip(t.Note) : null,
+        };
+
+    static object DescribeElement(Element e) =>
+        new
+        {
+            e.Name,
+            e.Kind,
+            command = Clip(e.Command),
+            args = e
+                .Args.Select(a => new
+                {
+                    a.Key,
+                    a.Label,
+                    a.ValueType,
+                    values = a.Values.Take(20).Select(Clip).ToArray(),
+                    totalValues = a.Values.Length,
+                    objects = a
+                        .Objects?.Take(200)
+                        .Select(o => new
+                        {
+                            unitId = o.UnitId,
+                            player = o.Player,
+                            proto = o.Proto,
+                        })
+                        .ToArray(),
+                    totalObjects = a.Objects?.Length,
+                    a.SelectionFlag,
+                    a.Trailer,
+                    a.ValueFlag,
+                    a.Magic,
+                })
+                .ToArray(),
+            extras = e
+                .Extras?.Take(20)
+                .Select(x => new
+                {
+                    expression = Clip(x.Expression),
+                    x.Flag,
+                    strings = x.Strings.Take(20).Select(Clip).ToArray(),
+                })
+                .ToArray(),
+            totalExtras = e.Extras?.Length,
+            e.Trailer,
+        };
 }

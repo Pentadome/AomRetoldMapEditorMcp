@@ -30,16 +30,26 @@ internal sealed partial class Server(
     DialogCatalog? _dialogs; // Decoded normal/alternative editor UI windows; metadata only.
     bool _disposed;
     volatile bool _fullTools = fullTools; // Publish selected immutable tool snapshot to concurrent list requests.
+
     // Shipped game/config/editor.con binds Ctrl+N/L/S to new/load/save; ALT+F4 is Windows close.
     static readonly string[] DataLossKeys = ["N", "L", "S"];
+
     // Windows SDK VK_LBUTTON=1, VK_RBUTTON=2, VK_SHIFT/CONTROL/MENU=0x10/11/12.
     static readonly int[] HeldInputKeys = [1, 2, 0x10, 0x11, 0x12];
+
     // Host batch schema: step must identify an existing tool; modifiers are Ui.Press's public names.
     static readonly string[] StepRequired = ["name"];
     static readonly string[] AreaRequired = ["x", "z", "radius"]; // Host world-XZ circle filter fields.
     static readonly JsonElement Empty = JsonDocument.Parse("{}").RootElement.Clone();
     static readonly string[] Modifiers = ["CTRL", "SHIFT", "ALT"];
-    static readonly string[] TriggerOperations = ["inspect", "validate", "patch", "export", "apply"]; // Host workflow vocabulary.
+    static readonly string[] TriggerOperations =
+    [
+        "inspect",
+        "validate",
+        "patch",
+        "export",
+        "apply",
+    ]; // Host workflow vocabulary.
     static readonly string[] RecoveryOperations = ["inspect", "recover"];
     static readonly string[] TriggerEditOperations = ["patch", "clone"];
     static readonly string[] PlayerWorkflowOperations = ["preview", "verify", "apply"];
@@ -50,23 +60,64 @@ internal sealed partial class Server(
     static readonly string[] TriggerLabelRequired = ["kind", "elementIndex", "expected", "value"];
     static readonly string[] TriggerArgRequired = ["key", "value"];
     static readonly string[] DiplomacyChangeRequired = ["player", "target", "expected", "desired"];
-    static readonly string[] PlayerSettingChangeRequired = ["player", "field", "expected", "desired"];
-    static readonly string[] PlayerSettingFields = ["name", "control", "aiPath", "civ", "color", "visibility", "food", "wood", "gold", "favor", "pop", "popLimit", "handicap", "startAge", "maxAge", "classicalGod", "heroicGod", "mythicGod"];
-    static readonly string[] TriggerReplacementRequired = ["kind", "elementIndex", "parameter", "expected", "value"];
+    static readonly string[] PlayerSettingChangeRequired =
+    [
+        "player",
+        "field",
+        "expected",
+        "desired",
+    ];
+    static readonly string[] PlayerSettingFields =
+    [
+        "name",
+        "control",
+        "aiPath",
+        "civ",
+        "color",
+        "visibility",
+        "food",
+        "wood",
+        "gold",
+        "favor",
+        "pop",
+        "popLimit",
+        "handicap",
+        "startAge",
+        "maxAge",
+        "classicalGod",
+        "heroicGod",
+        "mythicGod",
+    ];
+    static readonly string[] TriggerReplacementRequired =
+    [
+        "kind",
+        "elementIndex",
+        "parameter",
+        "expected",
+        "value",
+    ];
     static readonly string[] FormationShapes = ["rows", "ring"]; // Host geometry vocabulary.
     static readonly string[] ToolSets = ["core", "full"]; // Host surface vocabulary, not game permissions.
     const string CallToolName = "editor_call"; // Core proxy reaching full-catalog tools without a surface switch.
+
     // Host search bounds, not game/protocol limits.
     const int ToolSearchMaxQueryLength = 256;
     const int ToolSearchMaxLimit = 50;
     const int ToolSearchDefaultLimit = 10;
+
     // Host core-surface policy: helpers plus essential history/selection/camera/file commands.
     // Internal helper preparation still uses full catalog; this is not a permissions sandbox.
     static readonly HashSet<string> CoreNativeTools = new(StringComparer.Ordinal)
     {
-        "editor_undo", "editor_redo", "editor_uiClearSelection", "editor_uiSelectType",
-        "editor_uiLookAtAndSelectUnit", "editor_uiSetCameraStartLoc", "editor_saveScenario",
-        "editor_uiLoadTriggers", "editor_uiSaveTriggers",
+        "editor_undo",
+        "editor_redo",
+        "editor_uiClearSelection",
+        "editor_uiSelectType",
+        "editor_uiLookAtAndSelectUnit",
+        "editor_uiSetCameraStartLoc",
+        "editor_saveScenario",
+        "editor_uiLoadTriggers",
+        "editor_uiSaveTriggers",
     };
 
     /// <summary>Releases the host bridge after all SDK handlers have stopped.</summary>
@@ -97,7 +148,8 @@ internal sealed partial class Server(
             {
                 // Host identity/release version; not the MCP protocol version (negotiated by SDK).
                 ServerInfo = new() { Name = "aom-retold-editor", Version = "0.1.0" },
-                ServerInstructions = $"Initial tool set: {(_fullTools ? "full" : "core")}. Use editor_search_tools to find tools by name/description across the full catalog without switching modes; call any of them (native commands, action_* UI actions, workflow helpers) through editor_call with the target's arguments, using includeSchema=true for its schema. Use editor_toolset to inspect/switch core/full mid-session. Only currently listed tools are callable; refresh tools/list after tools/list_changed. Controls local offline scenario editor. Commands report native return, not semantic verification. Use screenshots/state to verify effects. Unknown game builds fail closed; regenerate layout/catalog after patches. Data-loss actions need explicit confirmation. Do not retry mutations after unknown-outcome timeouts.",
+                ServerInstructions =
+                    $"Initial tool set: {(_fullTools ? "full" : "core")}. Use editor_search_tools to find tools by name/description across the full catalog without switching modes; call any of them (native commands, action_* UI actions, workflow helpers) through editor_call with the target's arguments, using includeSchema=true for its schema. Use editor_toolset to inspect/switch core/full mid-session. Only currently listed tools are callable; refresh tools/list after tools/list_changed. Controls local offline scenario editor. Commands report native return, not semantic verification. Use screenshots/state to verify effects. Unknown game builds fail closed; regenerate layout/catalog after patches. Data-loss actions need explicit confirmation. Do not retry mutations after unknown-outcome timeouts. Task router: scenario -> campaign/Workshop mod: editor_build_campaign (check dependencies for profile-only XS); \"what did the user mark?\" (object notes): editor_unit_notes scenarioPath=\"latest\" (core); \"why do I get this error\": editor_xs_check scenarioPath=\"latest\" -> editor_xs_diagnostics -> editor_playtest inspect (trigger-script errors appear only as an in-game dialog); change triggers: editor_trigger_list -> editor_trigger_edit (preview, renderedXs) -> editor_triggers apply (resets Triggers -> XS Scripts; re-add per xsScripts). Saved-file workflow helpers (full toolset or editor_call; editor_unit_notes also core): editor_unit_notes, editor_scenario_diff, editor_startup_orders, editor_install_ai, editor_runtime_probe, editor_runtime_report, editor_playtest (editor_help topic=workflows); editor_build_campaign packages saved scenarios plus the XS they need as a campaign mod (topic=campaign).",
                 Capabilities = new() { Tools = new() { ListChanged = true } },
                 Handlers = new()
                 {
@@ -110,11 +162,16 @@ internal sealed partial class Server(
                             cancellationToken.ThrowIfCancellationRequested();
                             // Once started, finish bounded operations/cleanup even if cancelled.
                             var previous = _fullTools;
-                            var result = Call(request.Params.Name,
-                                JsonSerializer.SerializeToElement(request.Params.Arguments, Json));
+                            var result = Call(
+                                request.Params.Name,
+                                JsonSerializer.SerializeToElement(request.Params.Arguments, Json)
+                            );
                             if (previous != _fullTools)
                                 // Surface already changed; announce it even if caller cancels afterward.
-                                await request.Server.SendNotificationAsync(NotificationMethods.ToolListChangedNotification, CancellationToken.None);
+                                await request.Server.SendNotificationAsync(
+                                    NotificationMethods.ToolListChangedNotification,
+                                    CancellationToken.None
+                                );
                             return result;
                         }
                         finally
@@ -122,18 +179,28 @@ internal sealed partial class Server(
                             calls.Release();
                         }
                     },
-                    ListResourcesHandler = (_, _) => ValueTask.FromResult(new ListResourcesResult()),
+                    ListResourcesHandler = (_, _) =>
+                        ValueTask.FromResult(new ListResourcesResult()),
                     ListPromptsHandler = (_, _) => ValueTask.FromResult(new ListPromptsResult()),
                 },
             };
-            options.Filters.Message.IncomingFilters.Add(next => (context, cancellationToken) =>
-            {
-                // Host safety ceiling: 2,000,000 serialized UTF-16 chars (nominal "2 MB" message cap),
-                // not a protocol-mandated limit or an exact UTF-8 byte count.
-                if (JsonSerializer.Serialize(context.JsonRpcMessage, McpJsonUtilities.DefaultOptions).Length > 2_000_000)
-                    throw new McpProtocolException("Message exceeds 2 MB.", McpErrorCode.InvalidParams);
-                return next(context, cancellationToken);
-            });
+            options.Filters.Message.IncomingFilters.Add(next =>
+                (context, cancellationToken) =>
+                {
+                    // Host safety ceiling: 2,000,000 serialized UTF-16 chars (nominal "2 MB" message cap),
+                    // not a protocol-mandated limit or an exact UTF-8 byte count.
+                    if (
+                        JsonSerializer
+                            .Serialize(context.JsonRpcMessage, McpJsonUtilities.DefaultOptions)
+                            .Length > 2_000_000
+                    )
+                        throw new McpProtocolException(
+                            "Message exceeds 2 MB.",
+                            McpErrorCode.InvalidParams
+                        );
+                    return next(context, cancellationToken);
+                }
+            );
             await using var transport = new StdioServerTransport(options);
             await using var server = McpServer.Create(transport, options);
             await server.RunAsync();
@@ -141,22 +208,42 @@ internal sealed partial class Server(
     }
 
     Tool[] Tools => _fullTools ? FullTools : CoreTools;
-    Tool[] CoreTools => field ??= Extras().Concat(_catalog.Tools(CoreNativeTools))
-        .Select(t => AddShaping(JsonSerializer.SerializeToElement(t, Json).Deserialize<Tool>(Json)!)).ToArray();
-    Tool[] FullTools => field ??= Extras().Concat(WorkflowExtras()).Concat(_catalog.Tools())
-        .Select(t => AddShaping(JsonSerializer.SerializeToElement(t, Json).Deserialize<Tool>(Json)!)).ToArray();
+    Tool[] CoreTools =>
+        field ??= Extras()
+            .Append(UnitNotesSpec())
+            .Concat(_catalog.Tools(CoreNativeTools))
+            .Select(t =>
+                AddShaping(JsonSerializer.SerializeToElement(t, Json).Deserialize<Tool>(Json)!)
+            )
+            .ToArray();
+    Tool[] FullTools =>
+        field ??= Extras()
+            .Append(UnitNotesSpec())
+            .Concat(WorkflowExtras())
+            .Concat(_catalog.Tools())
+            .Select(t =>
+                AddShaping(JsonSerializer.SerializeToElement(t, Json).Deserialize<Tool>(Json)!)
+            )
+            .ToArray();
     Dictionary<string, Tool> ToolIndex => _fullTools ? FullIndex : CoreIndex;
-    Dictionary<string, Tool> CoreIndex => field ??= CoreTools.ToDictionary(t => t.Name, StringComparer.Ordinal);
-    Dictionary<string, Tool> FullIndex => field ??= FullTools.ToDictionary(t => t.Name, StringComparer.Ordinal);
+    Dictionary<string, Tool> CoreIndex =>
+        field ??= CoreTools.ToDictionary(t => t.Name, StringComparer.Ordinal);
+    Dictionary<string, Tool> FullIndex =>
+        field ??= FullTools.ToDictionary(t => t.Name, StringComparer.Ordinal);
 
     ListToolsResult List(ListToolsRequestParams? p)
     {
         var tools = Tools;
         var start = 0;
         // MCP permits omitted params; absent cursor means the first page.
-        if (p?.Cursor is { } cursor
-            && (!int.TryParse(cursor, NumberStyles.Integer, CultureInfo.InvariantCulture, out start)
-                || start < 0 || start > tools.Length))
+        if (
+            p?.Cursor is { } cursor
+            && (
+                !int.TryParse(cursor, NumberStyles.Integer, CultureInfo.InvariantCulture, out start)
+                || start < 0
+                || start > tools.Length
+            )
+        )
             throw new McpProtocolException("Invalid tools cursor.", McpErrorCode.InvalidParams);
         // Host paging choice: 100 tool definitions per response to avoid huge schema payloads.
         const int pageSize = 100;
@@ -164,8 +251,10 @@ internal sealed partial class Server(
         return new()
         {
             Tools = page,
-            NextCursor = start + page.Length < tools.Length
-                ? (start + page.Length).ToString(CultureInfo.InvariantCulture) : null,
+            NextCursor =
+                start + page.Length < tools.Length
+                    ? (start + page.Length).ToString(CultureInfo.InvariantCulture)
+                    : null,
         };
     }
 
@@ -176,34 +265,53 @@ internal sealed partial class Server(
         var terms = query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         var offset = Int(args, "offset", 0);
         var limit = Int(args, "limit", ToolSearchDefaultLimit);
-        var includeSchema = args.TryGetProperty("includeSchema", out var schemaFlag) && schemaFlag.GetBoolean();
+        var includeSchema =
+            args.TryGetProperty("includeSchema", out var schemaFlag) && schemaFlag.GetBoolean();
         var full = _fullTools;
-        int Rank(Tool tool) => tool.Name.Equals(query, StringComparison.OrdinalIgnoreCase) ? 0
+        int Rank(Tool tool) =>
+            tool.Name.Equals(query, StringComparison.OrdinalIgnoreCase) ? 0
             : tool.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ? 1
-            : terms.All(term => tool.Name.Contains(term, StringComparison.OrdinalIgnoreCase)) ? 2 : 3;
-        var matches = FullTools.Where(t => terms.All(term =>
-                t.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
-                || (t.Description ?? "").Contains(term, StringComparison.OrdinalIgnoreCase)))
-            .OrderBy(Rank).ThenBy(t => t.Name, StringComparer.Ordinal).ToArray();
-        var tools = matches.Skip(offset).Take(limit).Select(t =>
-        {
-            var available = full || CoreIndex.ContainsKey(t.Name);
-            var entry = new Dictionary<string, object>
+            : terms.All(term => tool.Name.Contains(term, StringComparison.OrdinalIgnoreCase)) ? 2
+            : 3;
+        var matches = FullTools
+            .Where(t =>
+                terms.All(term =>
+                    t.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
+                    || (t.Description ?? "").Contains(term, StringComparison.OrdinalIgnoreCase)
+                )
+            )
+            .OrderBy(Rank)
+            .ThenBy(t => t.Name, StringComparer.Ordinal)
+            .ToArray();
+        var tools = matches
+            .Skip(offset)
+            .Take(limit)
+            .Select(t =>
             {
-                ["name"] = t.Name,
-                ["description"] = t.Description ?? "",
-                ["available"] = available,
-                ["requiredToolset"] = CoreIndex.ContainsKey(t.Name) ? "core" : "full",
-                // Control tools must be called directly; everything else is reachable from either set.
-                ["callVia"] = available || t.Name is "editor_toolset" or "editor_batch" or CallToolName ? "direct" : CallToolName,
-            };
-            if (includeSchema)
-            {
-                entry["inputSchema"] = t.InputSchema;
-                entry["annotations"] = JsonSerializer.SerializeToElement(t.Annotations, McpJsonUtilities.DefaultOptions);
-            }
-            return entry;
-        }).ToArray();
+                var available = full || CoreIndex.ContainsKey(t.Name);
+                var entry = new Dictionary<string, object>
+                {
+                    ["name"] = t.Name,
+                    ["description"] = t.Description ?? "",
+                    ["available"] = available,
+                    ["requiredToolset"] = CoreIndex.ContainsKey(t.Name) ? "core" : "full",
+                    // Control tools must be called directly; everything else is reachable from either set.
+                    ["callVia"] =
+                        available || t.Name is "editor_toolset" or "editor_batch" or CallToolName
+                            ? "direct"
+                            : CallToolName,
+                };
+                if (includeSchema)
+                {
+                    entry["inputSchema"] = t.InputSchema;
+                    entry["annotations"] = JsonSerializer.SerializeToElement(
+                        t.Annotations,
+                        McpJsonUtilities.DefaultOptions
+                    );
+                }
+                return entry;
+            })
+            .ToArray();
         return new
         {
             toolset = full ? "full" : "core",
@@ -212,14 +320,20 @@ internal sealed partial class Server(
             offset,
             limit,
             nextOffset = offset < matches.Length && tools.Length < matches.Length - offset
-                ? (int?)(offset + tools.Length) : null,
+                ? (int?)(offset + tools.Length)
+                : null,
             tools,
             guidance = $"Metadata only; available means exposed in the current set, not runtime readiness. Call hidden results (callVia={CallToolName}) as {CallToolName} {{name, arguments}}; includeSchema=true returns their inputSchema/annotations. Alternatively switch with standalone editor_toolset mode=full, then refresh tools/list without an old cursor. Search changes nothing and does not execute matches.",
         };
     }
 
     // preflighted: batch already preflighted every step before connecting.
-    CallToolResult Call(string name, JsonElement args, Game? batchGame = null, bool preflighted = false)
+    CallToolResult Call(
+        string name,
+        JsonElement args,
+        Game? batchGame = null,
+        bool preflighted = false
+    )
     {
         var passedPreflight = false;
         try
@@ -231,20 +345,32 @@ internal sealed partial class Server(
             if (name == CallToolName)
             {
                 // Preflight validates the target against its full-catalog schema; result is the target's own.
-                if (!preflighted) Preflight(name, args);
+                if (!preflighted)
+                    Preflight(name, args);
                 (name, args) = CallTarget(args);
                 preflighted = true;
             }
-            if (!preflighted) Preflight(name, args);
+            if (!preflighted)
+                Preflight(name, args);
             passedPreflight = true;
             var value = Invoke(name, args, batchGame);
             if (value is ImageResult image)
                 return new()
                 {
                     // Registered PNG media type (MCP image content); optional JSON legend follows as text/structured content.
-                    Content = image.Data is null ? [ImageContentBlock.FromBytes(image.Bytes, "image/png")]
-                        : [ImageContentBlock.FromBytes(image.Bytes, "image/png"), new TextContentBlock { Text = JsonSerializer.Serialize(image.Data, Json) }],
-                    StructuredContent = image.Data is null ? null : JsonSerializer.SerializeToElement(image.Data, Json),
+                    Content = image.Data is null
+                        ? [ImageContentBlock.FromBytes(image.Bytes, "image/png")]
+                        :
+                        [
+                            ImageContentBlock.FromBytes(image.Bytes, "image/png"),
+                            new TextContentBlock
+                            {
+                                Text = JsonSerializer.Serialize(image.Data, Json),
+                            },
+                        ],
+                    StructuredContent = image.Data is null
+                        ? null
+                        : JsonSerializer.SerializeToElement(image.Data, Json),
                     IsError = false,
                 };
             return new()
@@ -259,35 +385,70 @@ internal sealed partial class Server(
             var noInput = e is FocusRefusedException;
             // Read-only annotated helpers never dispatch native commands or write files, so their failures are inspections.
             var readOnly = FullIndex.GetValueOrDefault(name)?.Annotations?.ReadOnlyHint == true;
-            var safeInspection = passedPreflight && (noInput || readOnly || WorkflowSafeInspection(name, args) || name is "editor_search_tools" or "editor_trigger_list" or "editor_players" or "editor_player_dependency_audit"
-                || (name is "editor_set_diplomacy" or "editor_player_settings") && args.GetProperty("operation").GetString() != "apply"
-                || (name is "editor_trigger_edit" or "editor_stage_ai")
-                    && (!args.TryGetProperty("preview", out var preview) || preview.GetBoolean()));
+            var safeInspection =
+                passedPreflight
+                && (
+                    noInput
+                    || readOnly
+                    || WorkflowSafeInspection(name, args)
+                    || name
+                        is "editor_search_tools"
+                            or "editor_trigger_list"
+                            or "editor_players"
+                            or "editor_player_dependency_audit"
+                    || (name is "editor_set_diplomacy" or "editor_player_settings")
+                        && args.GetProperty("operation").GetString() != "apply"
+                    || (name is "editor_trigger_edit" or "editor_stage_ai")
+                        && (
+                            !args.TryGetProperty("preview", out var preview) || preview.GetBoolean()
+                        )
+                );
             var unknown = passedPreflight && !safeInspection;
-            var failure = e is WorkflowFailure known ? known.Details
-                : e is BridgeRefusal refusal && SingleCommandTool(name) ? RefusalDetails(refusal, name)
+            var failure =
+                e is WorkflowFailure known ? known.Details
+                : e is GameConnectionException connect
+                    ? new
+                    {
+                        code = connect.Code,
+                        phase = "connect",
+                        message = e.Message,
+                        nativeDispatched = (bool?)false,
+                        outcomeUnknown = (bool?)false,
+                        retrySafe = true,
+                        stagingPath = (string?)null,
+                        destinationPath = (string?)null,
+                        nextAction = connect.NextAction,
+                    }
+                : e is BridgeRefusal refusal && SingleCommandTool(name)
+                    ? RefusalDetails(refusal, name)
                 : new
-            {
-                code = e switch
                 {
-                    ArgumentException => "INVALID_ARGUMENT",
-                    _ when noInput => "FOCUS_NOT_GRANTED",
-                    InvalidDataException => "UNSUPPORTED_OR_INVALID_DATA",
-                    FileNotFoundException => "FILE_NOT_FOUND",
-                    _ => "OPERATION_FAILED",
-                },
-                phase = noInput ? "focus" : safeInspection ? "inspect/preview" : passedPreflight ? "unknown" : "preflight",
-                message = e.Message,
-                nativeDispatched = (bool?)(unknown ? null : false),
-                outcomeUnknown = (bool?)(unknown ? null : false),
-                retrySafe = !unknown,
-                stagingPath = (string?)null,
-                destinationPath = (string?)null,
-                nextAction = noInput ? "Bring editor window foreground manually; no input sent. Inspect state before proceeding."
-                    : safeInspection ? "Correct unsupported values/format; no native command or file write occurred."
-                    : passedPreflight ? "Inspect current state before retrying; mutation may have occurred."
+                    code = e switch
+                    {
+                        ArgumentException => "INVALID_ARGUMENT",
+                        _ when noInput => "FOCUS_NOT_GRANTED",
+                        InvalidDataException => "UNSUPPORTED_OR_INVALID_DATA",
+                        FileNotFoundException => "FILE_NOT_FOUND",
+                        _ => "OPERATION_FAILED",
+                    },
+                    phase = noInput ? "focus"
+                    : safeInspection ? "inspect/preview"
+                    : passedPreflight ? "unknown"
+                    : "preflight",
+                    message = e.Message,
+                    nativeDispatched = (bool?)(unknown ? null : false),
+                    outcomeUnknown = (bool?)(unknown ? null : false),
+                    retrySafe = !unknown,
+                    stagingPath = (string?)null,
+                    destinationPath = (string?)null,
+                    nextAction = noInput
+                        ? "Bring editor window foreground manually; no input sent. Inspect state before proceeding."
+                    : safeInspection
+                        ? "Correct unsupported values/format; no native command or file write occurred."
+                    : passedPreflight
+                        ? "Inspect current state before retrying; mutation may have occurred."
                     : "Fix arguments or unsupported format before retrying; no native operation ran.",
-            };
+                };
             return new()
             {
                 Content = [new TextContentBlock { Text = JsonSerializer.Serialize(failure, Json) }],
@@ -311,16 +472,25 @@ internal sealed partial class Server(
             Catalog.ValidateObject(step, ["name", "arguments", "delayMs"]);
             var name = String(step, "name");
             if (name == "editor_toolset")
-                throw new ArgumentException("editor_toolset must be standalone; batches preflight one tool set.");
+                throw new ArgumentException(
+                    "editor_toolset must be standalone; batches preflight one tool set."
+                );
             var delay = Int(step, "delayMs", 0);
             if (name == "editor_batch" || delay is < 0 or > 2000)
                 throw new ArgumentException("Nested batches forbidden; delayMs must be 0..2000.");
             var a = step.TryGetProperty("arguments", out var arguments) ? arguments : Empty;
             Preflight(name, a);
         }
-        using var game = steps.EnumerateArray().All(s => ConnectionFree(String(s, "name"),
-            s.TryGetProperty("arguments", out var a) ? a : Empty))
-            ? null : new Game(exe, _layout, pid);
+        using var game = steps
+            .EnumerateArray()
+            .All(s =>
+                ConnectionFree(
+                    String(s, "name"),
+                    s.TryGetProperty("arguments", out var a) ? a : Empty
+                )
+            )
+            ? null
+            : new Game(exe, _layout, pid);
         var content = new List<ContentBlock>();
         var results = new List<object>();
         var failed = false;
@@ -331,12 +501,14 @@ internal sealed partial class Server(
             var a = step.TryGetProperty("arguments", out var arguments) ? arguments : Empty;
             var result = Call(name, a, game, preflighted: true);
             failed = result.IsError == true;
-            results.Add(new
-            {
-                name,
-                isError = failed,
-                structuredContent = result.StructuredContent,
-            });
+            results.Add(
+                new
+                {
+                    name,
+                    isError = failed,
+                    structuredContent = result.StructuredContent,
+                }
+            );
             content.Add(new TextContentBlock { Text = $"Step {results.Count}: {name}" });
             content.AddRange(result.Content);
             if (failed)
@@ -345,14 +517,17 @@ internal sealed partial class Server(
         return new()
         {
             Content = content,
-            StructuredContent = JsonSerializer.SerializeToElement(new
-            {
-                steps = results,
-                attempted = results.Count,
-                completed = results.Count - (failed ? 1 : 0),
-                stoppedOnError = failed,
-                atomic = false,
-            }, Json),
+            StructuredContent = JsonSerializer.SerializeToElement(
+                new
+                {
+                    steps = results,
+                    attempted = results.Count,
+                    completed = results.Count - (failed ? 1 : 0),
+                    stoppedOnError = failed,
+                    atomic = false,
+                },
+                Json
+            ),
             IsError = failed,
         };
     }
@@ -367,17 +542,34 @@ internal sealed partial class Server(
         else
             foreach (var p in args.EnumerateObject())
                 if (!properties.TryGetProperty(p.Name, out _))
-                    throw new ArgumentException($"Unknown argument {path}.{p.Name}. Allowed: {string.Join(", ", properties.EnumerateObject().Select(q => q.Name))}.");
+                    throw new ArgumentException(
+                        Catalog.UnknownArgument(
+                            p.Name,
+                            properties.EnumerateObject().Select(q => q.Name).ToArray(),
+                            path + "."
+                        )
+                    );
         foreach (var required in schema.GetProperty("required").EnumerateArray())
             if (!args.TryGetProperty(required.GetString()!, out _))
-                throw new ArgumentException($"Missing required argument '{(path.Length == 0 ? "" : path + ".")}{required.GetString()}'." + (required.GetString() switch
-                {
-                    "token" => " Obtain one from editor_units_snapshot (host memory, last 16 kept).",
-                    "confirmDestructive" or "confirmPlacement" or "confirmWrite" => " Set it to true to authorize this mutation.",
-                    _ => "",
-                }));
+                throw new ArgumentException(
+                    $"Missing required argument '{(path.Length == 0 ? "" : path + ".")}{required.GetString()}'."
+                        + (
+                            required.GetString() switch
+                            {
+                                "token" =>
+                                    " Obtain one from editor_units_snapshot (host memory, last 16 kept).",
+                                "confirmDestructive" or "confirmPlacement" or "confirmWrite" =>
+                                    " Set it to true to authorize this mutation.",
+                                _ => "",
+                            }
+                        )
+                );
         foreach (var p in args.EnumerateObject())
-            ValidateValue(p.Value, properties.GetProperty(p.Name), path.Length == 0 ? p.Name : path + "." + p.Name);
+            ValidateValue(
+                p.Value,
+                properties.GetProperty(p.Name),
+                path.Length == 0 ? p.Name : path + "." + p.Name
+            );
     }
 
     /// <summary>Validates one value against the host's JSON Schema subset; messages name the argument path and constraint.</summary>
@@ -388,24 +580,54 @@ internal sealed partial class Server(
             "string" => value.ValueKind == JsonValueKind.String,
             "boolean" => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
             "integer" => value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out _),
-            "number" => value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var n)
+            "number" => value.ValueKind == JsonValueKind.Number
+                && value.TryGetDouble(out var n)
                 && double.IsFinite(n),
             "array" => value.ValueKind == JsonValueKind.Array,
             "object" => value.ValueKind == JsonValueKind.Object,
             _ => false,
         };
-        if (!valid || (schema.TryGetProperty("const", out var c) && !JsonElement.DeepEquals(value, c))
-            || (schema.TryGetProperty("enum", out var choices)
-                && !choices.EnumerateArray().Any(c => JsonElement.DeepEquals(value, c))))
-            throw new ArgumentException($"Invalid value for '{path}': expected " + (schema.TryGetProperty("enum", out var allowed)
-                ? "one of " + string.Join(", ", allowed.EnumerateArray().Select(a => a.ToString()))
-                : schema.TryGetProperty("const", out var exact) ? exact.ToString() : schema.GetProperty("type").GetString()) + ".");
-        if (value.ValueKind == JsonValueKind.Number
-            && ((schema.TryGetProperty("minimum", out var lower) && value.GetDouble() < lower.GetDouble())
-                || (schema.TryGetProperty("maximum", out var upper) && value.GetDouble() > upper.GetDouble())))
-            throw new ArgumentException($"Argument '{path}' outside schema bounds"
-                + (schema.TryGetProperty("minimum", out var lo) ? $" (minimum {lo})" : "")
-                + (schema.TryGetProperty("maximum", out var hi) ? $" (maximum {hi})" : "") + ".");
+        if (
+            !valid
+            || (schema.TryGetProperty("const", out var c) && !JsonElement.DeepEquals(value, c))
+            || (
+                schema.TryGetProperty("enum", out var choices)
+                && !choices.EnumerateArray().Any(c => JsonElement.DeepEquals(value, c))
+            )
+        )
+            throw new ArgumentException(
+                $"Invalid value for '{path}': expected "
+                    + (
+                        schema.TryGetProperty("enum", out var allowed)
+                            ? "one of "
+                                + string.Join(
+                                    ", ",
+                                    allowed.EnumerateArray().Select(a => a.ToString())
+                                )
+                        : schema.TryGetProperty("const", out var exact) ? exact.ToString()
+                        : schema.GetProperty("type").GetString()
+                    )
+                    + "."
+            );
+        if (
+            value.ValueKind == JsonValueKind.Number
+            && (
+                (
+                    schema.TryGetProperty("minimum", out var lower)
+                    && value.GetDouble() < lower.GetDouble()
+                )
+                || (
+                    schema.TryGetProperty("maximum", out var upper)
+                    && value.GetDouble() > upper.GetDouble()
+                )
+            )
+        )
+            throw new ArgumentException(
+                $"Argument '{path}' outside schema bounds"
+                    + (schema.TryGetProperty("minimum", out var lo) ? $" (minimum {lo})" : "")
+                    + (schema.TryGetProperty("maximum", out var hi) ? $" (maximum {hi})" : "")
+                    + "."
+            );
         if (value.ValueKind == JsonValueKind.Object)
         {
             ValidateSchema(value, schema, path);
@@ -414,11 +636,17 @@ internal sealed partial class Server(
         if (value.ValueKind != JsonValueKind.Array)
             return;
         var length = value.GetArrayLength();
-        if ((schema.TryGetProperty("minItems", out var min) && length < min.GetInt32())
-            || (schema.TryGetProperty("maxItems", out var max) && length > max.GetInt32()))
-            throw new ArgumentException($"Argument '{path}' has {length} items; expected "
-                + (schema.TryGetProperty("minItems", out var mn) ? mn.ToString() : "0") + ".."
-                + (schema.TryGetProperty("maxItems", out var mx) ? mx.ToString() : "any") + ".");
+        if (
+            (schema.TryGetProperty("minItems", out var min) && length < min.GetInt32())
+            || (schema.TryGetProperty("maxItems", out var max) && length > max.GetInt32())
+        )
+            throw new ArgumentException(
+                $"Argument '{path}' has {length} items; expected "
+                    + (schema.TryGetProperty("minItems", out var mn) ? mn.ToString() : "0")
+                    + ".."
+                    + (schema.TryGetProperty("maxItems", out var mx) ? mx.ToString() : "any")
+                    + "."
+            );
         var index = 0;
         foreach (var item in value.EnumerateArray())
             ValidateValue(item, schema.GetProperty("items"), $"{path}[{index++}]");
@@ -428,11 +656,19 @@ internal sealed partial class Server(
     static (string Name, JsonElement Args) CallTarget(JsonElement args)
     {
         Catalog.ValidateObject(args, ["name", "arguments"]);
-        if (!args.TryGetProperty("name", out var n) || n.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(n.GetString()))
-            throw new ArgumentException("Missing required argument 'name' (exact tool name from editor_search_tools).");
+        if (
+            !args.TryGetProperty("name", out var n)
+            || n.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(n.GetString())
+        )
+            throw new ArgumentException(
+                "Missing required argument 'name' (exact tool name from editor_search_tools)."
+            );
         var name = n.GetString()!;
         if (name is CallToolName or "editor_batch" or "editor_toolset")
-            throw new ArgumentException($"{name} cannot be called through {CallToolName}; call it directly.");
+            throw new ArgumentException(
+                $"{name} cannot be called through {CallToolName}; call it directly."
+            );
         if (!args.TryGetProperty("arguments", out var a) || a.ValueKind == JsonValueKind.Null)
             return (name, Empty);
         if (a.ValueKind != JsonValueKind.Object)
@@ -440,14 +676,50 @@ internal sealed partial class Server(
         return (name, a);
     }
 
-    static bool ConnectionFree(string name, JsonElement args) => name == CallToolName
-        ? CallTarget(args) is var (target, targetArgs) && ConnectionFree(target, targetArgs)
-        : WorkflowNames.Contains(name) || name is "editor_toolset" or "editor_search_tools" or "editor_catalog" or "editor_capabilities" or "editor_export_recovery" or "editor_trigger_list" or "editor_trigger_player_parity" or "editor_trigger_edit" or "editor_players" or "editor_player_dependency_audit" or "editor_stage_ai" or "editor_pantheon" or "editor_dependencies" or "editor_generate_catalog" or "editor_xs_api" or "editor_dialogs" or "editor_xs_diagnostics" or "editor_trigger_elements" or "editor_xs_check" or "editor_help" or "editor_scenario_digest"
-        || GameDataCatalog.ToolKinds.ContainsKey(name)
-        || (name == "editor_terrain_catalog" && args.TryGetProperty("kind", out var catalogKind) && catalogKind.GetString() is "mixes" or "editModes")
-        || (name is "editor_set_diplomacy" or "editor_player_settings" && (args.GetProperty("operation").GetString() is "preview" or "verify"))
-        || (name == "editor_triggers" && args.GetProperty("operation").GetString() is "inspect" or "validate" or "patch")
-        || (name == "editor_place_formation" && Formations.Preview(args));
+    static bool ConnectionFree(string name, JsonElement args) =>
+        name == CallToolName
+            ? CallTarget(args) is var (target, targetArgs) && ConnectionFree(target, targetArgs)
+            : WorkflowNames.Contains(name)
+                || name
+                    is "editor_toolset"
+                        or "editor_search_tools"
+                        or "editor_catalog"
+                        or "editor_capabilities"
+                        or "editor_export_recovery"
+                        or "editor_trigger_list"
+                        or "editor_trigger_player_parity"
+                        or "editor_trigger_edit"
+                        or "editor_players"
+                        or "editor_player_dependency_audit"
+                        or "editor_stage_ai"
+                        or "editor_pantheon"
+                        or "editor_dependencies"
+                        or "editor_generate_catalog"
+                        or "editor_xs_api"
+                        or "editor_dialogs"
+                        or "editor_xs_diagnostics"
+                        or "editor_trigger_elements"
+                        or "editor_xs_check"
+                        or "editor_help"
+                        or "editor_scenario_digest"
+                || GameDataCatalog.ToolKinds.ContainsKey(name)
+                || (
+                    name == "editor_terrain_catalog"
+                    && args.TryGetProperty("kind", out var catalogKind)
+                    && catalogKind.GetString() is "mixes" or "editModes"
+                )
+                || (
+                    name is "editor_set_diplomacy" or "editor_player_settings"
+                    && (args.GetProperty("operation").GetString() is "preview" or "verify")
+                )
+                || (
+                    name == "editor_triggers"
+                    && args.GetProperty("operation").GetString()
+                        is "inspect"
+                            or "validate"
+                            or "patch"
+                )
+                || (name == "editor_place_formation" && Formations.Preview(args));
 
     // anyToolset: editor_call targets resolve against the full catalog regardless of the exposed set.
     void Preflight(string name, JsonElement args, bool anyToolset = false)
@@ -465,12 +737,20 @@ internal sealed partial class Server(
             }
             return;
         }
-        if (name.StartsWith("editor_", StringComparison.Ordinal) && Catalog.RemovedCommand(name[7..]))
-            throw new ArgumentException("Native loadScenario tool removed after game crash. Use editor Load Scenario UI.");
-        var spec = (anyToolset ? FullIndex : ToolIndex).GetValueOrDefault(name)
-            ?? throw new ArgumentException(anyToolset
-                ? $"Unknown tool: {name}. Find exact names with editor_search_tools."
-                : $"Unknown or unexposed tool: {name}. Call it via {CallToolName}, or use editor_toolset mode=full or --toolset full for expanded surface.");
+        if (
+            name.StartsWith("editor_", StringComparison.Ordinal)
+            && Catalog.RemovedCommand(name[7..])
+        )
+            throw new ArgumentException(
+                "Native loadScenario tool removed after game crash. Use editor Load Scenario UI."
+            );
+        var spec =
+            (anyToolset ? FullIndex : ToolIndex).GetValueOrDefault(name)
+            ?? throw new ArgumentException(
+                anyToolset
+                    ? $"Unknown tool: {name}. Find exact names with editor_search_tools."
+                    : $"Unknown or unexposed tool: {name}. Call it via {CallToolName}, or use editor_toolset mode=full or --toolset full for expanded surface."
+            );
         ValidateSchema(args, spec.InputSchema);
         PreflightShaping(name, args);
         args = StripShaping(name, args);
@@ -485,20 +765,45 @@ internal sealed partial class Server(
             var key = String(args, "key");
             _ = Ui.VirtualKey(key); // Unknown key names refuse before focus/input.
             var mods = KeyModifiers(args);
-            var dataLoss = (key.Equals("F4", StringComparison.OrdinalIgnoreCase) && mods.Contains("ALT", StringComparer.OrdinalIgnoreCase))
-                || (DataLossKeys.Contains(key, StringComparer.OrdinalIgnoreCase) && mods.Contains("CTRL", StringComparer.OrdinalIgnoreCase));
-            if (dataLoss && (!args.TryGetProperty("confirmDestructive", out var confirmed) || confirmed.ValueKind != JsonValueKind.True))
-                throw new ArgumentException("New/load/save/close hotkey requires confirmDestructive=true.");
+            var dataLoss =
+                (
+                    key.Equals("F4", StringComparison.OrdinalIgnoreCase)
+                    && mods.Contains("ALT", StringComparer.OrdinalIgnoreCase)
+                )
+                || (
+                    DataLossKeys.Contains(key, StringComparer.OrdinalIgnoreCase)
+                    && mods.Contains("CTRL", StringComparer.OrdinalIgnoreCase)
+                );
+            if (
+                dataLoss
+                && (
+                    !args.TryGetProperty("confirmDestructive", out var confirmed)
+                    || confirmed.ValueKind != JsonValueKind.True
+                )
+            )
+                throw new ArgumentException(
+                    "New/load/save/close hotkey requires confirmDestructive=true."
+                );
         }
-        if (name == "editor_map_info" && args.TryGetProperty("planeY", out _) && !args.TryGetProperty("screen", out _))
+        if (
+            name == "editor_map_info"
+            && args.TryGetProperty("planeY", out _)
+            && !args.TryGetProperty("screen", out _)
+        )
             throw new ArgumentException("planeY requires screen coordinates.");
-        if (name.StartsWith("editor_", StringComparison.Ordinal)
-            && _catalog.Commands.TryGetValue(name[7..], out var command)) // Host editor_ namespace has seven characters.
+        if (
+            name.StartsWith("editor_", StringComparison.Ordinal)
+            && _catalog.Commands.TryGetValue(name[7..], out var command)
+        ) // Host editor_ namespace has seven characters.
             _ = Catalog.Build(command, args);
-        if (name == "editor_triggers") EditorFiles.PreflightTriggers(args);
-        if (name == "editor_save_checkpoint") EditorFiles.PreflightCheckpoint(args);
-        if (name == "editor_export_recovery") EditorFiles.PreflightRecovery(args);
-        if (name == "editor_trigger_edit") TriggerEdits.Preflight(args);
+        if (name == "editor_triggers")
+            EditorFiles.PreflightTriggers(args);
+        if (name == "editor_save_checkpoint")
+            EditorFiles.PreflightCheckpoint(args);
+        if (name == "editor_export_recovery")
+            EditorFiles.PreflightRecovery(args);
+        if (name == "editor_trigger_edit")
+            TriggerEdits.Preflight(args);
         PreflightWorkflow(name, args);
         PreflightScene(name, args);
         PreflightWorld(name, args);
@@ -506,36 +811,54 @@ internal sealed partial class Server(
         PreflightScript(name, args);
         if (name == "editor_set_diplomacy" && args.GetProperty("operation").GetString() == "apply")
             PlayerWorkflow.PreflightApply(args, exe);
-        if (name == "editor_player_settings" && args.GetProperty("operation").GetString() == "apply")
+        if (
+            name == "editor_player_settings"
+            && args.GetProperty("operation").GetString() == "apply"
+        )
             PlayerSettings.PreflightApply(args);
         if (name == "editor_place_formation")
         {
             _ = Formations.Plan(args);
             if (!Formations.Preview(args) && _layout.Units is null)
-                throw new InvalidDataException("Formation observation requires reviewed live-unit layout; no placement requested.");
+                throw new InvalidDataException(
+                    "Formation observation requires reviewed live-unit layout; no placement requested."
+                );
         }
         if (name == "editor_validate_scenario" && args.TryGetProperty("triggerPath", out var path))
             _ = ScenarioChecks.LoadController(path.GetString()!, out _);
     }
 
     static string[] KeyModifiers(JsonElement args) =>
-        args.TryGetProperty("modifiers", out var m) ? m.EnumerateArray().Select(v => v.GetString() ?? "").ToArray() : [];
+        args.TryGetProperty("modifiers", out var m)
+            ? m.EnumerateArray().Select(v => v.GetString() ?? "").ToArray()
+            : [];
 
     // Invoke runs only after Preflight: schema, confirmations and argument checks are not repeated here.
     object InvokeCore(string name, JsonElement args, Game? batchGame = null)
     {
-        if (WorkflowNames.Contains(name)) return InvokeWorkflow(name, args);
-        if (SceneNames.Contains(name)) return InvokeScene(name, args, batchGame);
-        if (WorldNames.Contains(name)) return InvokeWorld(name, args, batchGame);
-        if (DialogNames.Contains(name)) return InvokeDialog(name, args, batchGame);
-        if (ScriptNames.Contains(name)) return InvokeScript(name, args);
-        if (name == "editor_search_tools") return SearchTools(args);
+        if (WorkflowNames.Contains(name))
+            return InvokeWorkflow(name, args);
+        if (SceneNames.Contains(name))
+            return InvokeScene(name, args, batchGame);
+        if (WorldNames.Contains(name))
+            return InvokeWorld(name, args, batchGame);
+        if (DialogNames.Contains(name))
+            return InvokeDialog(name, args, batchGame);
+        if (ScriptNames.Contains(name))
+            return InvokeScript(name, args);
+        if (name == "editor_search_tools")
+            return SearchTools(args);
         if (name == "editor_toolset")
         {
             var next = String(args, "mode", _fullTools ? "full" : "core") == "full";
             var changed = next != _fullTools;
             _fullTools = next;
-            return new { toolset = next ? "full" : "core", exposedToolCount = Tools.Length, changed };
+            return new
+            {
+                toolset = next ? "full" : "core",
+                exposedToolCount = Tools.Length,
+                changed,
+            };
         }
         if (name == "editor_capabilities")
         {
@@ -556,28 +879,55 @@ internal sealed partial class Server(
                 scenarioEditing = "Never edit .mythscn directly. Use game editor, game-writer checkpoints and normal Load Scenario UI; native loadScenario disabled after crash.",
                 aiScripts = "Computer-player .xs personality must be under active-profile Games\\Age of Mythology Retold\\<id>\\Game\\AI (or its subdirectory); stock scripts/includes resolve from INSTALLPATH\\game\\ai. Profile <id>\\ai (without Game) is not used. Triggers belong in active-profile trigger directory; use filename stems for uiLoadTriggers/uiSaveTriggers.",
                 exportRecovery = "On unknown export outcome, use editor_export_recovery inspect on reported staging path. Recover only to a new file with expectedSha256; no second native dispatch.",
-                workflowTools = new { requiredToolset = "full", callVia = CallToolName, names = WorkflowNames.Order().ToArray(), savedIdentity = "Checkpoint IDs only; never assume live/runtime identity.",
+                workflowTools = new
+                {
+                    requiredToolset = "full",
+                    callVia = CallToolName,
+                    names = WorkflowNames.Except(CoreWorkflowNames).Order().ToArray(),
+                    alsoInCore = CoreWorkflowNames.Order().ToArray(),
+                    savedIdentity = "Checkpoint IDs only; never assume live/runtime identity.",
                     scenarioDiff = "Partial semantic decoding plus ordered raw section hashes; all assertions before paging, no universal unchanged claim.",
                     aiInstallation = "Receipt-owned aom_mcp namespace only; preview first, source/old/receipt hashes, exclusive staging/backups/receipts. No binding/compile/runtime proof.",
                     startupOrders = "Explicit saved pools, reviewed task effects, preserve jobs, bounded deterministic minimum-distance XZ assignments; new TR only, no live apply.",
-                    playtest = PlaytestWorkflow.Capabilities(), telemetry = RuntimeTelemetry.Capabilities(),
-                    runtimeEvidence = "Hash/time/run/player-bound supplied debug transcripts only; capture transport/compiler proof unavailable." },
+                    playtest = PlaytestWorkflow.Capabilities(),
+                    telemetry = RuntimeTelemetry.Capabilities(),
+                    runtimeEvidence = "Hash/time/run/player-bound supplied debug transcripts only; capture transport/compiler proof unavailable.",
+                },
             };
         }
-        if (name == "editor_export_recovery") return EditorFiles.Recover(args);
-        if (name == "editor_trigger_list") return CampaignTriggers.Query(args);
-        if (name == "editor_trigger_player_parity") return TriggerParity.Query(args);
-        if (name == "editor_trigger_edit") return TriggerEdits.Edit(args);
-        if (name == "editor_players") return ScenarioReader.Query(args, exe);
-        if (name == "editor_player_dependency_audit") return ScenarioAudit.Query(args, exe);
+        if (name == "editor_export_recovery")
+            return EditorFiles.Recover(args);
+        if (name == "editor_trigger_list")
+            return CampaignTriggers.Query(args);
+        if (name == "editor_trigger_player_parity")
+            return TriggerParity.Query(args);
+        if (name == "editor_trigger_edit")
+            return TriggerEdits.Edit(args);
+        if (name == "editor_players")
+            return ScenarioReader.Query(args, exe);
+        if (name == "editor_player_dependency_audit")
+            return ScenarioAudit.Query(args, exe);
         if (name == "editor_set_diplomacy" && args.GetProperty("operation").GetString() != "apply")
             return PlayerWorkflow.Diplomacy(args, exe);
-        if (name == "editor_player_settings" && args.GetProperty("operation").GetString() != "apply")
-            return PlayerSettings.Execute(null, args, exe, _layout.ExeSha256, (_, _) => throw new InvalidOperationException("Read-only operation."));
-        if (name == "editor_stage_ai") return PlayerWorkflow.StageAi(args, exe);
-        if (name == "editor_place_formation" && Formations.Preview(args)) return Formations.PreviewResult(args);
+        if (
+            name == "editor_player_settings"
+            && args.GetProperty("operation").GetString() != "apply"
+        )
+            return PlayerSettings.Execute(
+                null,
+                args,
+                exe,
+                _layout.ExeSha256,
+                (_, _) => throw new InvalidOperationException("Read-only operation.")
+            );
+        if (name == "editor_stage_ai")
+            return PlayerWorkflow.StageAi(args, exe);
+        if (name == "editor_place_formation" && Formations.Preview(args))
+            return Formations.PreviewResult(args);
         if (name == "editor_triggers" && ConnectionFree(name, args))
-            return String(args, "operation") == "patch" ? TriggerCodec.Patch(args) : TriggerCodec.Inspect(String(args, "path"));
+            return String(args, "operation") == "patch"
+                ? TriggerCodec.Patch(args)
+                : TriggerCodec.Inspect(String(args, "path"), XsScripts.Report(args));
         if (name == "editor_dependencies")
             return (_gameData ??= new GameDataCatalog()).Dependencies(exe, _layout.ExeSha256, args);
         if (GameDataCatalog.ToolKinds.TryGetValue(name, out var kind))
@@ -591,19 +941,60 @@ internal sealed partial class Server(
             var output = Generator.DefaultOutput();
             var force = args.TryGetProperty("force", out var f) && f.GetBoolean();
             var hadUi = Directory.Exists(Path.Combine(output, "ui"));
-            if (!force && hadUi && GameDataCatalog.IsFresh(exe, _layout.ExeSha256) && DialogCatalog.IsFresh(exe, _layout.ExeSha256))
-                return new { fresh = true, generated = false, output };
+            if (
+                !force
+                && hadUi
+                && GameDataCatalog.IsFresh(exe, _layout.ExeSha256)
+                && DialogCatalog.IsFresh(exe, _layout.ExeSha256)
+            )
+            {
+                // Rest is fresh; rebuild only the exemplar index when the exe or the campaign corpus changed (or it predates B1).
+                if (TriggerExemplars.IsFresh(output, exe, _layout.ExeSha256))
+                    return new
+                    {
+                        fresh = true,
+                        generated = false,
+                        output,
+                    };
+                return new
+                {
+                    fresh = true,
+                    generated = true,
+                    output,
+                    triggerExemplars = Generator.ExportExemplars(exe, _layout.ExeSha256, output),
+                };
+            }
             var result = Generator.GenerateMetadata(exe, output);
             _gameData = null; // Next catalog call reloads regenerated metadata without restart.
             _dialogs = null;
-            return new { fresh = true, generated = true, result.Output, result.UiFiles, result.DataFiles, result.MixFiles, result.GodPowerFiles, result.DialogWindows,
-                uiActionsNeedRestart = !hadUi };
+            return new
+            {
+                fresh = true,
+                generated = true,
+                result.Output,
+                result.UiFiles,
+                result.DataFiles,
+                result.MixFiles,
+                result.GodPowerFiles,
+                result.DialogWindows,
+                result.TriggerExemplars,
+                uiActionsNeedRestart = !hadUi,
+            };
         }
         if (name == "editor_pantheon")
         {
-            var pantheon = args.TryGetProperty("pantheon", out var pv) ? pv.GetString() : args.TryGetProperty("culture", out var cv) ? cv.GetString() : null;
-            return (_gameData ??= new GameDataCatalog()).Lookup(exe, _layout.ExeSha256,
-                pantheon ?? throw new ArgumentException("Missing required argument 'pantheon' (alias 'culture'), e.g. greeks."));
+            var pantheon =
+                args.TryGetProperty("pantheon", out var pv) ? pv.GetString()
+                : args.TryGetProperty("culture", out var cv) ? cv.GetString()
+                : null;
+            return (_gameData ??= new GameDataCatalog()).Lookup(
+                exe,
+                _layout.ExeSha256,
+                pantheon
+                    ?? throw new ArgumentException(
+                        "Missing required argument 'pantheon' (alias 'culture'), e.g. greeks."
+                    )
+            );
         }
         if (name == "editor_catalog")
         {
@@ -614,19 +1005,36 @@ internal sealed partial class Server(
                 toolset = _fullTools ? "full" : "core",
                 exposedToolCount = Tools.Length,
                 commands = _catalog.Commands.Values.Where(c =>
-                    !Catalog.RemovedCommand(c.Name) && (_fullTools || CoreNativeTools.Contains("editor_" + c.Name))
+                    !Catalog.RemovedCommand(c.Name)
+                    && (_fullTools || CoreNativeTools.Contains("editor_" + c.Name))
                     && c.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
                 ),
                 menuActionCount = _fullTools ? _catalog.Actions.Count : 0,
                 coverage = "Current tool set only; use editor_toolset mode=full for expanded surface. Generated documented commands/actions, not proof of live effects. Native return values are not captured.",
             };
         }
-        if (name is "editor_units" or "editor_inspect_selection" or "editor_map_info" or "editor_validate_scenario")
+        if (
+            name
+            is "editor_units"
+                or "editor_inspect_selection"
+                or "editor_map_info"
+                or "editor_validate_scenario"
+        )
         {
-            if ((name is "editor_units" or "editor_inspect_selection" or "editor_validate_scenario" && _layout.Units is null)
+            if (
+                (
+                    name
+                        is "editor_units"
+                            or "editor_inspect_selection"
+                            or "editor_validate_scenario"
+                    && _layout.Units is null
+                )
                 || (name == "editor_inspect_selection" && _layout.Selection is null)
-                || (name == "editor_map_info" && _layout.Map is null))
-                throw new InvalidDataException("Live read layout unavailable for this build. Passive review required; offsets are never guessed.");
+                || (name == "editor_map_info" && _layout.Map is null)
+            )
+                throw new InvalidDataException(
+                    "Live read layout unavailable for this build. Passive review required; offsets are never guessed."
+                );
             using var connected = batchGame is null ? new Game(exe, _layout, pid) : null;
             var live = batchGame ?? connected!;
             return name switch
@@ -656,31 +1064,60 @@ internal sealed partial class Server(
         }
         using var ownedGame = batchGame is null ? new Game(exe, _layout, pid) : null;
         var game = batchGame ?? ownedGame!;
-        if (name == "editor_place_formation") return Formations.Place(game, args, a => Place(game, a));
+        if (name == "editor_place_formation")
+            return Formations.Place(game, args, a => Place(game, a));
         if (name == "editor_set_diplomacy")
-            return PlayerWorkflow.Apply(game, args, exe, (command, a) =>
-                _bridge.Execute(game, Catalog.Build(_catalog.Commands[command], a)));
+            return PlayerWorkflow.Apply(
+                game,
+                args,
+                exe,
+                (command, a) => _bridge.Execute(game, Catalog.Build(_catalog.Commands[command], a))
+            );
         if (name == "editor_player_settings")
-            return PlayerSettings.Execute(game, args, exe, _layout.ExeSha256, (command, a) =>
-                _bridge.Execute(game, Catalog.Build(_catalog.Commands[command], a)));
+            return PlayerSettings.Execute(
+                game,
+                args,
+                exe,
+                _layout.ExeSha256,
+                (command, a) => _bridge.Execute(game, Catalog.Build(_catalog.Commands[command], a))
+            );
         if (name == "editor_save_checkpoint")
-            return EditorFiles.Checkpoint(game, args, (command, a) =>
-                _bridge.Execute(game, Catalog.Build(_catalog.Commands[command], a)));
+            return EditorFiles.Checkpoint(
+                game,
+                args,
+                (command, a) => _bridge.Execute(game, Catalog.Build(_catalog.Commands[command], a))
+            );
         if (name == "editor_triggers")
-            return EditorFiles.Triggers(game, args, (command, a) =>
-                _bridge.Execute(game, Catalog.Build(_catalog.Commands[command], a)));
+            return EditorFiles.Triggers(
+                game,
+                args,
+                (command, a) => _bridge.Execute(game, Catalog.Build(_catalog.Commands[command], a))
+            );
         if (name == "editor_focus")
         {
             game.Focus();
             return game.State();
         }
-        if (name == "editor_ui_read") return UiRead.Query(game, args, _layout.ExeSha256);
+        if (name == "editor_ui_read")
+            return UiRead.Query(game, args, _layout.ExeSha256);
         if (name == "editor_screenshot")
         {
             // Host default 1280 px is half the tested 2560-wide client; region uses full-resolution pixels.
-            var region = args.TryGetProperty("region", out var rect) ? rect.EnumerateArray().Select(n => n.GetInt32()).ToArray() : null;
-            var resolutionScale = args.TryGetProperty("resolutionScale", out var rs) ? rs.GetDouble() : 1;
-            return new ImageResult(Ui.Screenshot(game, Int(args, "maxWidth", 1280), region, Int(args, "scale", 1), resolutionScale));
+            var region = args.TryGetProperty("region", out var rect)
+                ? rect.EnumerateArray().Select(n => n.GetInt32()).ToArray()
+                : null;
+            var resolutionScale = args.TryGetProperty("resolutionScale", out var rs)
+                ? rs.GetDouble()
+                : 1;
+            return new ImageResult(
+                Ui.Screenshot(
+                    game,
+                    Int(args, "maxWidth", 1280),
+                    region,
+                    Int(args, "scale", 1),
+                    resolutionScale
+                )
+            );
         }
         if (name == "editor_mouse_move")
         {
@@ -769,12 +1206,23 @@ internal sealed partial class Server(
             steps.Add(_bridge.Execute(game, $"uiSetPlacementPlayer({player})"));
             steps.Add(_bridge.Execute(game, $"uiSetProtoCursor({quoted},true)"));
             (uint Proto, uint Player) prepared;
-            try { prepared = WaitSelection(game, clear: false, player); }
-            catch (InvalidOperationException) when (ProtoSuggestions(proto) is { Length: > 0 } suggestions
-                && !suggestions.Contains(proto, StringComparer.OrdinalIgnoreCase))
+            try
             {
-                throw new WorkflowFailure("UNKNOWN_PROTO", "prepare", $"Prototype '{proto}' was not accepted by the placement cursor. Did you mean: {string.Join(", ", suggestions)}?",
-                    false, false, "No placement requested; cursor cleanup follows. Retry with an exact suggested name.");
+                prepared = WaitSelection(game, clear: false, player);
+            }
+            catch (InvalidOperationException)
+                when (ProtoSuggestions(proto) is { Length: > 0 } suggestions
+                    && !suggestions.Contains(proto, StringComparer.OrdinalIgnoreCase)
+                )
+            {
+                throw new WorkflowFailure(
+                    "UNKNOWN_PROTO",
+                    "prepare",
+                    $"Prototype '{proto}' was not accepted by the placement cursor. Did you mean: {string.Join(", ", suggestions)}?",
+                    false,
+                    false,
+                    "No placement requested; cursor cleanup follows. Retry with an exact suggested name."
+                );
             }
             var (selected, owner) = prepared;
             game.Move(x, y);
@@ -905,24 +1353,47 @@ internal sealed partial class Server(
                 required = Array.Empty<string>(),
                 additionalProperties = false,
             },
-            annotations = new { readOnlyHint = false, destructiveHint = false, idempotentHint = true, openWorldHint = false },
+            annotations = new
+            {
+                readOnlyHint = false,
+                destructiveHint = false,
+                idempotentHint = true,
+                openWorldHint = false,
+            },
         };
-        yield return Spec("editor_search_tools",
+        yield return Spec(
+            "editor_search_tools",
             "Find tools by name or description across the full host catalog, even in core mode. Case-insensitive whitespace-separated terms must all match; exact/name matches rank first, then descriptions, with stable name ordering. Returns compact names/descriptions, current availability, required toolset and callVia (direct, or editor_call for tools hidden in the current set). includeSchema=true adds each result's inputSchema and annotations (use a small limit). query must be nonblank, max 256 characters; offset>=0, limit=1..50 (default 10). Read-only, no game connection, mode switch or match execution.",
             new Dictionary<string, object>
             {
-                ["query"] = new { type = "string", minLength = 1, maxLength = ToolSearchMaxQueryLength },
+                ["query"] = new
+                {
+                    type = "string",
+                    minLength = 1,
+                    maxLength = ToolSearchMaxQueryLength,
+                },
                 ["offset"] = new { type = "integer", minimum = 0 },
-                ["limit"] = new { type = "integer", minimum = 1, maximum = ToolSearchMaxLimit },
+                ["limit"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = ToolSearchMaxLimit,
+                },
                 ["includeSchema"] = new { type = "boolean", @default = false },
-            }, ["query"], true);
-        yield return Spec(CallToolName,
+            },
+            ["query"],
+            true
+        );
+        yield return Spec(
+            CallToolName,
             "Call any tool in the full catalog by exact name without switching tool sets, so core mode reaches every native editor command, action_* shipped UI action and workflow helper. Find names with editor_search_tools (includeSchema=true for the target's inputSchema/annotations). arguments are validated against the target's schema before anything runs, and every target guard and confirmation (confirmDestructive/confirmWrite/confirmPlacement, removed-command refusal) still applies; the result and error codes are the target's own. Not for editor_batch, editor_toolset or editor_call itself; allowed as an editor_batch step. Annotations here are worst-case; the target's own annotations describe the actual call.",
             new Dictionary<string, object>
             {
                 ["name"] = new { type = "string", minLength = 1 },
                 ["arguments"] = new { type = "object" },
-            }, ["name"]);
+            },
+            ["name"]
+        );
         yield return Spec(
             "editor_batch",
             "Run 1..32 existing tool calls sequentially in one connection. Schema/native-confirmation preflight; every step retains guards. Optional delayMs before a step for queued UI effects. Stops on first error; earlier effects remain (NOT atomic), no retries. Put screenshot last; inspect native acknowledgements independently. Steps are static: a step's output (e.g. observed unitId, projected pixel) cannot be referenced by later steps; split into separate calls when arguments depend on earlier results.",
@@ -930,7 +1401,9 @@ internal sealed partial class Server(
             {
                 ["steps"] = new
                 {
-                    type = "array", minItems = 1, maxItems = 32,
+                    type = "array",
+                    minItems = 1,
+                    maxItems = 32,
                     items = new
                     {
                         type = "object",
@@ -938,7 +1411,12 @@ internal sealed partial class Server(
                         {
                             name = new { type = "string" },
                             arguments = new { type = "object" },
-                            delayMs = new { type = "integer", minimum = 0, maximum = 2000 },
+                            delayMs = new
+                            {
+                                type = "integer",
+                                minimum = 0,
+                                maximum = 2000,
+                            },
                         },
                         required = StepRequired,
                         additionalProperties = false,
@@ -947,10 +1425,15 @@ internal sealed partial class Server(
             },
             ["steps"]
         );
-        yield return Spec("editor_capabilities",
+        yield return Spec(
+            "editor_capabilities",
             "Read host/toolset metadata, file/AI/script locations and safe workflow limits without connecting to the game. Call after reconnect or before editing.",
-            [], [], true);
-        yield return Spec("editor_export_recovery",
+            [],
+            [],
+            true
+        );
+        yield return Spec(
+            "editor_export_recovery",
             "Inspect or recover an existing game-writer staging file after a failed checkpoint/trigger export. No game connection and NO native retry. Inspect first; recover requires expectedSha256, fresh outputPath, confirmWrite=true. Staging must belong to active profile and match AomMcp staging prefix.",
             new Dictionary<string, object>
             {
@@ -960,73 +1443,192 @@ internal sealed partial class Server(
                 ["expectedSha256"] = new { type = "string" },
                 ["profileDirectory"] = new { type = "string" },
                 ["confirmWrite"] = new { type = "boolean" },
-            }, ["operation", "stagedPath"]);
-        yield return Spec("editor_trigger_list",
+            },
+            ["operation", "stagedPath"]
+        );
+        yield return Spec(
+            "editor_trigger_list",
             "Read-only bounded search/page/detail over exported TR v12 triggers. Use triggerId for detail; optional player/arg/references filters return paged element-level matches (references includes incoming/outgoing Trigger:* EventID edges). Snapshot not live proof.",
             new Dictionary<string, object>
             {
                 ["path"] = new { type = "string" },
                 ["filter"] = new { type = "string" },
-                ["player"] = new { type = "integer", minimum = 0, maximum = 12 },
-                ["arg"] = new { type = "object", properties = new Dictionary<string, object>
+                ["player"] = new
                 {
-                    ["key"] = new { type = "string" }, ["value"] = new { type = "string" },
-                }, required = TriggerArgRequired, additionalProperties = false },
+                    type = "integer",
+                    minimum = 0,
+                    maximum = 12,
+                },
+                ["arg"] = new
+                {
+                    type = "object",
+                    properties = new Dictionary<string, object>
+                    {
+                        ["key"] = new { type = "string" },
+                        ["value"] = new { type = "string" },
+                    },
+                    required = TriggerArgRequired,
+                    additionalProperties = false,
+                },
                 ["references"] = new { type = "integer", minimum = 0 },
                 ["triggerId"] = new { type = "integer", minimum = 0 },
                 ["offset"] = new { type = "integer", minimum = 0 },
-                ["limit"] = new { type = "integer", minimum = 1, maximum = 200 },
-            }, ["path"], true);
-        yield return Spec("editor_trigger_player_parity",
+                ["limit"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = 200,
+                },
+            },
+            ["path"],
+            true
+        );
+        yield return Spec(
+            "editor_trigger_player_parity",
             "Read-only heuristic template→target player parity audit on exported TR v12. Paged gaps/target-only/review hints and proposed editor_trigger_edit edits. No changes or runtime proof.",
             new Dictionary<string, object>
             {
                 ["path"] = new { type = "string" },
-                ["templatePlayer"] = new { type = "integer", minimum = 0, maximum = 12 },
-                ["targetPlayer"] = new { type = "integer", minimum = 0, maximum = 12 },
-                ["triggerIds"] = new { type = "array", minItems = 1, maxItems = 200, items = new { type = "integer", minimum = 0 } },
+                ["templatePlayer"] = new
+                {
+                    type = "integer",
+                    minimum = 0,
+                    maximum = 12,
+                },
+                ["targetPlayer"] = new
+                {
+                    type = "integer",
+                    minimum = 0,
+                    maximum = 12,
+                },
+                ["triggerIds"] = new
+                {
+                    type = "array",
+                    minItems = 1,
+                    maxItems = 200,
+                    items = new { type = "integer", minimum = 0 },
+                },
                 ["filter"] = new { type = "string" },
                 ["offset"] = new { type = "integer", minimum = 0 },
-                ["limit"] = new { type = "integer", minimum = 1, maximum = 200 },
-            }, ["path", "templatePlayer", "targetPlayer"], true);
-        yield return Spec("editor_trigger_edit",
-            "Preview-first patch/clone of reviewed TR v12 records in exported .trg. Single operation or edits array (1..64 operations) applied in memory with one new output and grouped diff. expectedSha256/source triggerId/expectedName mandatory; clone needs unique newId/newName. Optional active/loop, removeEffects/removeConditions indices (at least one element of each kind remains), labels (printable ASCII, changes element Kind/display label), duplicates (byte-exact copies of original conditions/effects appended in order; max 32), replacements for reviewed single-value numeric Player/PlayerID/FromPlayerID/ToPlayerID/EventID/TechID/Count/Dist/Status/Value/Duration and string ProtoUnit/UnitType/Command/QVName/Op params with expected old value. Indexes use ORIGINAL numbering; duplicates are numbered after originals per kind (e.g. first effect duplicate = original effect count), so a replacement can retarget a copy before removals renumber the result. objectReplacements use complete expected/new objects tuples {unitId,player,proto}, selected by original kind/elementIndex or copyHandle. copyEffects (max 32) use handle/sourceTriggerId/expectedSourceName/effectIndex/beforeEffectIndex; source always immutable original export, insertion before original destination index (original count means end), equal positions preserve request order. Copies retain commands/expression extras/flags. Replacements may also set the XS Code Snippet effect parameter CodeSnippet (value type 72 only; up to 250000 chars, tabs/line breaks allowed); other text parameters stay at 128 chars and errors name the parameter and limit. Several patch edits of the same trigger are merged (same-target or removed-and-changed conflicts are refused naming both edit positions; a trigger cannot be both patched and cloned in one batch). preview=true default, no file or game change. preview=false requires new outputPath (or the text auto = first unused <stem>.eN.trg beside the source) + confirmWrite=true; the result carries next {path, expectedSha256} to chain the following edit; no scenario file edits. Refuses unknown references/group membership and validates original records remain byte-identical. Trigger XS syscalls: editor_xs_api context=trigger.",
+                ["limit"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = 200,
+                },
+            },
+            ["path", "templatePlayer", "targetPlayer"],
+            true
+        );
+        yield return Spec(
+            "editor_trigger_edit",
+            "Preview-first patch/clone of reviewed TR v12 records in exported .trg. Single operation or edits array (1..64 operations) applied in memory with one new output and grouped diff. expectedSha256/source triggerId/expectedName mandatory; clone needs unique newId/newName. Optional active/loop, removeEffects/removeConditions indices (at least one element of each kind remains), labels (printable ASCII, changes element Kind/display label), duplicates (byte-exact copies of original conditions/effects appended in order; max 32), replacements for reviewed single-value numeric Player/PlayerID/FromPlayerID/ToPlayerID/EventID/TechID/Count/Dist/Status/Value/Duration and string ProtoUnit/UnitType/Command/QVName/Op params with expected old value. Indexes use ORIGINAL numbering; duplicates are numbered after originals per kind (e.g. first effect duplicate = original effect count), so a replacement can retarget a copy before removals renumber the result. objectReplacements use complete expected/new objects tuples {unitId,player,proto}, selected by original kind/elementIndex or copyHandle. copyEffects (max 32) use handle/sourceTriggerId/expectedSourceName/effectIndex/beforeEffectIndex; source is the immutable original export, or another hash-pinned file via sourcePath+sourceSha256 (.trg export or game-written TR v12 .mythscn, e.g. an editor_trigger_elements library:true location; a Trigger: element's source-numbered EventID must be reset with copyValues), insertion before original destination index (original count means end), equal positions preserve request order. Copies retain commands/expression extras/flags. copyValues {copyHandle, parameter, expected, value} change one single-value parameter of a copied effect (any parameter, e.g. PlayerID/Message) only when the exemplar index (editor_generate_catalog) proves that value type re-encodes byte-exact over the shipped corpus; else UNPROVEN_VARTYPE. Unit lists go through objectReplacements. Replacements may also set the XS Code Snippet effect parameter CodeSnippet (value type 72 only; up to 250000 chars, tabs/line breaks allowed); other text parameters stay at 128 chars and errors name the parameter and limit. Several patch edits of the same trigger are merged (same-target or removed-and-changed conflicts are refused naming both edit positions; a trigger cannot be both patched and cloned in one batch). preview=true default, no file or game change. preview=false requires new outputPath (or the text auto = first unused <stem>.eN.trg beside the source) + confirmWrite=true; the result carries next {path, expectedSha256, basePath, baseSha256} to chain the following edit (basePath = the game export the chain started from; pass it on, then to editor_triggers apply autoBackup as expectedBasePath/expectedBaseSha256); no scenario file edits. Refuses unknown references/group membership and validates original records remain byte-identical. Trigger XS syscalls: editor_xs_api context=trigger. Injection guard: a string parameter expanded inside quotes (e.g. QVName) refuses quotes/backslashes/newlines (STRING_PARAM_NOT_CODE: the game escapes them and the compile of EVERY trigger breaks); code characters in a bare-code slot (e.g. Op) need top-level allowRawXsInjection=true (RAW_XS_INJECTION otherwise). To run code use an XS: Code Snippet effect (copyEffects/duplicates + CodeSnippet). Results carry renderedXs per touched element (templates with stored values substituted, approximate) with a brace/quote balance check.",
             new Dictionary<string, object>
             {
                 ["operation"] = new { type = "string", @enum = TriggerEditOperations },
-                ["edits"] = new { type = "array", minItems = 1, maxItems = 64, items = new
+                ["edits"] = new
                 {
-                    type = "object", properties = new Dictionary<string, object>
+                    type = "array",
+                    minItems = 1,
+                    maxItems = 64,
+                    items = new
                     {
-                        ["operation"] = new { type = "string", @enum = TriggerEditOperations },
-                        ["triggerId"] = new { type = "integer", minimum = 0 },
-                        ["expectedName"] = new { type = "string" },
-                        ["newId"] = new { type = "integer", minimum = 0 },
-                        ["newName"] = new { type = "string" },
-                        ["active"] = new { type = "boolean" }, ["loop"] = new { type = "boolean" },
-                        ["objectReplacements"] = TriggerObjects.ReplacementSchema(), ["copyEffects"] = TriggerObjects.CopySchema(),
-                        ["removeEffects"] = new { type = "array", items = new { type = "integer", minimum = 0 }, maxItems = 200 },
-                        ["removeConditions"] = new { type = "array", items = new { type = "integer", minimum = 0 }, maxItems = 200 },
-                        ["labels"] = new { type = "array", maxItems = 200, items = new { type = "object", properties = new Dictionary<string, object>
+                        type = "object",
+                        properties = new Dictionary<string, object>
                         {
-                            ["kind"] = new { type = "string", @enum = TriggerElementKinds },
-                            ["elementIndex"] = new { type = "integer", minimum = 0 },
-                            ["expected"] = new { type = "string" }, ["value"] = new { type = "string" },
-                        }, required = TriggerLabelRequired, additionalProperties = false } },
-                        ["duplicates"] = new { type = "array", minItems = 1, maxItems = TriggerEdits.MaxDuplicates,
-                            items = new { type = "object", properties = new Dictionary<string, object>
+                            ["operation"] = new { type = "string", @enum = TriggerEditOperations },
+                            ["triggerId"] = new { type = "integer", minimum = 0 },
+                            ["expectedName"] = new { type = "string" },
+                            ["newId"] = new { type = "integer", minimum = 0 },
+                            ["newName"] = new { type = "string" },
+                            ["active"] = new { type = "boolean" },
+                            ["loop"] = new { type = "boolean" },
+                            ["objectReplacements"] = TriggerObjects.ReplacementSchema(),
+                            ["copyEffects"] = TriggerObjects.CopySchema(),
+                            ["copyValues"] = TriggerObjects.CopyValueSchema(),
+                            ["removeEffects"] = new
                             {
-                                ["kind"] = new { type = "string", @enum = TriggerElementKinds },
-                                ["elementIndex"] = new { type = "integer", minimum = 0 },
-                            }, required = TriggerDuplicateRequired, additionalProperties = false } },
-                        ["replacements"] = new { type = "array", maxItems = 200, items = new { type = "object", properties = new Dictionary<string, object>
-                        {
-                            ["kind"] = new { type = "string", @enum = TriggerElementKinds },
-                            ["elementIndex"] = new { type = "integer", minimum = 0 },
-                            ["parameter"] = new { type = "string" }, ["expected"] = new { type = "string" }, ["value"] = new { type = "string" },
-                        }, required = TriggerReplacementRequired, additionalProperties = false } },
-                    }, required = TriggerEditRequired, additionalProperties = false,
-                } },
+                                type = "array",
+                                items = new { type = "integer", minimum = 0 },
+                                maxItems = 200,
+                            },
+                            ["removeConditions"] = new
+                            {
+                                type = "array",
+                                items = new { type = "integer", minimum = 0 },
+                                maxItems = 200,
+                            },
+                            ["labels"] = new
+                            {
+                                type = "array",
+                                maxItems = 200,
+                                items = new
+                                {
+                                    type = "object",
+                                    properties = new Dictionary<string, object>
+                                    {
+                                        ["kind"] = new
+                                        {
+                                            type = "string",
+                                            @enum = TriggerElementKinds,
+                                        },
+                                        ["elementIndex"] = new { type = "integer", minimum = 0 },
+                                        ["expected"] = new { type = "string" },
+                                        ["value"] = new { type = "string" },
+                                    },
+                                    required = TriggerLabelRequired,
+                                    additionalProperties = false,
+                                },
+                            },
+                            ["duplicates"] = new
+                            {
+                                type = "array",
+                                minItems = 1,
+                                maxItems = TriggerEdits.MaxDuplicates,
+                                items = new
+                                {
+                                    type = "object",
+                                    properties = new Dictionary<string, object>
+                                    {
+                                        ["kind"] = new
+                                        {
+                                            type = "string",
+                                            @enum = TriggerElementKinds,
+                                        },
+                                        ["elementIndex"] = new { type = "integer", minimum = 0 },
+                                    },
+                                    required = TriggerDuplicateRequired,
+                                    additionalProperties = false,
+                                },
+                            },
+                            ["replacements"] = new
+                            {
+                                type = "array",
+                                maxItems = 200,
+                                items = new
+                                {
+                                    type = "object",
+                                    properties = new Dictionary<string, object>
+                                    {
+                                        ["kind"] = new
+                                        {
+                                            type = "string",
+                                            @enum = TriggerElementKinds,
+                                        },
+                                        ["elementIndex"] = new { type = "integer", minimum = 0 },
+                                        ["parameter"] = new { type = "string" },
+                                        ["expected"] = new { type = "string" },
+                                        ["value"] = new { type = "string" },
+                                    },
+                                    required = TriggerReplacementRequired,
+                                    additionalProperties = false,
+                                },
+                            },
+                        },
+                        required = TriggerEditRequired,
+                        additionalProperties = false,
+                    },
+                },
                 ["path"] = new { type = "string" },
                 ["triggerId"] = new { type = "integer", minimum = 0 },
                 ["expectedSha256"] = new { type = "string" },
@@ -1035,71 +1637,203 @@ internal sealed partial class Server(
                 ["newName"] = new { type = "string" },
                 ["active"] = new { type = "boolean" },
                 ["loop"] = new { type = "boolean" },
-                ["objectReplacements"] = TriggerObjects.ReplacementSchema(), ["copyEffects"] = TriggerObjects.CopySchema(),
-                ["removeEffects"] = new { type = "array", items = new { type = "integer", minimum = 0 }, maxItems = 200 },
-                ["removeConditions"] = new { type = "array", items = new { type = "integer", minimum = 0 }, maxItems = 200 },
-                ["labels"] = new { type = "array", maxItems = 200, items = new { type = "object", properties = new Dictionary<string, object>
+                ["allowRawXsInjection"] = new
                 {
-                    ["kind"] = new { type = "string", @enum = TriggerElementKinds },
-                    ["elementIndex"] = new { type = "integer", minimum = 0 },
-                    ["expected"] = new { type = "string" }, ["value"] = new { type = "string" },
-                }, required = TriggerLabelRequired, additionalProperties = false } },
-                ["duplicates"] = new { type = "array", items = new
+                    type = "boolean",
+                    description = "Top-level only. Permit XS code characters in a parameter the game expands as bare code (e.g. Op). Unsupported hack; result warns.",
+                },
+                ["basePath"] = new
                 {
-                    type = "object", properties = new Dictionary<string, object>
+                    type = "string",
+                    description = "Top-level only. Game export this chain of edits started from (next.basePath of the previous edit); defaults to path.",
+                },
+                ["baseSha256"] = new
+                {
+                    type = "string",
+                    description = "With basePath (next.baseSha256).",
+                },
+                ["objectReplacements"] = TriggerObjects.ReplacementSchema(),
+                ["copyEffects"] = TriggerObjects.CopySchema(),
+                ["copyValues"] = TriggerObjects.CopyValueSchema(),
+                ["removeEffects"] = new
+                {
+                    type = "array",
+                    items = new { type = "integer", minimum = 0 },
+                    maxItems = 200,
+                },
+                ["removeConditions"] = new
+                {
+                    type = "array",
+                    items = new { type = "integer", minimum = 0 },
+                    maxItems = 200,
+                },
+                ["labels"] = new
+                {
+                    type = "array",
+                    maxItems = 200,
+                    items = new
                     {
-                        ["kind"] = new { type = "string", @enum = TriggerElementKinds },
-                        ["elementIndex"] = new { type = "integer", minimum = 0 },
-                    }, required = TriggerDuplicateRequired, additionalProperties = false,
-                }, minItems = 1, maxItems = TriggerEdits.MaxDuplicates },
-                ["replacements"] = new { type = "array", items = new
+                        type = "object",
+                        properties = new Dictionary<string, object>
+                        {
+                            ["kind"] = new { type = "string", @enum = TriggerElementKinds },
+                            ["elementIndex"] = new { type = "integer", minimum = 0 },
+                            ["expected"] = new { type = "string" },
+                            ["value"] = new { type = "string" },
+                        },
+                        required = TriggerLabelRequired,
+                        additionalProperties = false,
+                    },
+                },
+                ["duplicates"] = new
                 {
-                    type = "object", properties = new Dictionary<string, object>
+                    type = "array",
+                    items = new
                     {
-                        ["kind"] = new { type = "string", @enum = TriggerElementKinds },
-                        ["elementIndex"] = new { type = "integer", minimum = 0 },
-                        ["parameter"] = new { type = "string" },
-                        ["expected"] = new { type = "string" },
-                        ["value"] = new { type = "string" },
-                    }, required = TriggerReplacementRequired, additionalProperties = false,
-                }, maxItems = 200 },
+                        type = "object",
+                        properties = new Dictionary<string, object>
+                        {
+                            ["kind"] = new { type = "string", @enum = TriggerElementKinds },
+                            ["elementIndex"] = new { type = "integer", minimum = 0 },
+                        },
+                        required = TriggerDuplicateRequired,
+                        additionalProperties = false,
+                    },
+                    minItems = 1,
+                    maxItems = TriggerEdits.MaxDuplicates,
+                },
+                ["replacements"] = new
+                {
+                    type = "array",
+                    items = new
+                    {
+                        type = "object",
+                        properties = new Dictionary<string, object>
+                        {
+                            ["kind"] = new { type = "string", @enum = TriggerElementKinds },
+                            ["elementIndex"] = new { type = "integer", minimum = 0 },
+                            ["parameter"] = new { type = "string" },
+                            ["expected"] = new { type = "string" },
+                            ["value"] = new { type = "string" },
+                        },
+                        required = TriggerReplacementRequired,
+                        additionalProperties = false,
+                    },
+                    maxItems = 200,
+                },
                 ["preview"] = new { type = "boolean" },
                 ["outputPath"] = new { type = "string" },
                 ["confirmWrite"] = new { type = "boolean" },
-            }, ["path", "expectedSha256"]);
-        yield return Spec("editor_players",
-            "Read-only players/AI, control, civ/color IDs, starting/max age, minor-god numeric IDs, population, resources, visibility/handicap and directional stances from GAME-WRITTEN .mythscn checkpoint. raw=true with one player returns bounded P1–P6 hex for research. Minor-god IDs are not source names; no live/runtime proof or edits.",
+            },
+            ["path", "expectedSha256"]
+        );
+        yield return Spec(
+            "editor_players",
+            "Read-only players/AI, control, civ/color IDs, starting/max age, minor-god numeric IDs, population, resources, visibility/handicap and directional stances from GAME-WRITTEN .mythscn checkpoint. path=\"latest\" = newest save in the active profile scenario folder; optional expectedSha256 pin (hash echoed). raw=true with one player returns bounded P1–P6 hex for research. Minor-god IDs are not source names; no live/runtime proof or edits.",
             new Dictionary<string, object>
             {
                 ["path"] = new { type = "string" },
-                ["player"] = new { type = "integer", minimum = 0, maximum = 12 },
+                ["expectedSha256"] = new { type = "string" },
+                ["player"] = new
+                {
+                    type = "integer",
+                    minimum = 0,
+                    maximum = 12,
+                },
                 ["raw"] = new { type = "boolean" },
-                ["aiDetail"] = new { type = "boolean", description = "Add per-player aiDetail: resolved profile Game/AI (then INSTALLPATH/game/ai) file, sha256, include checks." },
-            }, ["path"], true);
-        yield return Spec("editor_set_diplomacy",
+                ["aiDetail"] = new
+                {
+                    type = "boolean",
+                    description = "Add per-player aiDetail: resolved profile Game/AI (then INSTALLPATH/game/ai) file, sha256, include checks.",
+                },
+            },
+            ["path"],
+            true
+        );
+        yield return Spec(
+            "editor_set_diplomacy",
             "Preview/verify directional stance and optional AI path from game-written checkpoints. Legacy oneWay/mutual or changes array of 1..64 directed cells; matrix apply uses RGB gates before/after each click, one final game-writer checkpoint, and diagnostic checkpoint on uncertain input. Pinned 2560×1440 or 1920×1080 with pre-opened Diplomacy dialog (alternative: Players Settings > Diplomacy; normal: Scenario > Diplomacy; auto-detected, same grid), confirmed scene, fresh checkpoint+TR backups. AI Name text entry FAILED live P5 readback; desiredAiPath apply refuses before input. Manual AI path under profile <id>\\Game\\AI then verify. No .mythscn edits/retry/rollback.",
             new Dictionary<string, object>
             {
                 ["operation"] = new { type = "string", @enum = PlayerWorkflowOperations },
                 ["scenarioPath"] = new { type = "string" },
                 ["expectedSha256"] = new { type = "string" },
-                ["player"] = new { type = "integer", minimum = 1, maximum = 12 },
-                ["target"] = new { type = "integer", minimum = 1, maximum = 12 },
-                ["expectedStance"] = new { type = "integer", minimum = 0, maximum = 3 },
-                ["desiredStance"] = new { type = "integer", minimum = 1, maximum = 3 },
-                ["direction"] = new { type = "string", @enum = PlayerDirections },
-                ["changes"] = new { type = "array", minItems = 1, maxItems = 64, items = new
+                ["player"] = new
                 {
-                    type = "object", properties = new Dictionary<string, object>
+                    type = "integer",
+                    minimum = 1,
+                    maximum = 12,
+                },
+                ["target"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = 12,
+                },
+                ["expectedStance"] = new
+                {
+                    type = "integer",
+                    minimum = 0,
+                    maximum = 3,
+                },
+                ["desiredStance"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = 3,
+                },
+                ["direction"] = new { type = "string", @enum = PlayerDirections },
+                ["changes"] = new
+                {
+                    type = "array",
+                    minItems = 1,
+                    maxItems = 64,
+                    items = new
                     {
-                        ["player"] = new { type = "integer", minimum = 1, maximum = 12 },
-                        ["target"] = new { type = "integer", minimum = 1, maximum = 12 },
-                        ["expected"] = new { type = "integer", minimum = 1, maximum = 3 },
-                        ["desired"] = new { type = "integer", minimum = 1, maximum = 3 },
-                    }, required = DiplomacyChangeRequired, additionalProperties = false,
-                } },
-                ["expectedReverseStance"] = new { type = "integer", minimum = 0, maximum = 3 },
-                ["desiredReverseStance"] = new { type = "integer", minimum = 1, maximum = 3 },
+                        type = "object",
+                        properties = new Dictionary<string, object>
+                        {
+                            ["player"] = new
+                            {
+                                type = "integer",
+                                minimum = 1,
+                                maximum = 12,
+                            },
+                            ["target"] = new
+                            {
+                                type = "integer",
+                                minimum = 1,
+                                maximum = 12,
+                            },
+                            ["expected"] = new
+                            {
+                                type = "integer",
+                                minimum = 1,
+                                maximum = 3,
+                            },
+                            ["desired"] = new
+                            {
+                                type = "integer",
+                                minimum = 1,
+                                maximum = 3,
+                            },
+                        },
+                        required = DiplomacyChangeRequired,
+                        additionalProperties = false,
+                    },
+                },
+                ["expectedReverseStance"] = new
+                {
+                    type = "integer",
+                    minimum = 0,
+                    maximum = 3,
+                },
+                ["desiredReverseStance"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = 3,
+                },
                 ["expectedAiPath"] = new { type = "string" },
                 ["desiredAiPath"] = new { type = "string" },
                 ["verificationPath"] = new { type = "string" },
@@ -1110,32 +1844,64 @@ internal sealed partial class Server(
                 ["triggerProfileDirectory"] = new { type = "string" },
                 ["confirmDestructive"] = new { type = "boolean" },
                 ["confirmIsolatedScene"] = new { type = "boolean" },
-            }, ["operation", "scenarioPath", "expectedSha256"]);
-        yield return Spec("editor_player_settings",
+            },
+            ["operation", "scenarioPath", "expectedSha256"]
+        );
+        yield return Spec(
+            "editor_player_settings",
             "Preview/verify/apply guarded player settings changes at 2560×1440 or 1920×1080 in the alternative (pre-opened Players Settings) or normal (pre-opened Scenario > Player Data) UI, auto-detected. Supports name, control, AI browser path, civ/color, visibility, resources, pop/limit, handicap, age bounds and minor gods; unreviewed dropdowns may refuse. Requires source SHA and expected/desired strings; civ/minor gods need UI labels, colors an exact RGB swatch. Age changes require observedOnly assertions of all 3 minor-god IDs (auto-reset). AI browser change must be final and installed under game\\ai. Normal UI: AI Set requires control Computer; color swatchRgb sampled at x=88. apply: pre-opened panel, fresh scenario/TR backups, pixel/OCR gates, final checkpoint, diagnostic on uncertain outcome. No retry/save-over.",
             new Dictionary<string, object>
             {
                 ["operation"] = new { type = "string", @enum = PlayerWorkflowOperations },
-                ["scenarioPath"] = new { type = "string" }, ["expectedSha256"] = new { type = "string" },
-                ["changes"] = new { type = "array", minItems = 1, maxItems = 16, items = new
+                ["scenarioPath"] = new { type = "string" },
+                ["expectedSha256"] = new { type = "string" },
+                ["changes"] = new
                 {
-                    type = "object", properties = new Dictionary<string, object>
+                    type = "array",
+                    minItems = 1,
+                    maxItems = 16,
+                    items = new
                     {
-                        ["player"] = new { type = "integer", minimum = 1, maximum = 12 },
-                        ["field"] = new { type = "string", @enum = PlayerSettingFields },
-                        ["expected"] = new { type = "string" }, ["desired"] = new { type = "string" },
-                        ["expectedLabel"] = new { type = "string" }, ["desiredLabel"] = new { type = "string" },
-                        ["swatchRgb"] = new { type = "string" }, ["scroll"] = new { type = "integer", minimum = 0, maximum = 8 },
-                        ["observedOnly"] = new { type = "boolean" },
-                    }, required = PlayerSettingChangeRequired, additionalProperties = false,
-                } },
+                        type = "object",
+                        properties = new Dictionary<string, object>
+                        {
+                            ["player"] = new
+                            {
+                                type = "integer",
+                                minimum = 1,
+                                maximum = 12,
+                            },
+                            ["field"] = new { type = "string", @enum = PlayerSettingFields },
+                            ["expected"] = new { type = "string" },
+                            ["desired"] = new { type = "string" },
+                            ["expectedLabel"] = new { type = "string" },
+                            ["desiredLabel"] = new { type = "string" },
+                            ["swatchRgb"] = new { type = "string" },
+                            ["scroll"] = new
+                            {
+                                type = "integer",
+                                minimum = 0,
+                                maximum = 8,
+                            },
+                            ["observedOnly"] = new { type = "boolean" },
+                        },
+                        required = PlayerSettingChangeRequired,
+                        additionalProperties = false,
+                    },
+                },
                 ["verificationPath"] = new { type = "string" },
-                ["backupScenarioPath"] = new { type = "string" }, ["backupTriggerPath"] = new { type = "string" },
+                ["backupScenarioPath"] = new { type = "string" },
+                ["backupTriggerPath"] = new { type = "string" },
                 ["verificationDirectory"] = new { type = "string" },
-                ["scenarioProfileDirectory"] = new { type = "string" }, ["triggerProfileDirectory"] = new { type = "string" },
-                ["confirmDestructive"] = new { type = "boolean" }, ["confirmIsolatedScene"] = new { type = "boolean" },
-            }, ["operation", "scenarioPath", "expectedSha256", "changes"]);
-        yield return Spec("editor_stage_ai",
+                ["scenarioProfileDirectory"] = new { type = "string" },
+                ["triggerProfileDirectory"] = new { type = "string" },
+                ["confirmDestructive"] = new { type = "boolean" },
+                ["confirmIsolatedScene"] = new { type = "boolean" },
+            },
+            ["operation", "scenarioPath", "expectedSha256", "changes"]
+        );
+        yield return Spec(
+            "editor_stage_ai",
             "Preview/stage XS personality bytes by expected SHA-256 to new .xs path OUTSIDE installed game/profile directories. No game write; staged XS NOT a working personality. Install under active-profile <id>\\Game\\AI (editor_install_ai), resolve includes and playtest. preview=true by default; preview=false needs confirmWrite=true.",
             new Dictionary<string, object>
             {
@@ -1144,17 +1910,33 @@ internal sealed partial class Server(
                 ["outputPath"] = new { type = "string" },
                 ["preview"] = new { type = "boolean" },
                 ["confirmWrite"] = new { type = "boolean" },
-            }, ["sourcePath", "expectedSha256", "outputPath"]);
-        yield return Spec("editor_player_dependency_audit",
+            },
+            ["sourcePath", "expectedSha256", "outputPath"]
+        );
+        yield return Spec(
+            "editor_player_dependency_audit",
             "Read-only audit joining exported .trg and game-written .mythscn: player references, tribute, AI startAttacking calls, victory conditions, AI path/strategy presence. Saved snapshots only; not proof of runtime waves. Custom AI .xs personality MUST reside in active-profile <id>\\Game\\AI. Trigger exports belong in active-profile trigger folder.",
             new Dictionary<string, object>
             {
                 ["scenarioPath"] = new { type = "string" },
                 ["triggerPath"] = new { type = "string" },
-                ["player"] = new { type = "integer", minimum = 0, maximum = 12 },
+                ["player"] = new
+                {
+                    type = "integer",
+                    minimum = 0,
+                    maximum = 12,
+                },
                 ["offset"] = new { type = "integer", minimum = 0 },
-                ["limit"] = new { type = "integer", minimum = 1, maximum = 200 },
-            }, ["scenarioPath", "triggerPath", "player"], true);
+                ["limit"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = 200,
+                },
+            },
+            ["scenarioPath", "triggerPath", "player"],
+            true
+        );
         yield return Spec(
             "editor_status",
             "Read current editor state, build, thread and placement selection. No input sent.",
@@ -1163,44 +1945,114 @@ internal sealed partial class Server(
             true
         );
         // Same host page and reference-list bound as live-unit queries. IDs are current full live IDs, not scenario-name strings.
-        yield return Spec("editor_save_checkpoint",
+        yield return Spec(
+            "editor_save_checkpoint",
             "Save through native game writer to unique active-profile scenario staging file, verify stable l33t/zlib payload/decoded length, copy/hash-verify to caller-approved NEW absolute local .mythscn path. confirmWrite=true required. No overwrite option; original scenario files never silently overwritten. profileDirectory selects active scenario directory when ambiguous. Staging retained; native writer may change editor save-name/dirty state. Not semantic reload validation; never retry unknown outcomes.",
-            Props(("path", "string"), ("profileDirectory", "string"), ("confirmWrite", "boolean")), ["path", "confirmWrite"]);
-        yield return Spec("editor_place_formation",
+            Props(("path", "string"), ("profileDirectory", "string"), ("confirmWrite", "boolean")),
+            ["path", "confirmWrite"]
+        );
+        yield return Spec(
+            "editor_place_formation",
             "Bounded 1..32 objects in rows/ring, centered on x/y FULL-RESOLUTION CLIENT PIXELS; spacingPixels is NOT world distance (use editor_apply_layout formation for world units). Rows columns default ceil(sqrt(count)); ring spacing is neighbor chord before rounding, no columns allowed. preview defaults true: pure local plan/no game. preview=false requires confirmPlacement=true, checks whole plan against actual client before mutation, reuses single placement guards/cleanup and independently observes actual new IDs. Stops on first error with partial progress/no retry/rollback/save. Camera/UI hover affect world layout.",
             new Dictionary<string, object>
             {
                 ["proto"] = new { type = "string" },
-                ["player"] = new { type = "integer", minimum = 0, maximum = LiveUnits.MaxPlayer },
+                ["player"] = new
+                {
+                    type = "integer",
+                    minimum = 0,
+                    maximum = LiveUnits.MaxPlayer,
+                },
                 ["shape"] = new { type = "string", @enum = FormationShapes },
-                ["count"] = new { type = "integer", minimum = 1, maximum = Formations.MaxCount },
-                ["spacingPixels"] = new { type = "integer", minimum = 1, maximum = Formations.MaxSpacing },
-                ["x"] = new { type = "integer", minimum = 0, maximum = Formations.MaxPixel },
-                ["y"] = new { type = "integer", minimum = 0, maximum = Formations.MaxPixel },
-                ["columns"] = new { type = "integer", minimum = 1, maximum = Formations.MaxCount },
+                ["count"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = Formations.MaxCount,
+                },
+                ["spacingPixels"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = Formations.MaxSpacing,
+                },
+                ["x"] = new
+                {
+                    type = "integer",
+                    minimum = 0,
+                    maximum = Formations.MaxPixel,
+                },
+                ["y"] = new
+                {
+                    type = "integer",
+                    minimum = 0,
+                    maximum = Formations.MaxPixel,
+                },
+                ["columns"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = Formations.MaxCount,
+                },
                 ["preview"] = new { type = "boolean" },
                 ["confirmPlacement"] = new { type = "boolean" },
-            }, ["proto", "shape", "count", "spacingPixels", "x", "y"]);
-        yield return Spec("editor_validate_scenario",
+            },
+            ["proto", "shape", "count", "spacingPixels", "x", "y"]
+        );
+        yield return Spec(
+            "editor_validate_scenario",
             "Read-only partial diagnostics: live objects/map bounds, missing caller-declared requiredUnitIds or requireTownCenterPlayers; optional exported triggerPath for verified controller flags/percent/outcome/rule-reference heuristics. File is NOT proven current scene state. Objective UI/diplomacy/modes/dynamic XS references not inspected; no universal validity verdict or automatic fixes. offset>=0, limit1..200/default100.",
             new Dictionary<string, object>
             {
                 ["triggerPath"] = new { type = "string" },
-                ["requiredUnitIds"] = new { type = "array", items = new { type = "integer", minimum = 0 }, maxItems = LiveUnits.MaxLimit },
-                ["requireTownCenterPlayers"] = new { type = "array", items = new { type = "integer", minimum = 0, maximum = LiveUnits.MaxPlayer }, maxItems = LiveUnits.MaxPlayer },
+                ["requiredUnitIds"] = new
+                {
+                    type = "array",
+                    items = new { type = "integer", minimum = 0 },
+                    maxItems = LiveUnits.MaxLimit,
+                },
+                ["requireTownCenterPlayers"] = new
+                {
+                    type = "array",
+                    items = new
+                    {
+                        type = "integer",
+                        minimum = 0,
+                        maximum = LiveUnits.MaxPlayer,
+                    },
+                    maxItems = LiveUnits.MaxPlayer,
+                },
                 ["offset"] = new { type = "integer", minimum = 0 },
-                ["limit"] = new { type = "integer", minimum = 1, maximum = LiveUnits.MaxLimit },
-            }, [], true);
-        yield return Spec("editor_dependencies",
+                ["limit"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = LiveUnits.MaxLimit,
+                },
+            },
+            [],
+            true
+        );
+        yield return Spec(
+            "editor_dependencies",
             "Explain exact proto's static train/build links, positive Enable/CreateUnit/replacement tech effects/raw prerequisites, god starting units and shortest active/obtainable god-to-tech paths. Reuses cached shipped catalogs, no game. Abstract unit-type targets included; paths are potential, NOT evaluated prerequisites/exclusions or current-player trainability. Bounded relations: offset>=0, limit1..200/default50. Needs catalog: editor_generate_catalog.",
             new Dictionary<string, object>
             {
                 ["proto"] = new { type = "string" },
                 ["offset"] = new { type = "integer", minimum = 0 },
-                ["limit"] = new { type = "integer", minimum = 1, maximum = LiveUnits.MaxLimit },
-            }, ["proto"], true);
-        yield return Spec("editor_triggers",
-            "Inspect/validate/legacy-patch strict TR v12 single Always/CodeSnippet controllers; editor_trigger_list/edit handles read-only campaign/preview/new-file patch/clone. export verifies game-writer staging; apply replaces whole trigger set only after expectedSha256 for prepared file AND expectedLivePath/expectedLiveSha256 of reviewed game export; fresh game-written backup must match its trigger/camera semantics (export basenames differ). confirmDestructive=true, guarded round-trip of body/cameras (export-basename metadata may differ). No XS effect/persistence proof; no retry/rollback.",
+                ["limit"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = LiveUnits.MaxLimit,
+                },
+            },
+            ["proto"],
+            true
+        );
+        yield return Spec(
+            "editor_triggers",
+            "Inspect/validate/legacy-patch strict TR v12 single Always/CodeSnippet controllers; editor_trigger_list/edit handles read-only campaign/preview/new-file patch/clone. export verifies game-writer staging; apply replaces whole trigger set only after expectedSha256 for prepared file AND expectedLivePath/expectedLiveSha256 of reviewed game export; fresh game-written backup must match its trigger/camera semantics (export basenames differ). confirmDestructive=true, guarded round-trip of body/cameras (export-basename metadata may differ). No XS effect/persistence proof; no retry/rollback. autoBackup=true takes the backup itself (no expectedLive*); add expectedBasePath/expectedBaseSha256 (editor_trigger_edit basePath/baseSha256) so a live trigger set changed since that export is refused with LIVE_SOURCE_CHANGED listing differing triggers; without them lostUpdateCheck=\"skipped\". Import RESETS the scenario's Triggers->XS Scripts list (.trg carries none): inspect/validate/apply return xsScripts {warning, lastKnown (trigtemp.xs includes + newest profile save), sources, reAdd}; re-add the scripts before playtesting.",
             new Dictionary<string, object>
             {
                 ["operation"] = new { type = "string", @enum = TriggerOperations },
@@ -1217,26 +2069,70 @@ internal sealed partial class Server(
                 ["expectedLiveSha256"] = new { type = "string" },
                 ["expectedLivePath"] = new { type = "string" },
                 ["autoBackup"] = new { type = "boolean" },
-            }, ["operation", "path"]);
-        yield return Spec("editor_inspect_selection",
+                ["expectedBasePath"] = new
+                {
+                    type = "string",
+                    description = "autoBackup only: editor_trigger_edit basePath. The fresh backup must match it (lost-update check) or LIVE_SOURCE_CHANGED, nothing imported.",
+                },
+                ["expectedBaseSha256"] = new { type = "string" },
+            },
+            ["operation", "path"]
+        );
+        yield return Spec(
+            "editor_inspect_selection",
             "Read actual selection records and selected objects' live prototype/player/world position/current-max health. Not command acknowledgements; includes unresolved and non-unit selection kinds. Editor only; no focus/input/game calls. Requires reviewed unit+selection fields. Paging offset>=0, limit1..200/default100; changing selection refuses.",
             new Dictionary<string, object>
             {
                 // Same host page policies as editor_units, not native selection capacity.
                 ["offset"] = new { type = "integer", minimum = 0 },
-                ["limit"] = new { type = "integer", minimum = 1, maximum = LiveUnits.MaxLimit },
-            }, [], true);
+                ["limit"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = LiveUnits.MaxLimit,
+                },
+            },
+            [],
+            true
+        );
         // World coordinate/radius safety policies shared with live units; two screen axes, three world axes.
-        var worldNumber = new { type = "number", minimum = -LiveUnits.MaxCoordinate, maximum = LiveUnits.MaxCoordinate };
-        yield return Spec("editor_map_info",
+        var worldNumber = new
+        {
+            type = "number",
+            minimum = -LiveUnits.MaxCoordinate,
+            maximum = LiveUnits.MaxCoordinate,
+        };
+        yield return Spec(
+            "editor_map_info",
             "Read map tile/world dimensions, active camera and native render projection/full-resolution client viewport. Optional terrainAt [X,Z] returns native quantized node height; world [X,Y,Z] projects to client pixels/frustum visibility. screen [clientX,clientY] returns inverse ray; optional planeY gives explicit horizontal-plane intersection, not guessed terrain hit. Read-only editor access; changing/unreviewed layouts refuse.",
             new Dictionary<string, object>
             {
-                ["terrainAt"] = new { type = "array", items = worldNumber, minItems = 2, maxItems = 2 },
-                ["world"] = new { type = "array", items = worldNumber, minItems = 3, maxItems = 3 },
-                ["screen"] = new { type = "array", items = worldNumber, minItems = 2, maxItems = 2 },
+                ["terrainAt"] = new
+                {
+                    type = "array",
+                    items = worldNumber,
+                    minItems = 2,
+                    maxItems = 2,
+                },
+                ["world"] = new
+                {
+                    type = "array",
+                    items = worldNumber,
+                    minItems = 3,
+                    maxItems = 3,
+                },
+                ["screen"] = new
+                {
+                    type = "array",
+                    items = worldNumber,
+                    minItems = 2,
+                    maxItems = 2,
+                },
                 ["planeY"] = worldNumber,
-            }, [], true);
+            },
+            [],
+            true
+        );
         // Host paging/radius bounds, not engine API limits; player indices follow tested 0=Gaia..12.
         yield return Spec(
             "editor_units",
@@ -1244,22 +2140,49 @@ internal sealed partial class Server(
             new Dictionary<string, object>
             {
                 ["proto"] = new { type = "string" },
-                ["player"] = new { type = "integer", minimum = 0, maximum = LiveUnits.MaxPlayer },
+                ["player"] = new
+                {
+                    type = "integer",
+                    minimum = 0,
+                    maximum = LiveUnits.MaxPlayer,
+                },
                 ["offset"] = new { type = "integer", minimum = 0 },
-                ["limit"] = new { type = "integer", minimum = 1, maximum = LiveUnits.MaxLimit },
+                ["limit"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = LiveUnits.MaxLimit,
+                },
                 ["area"] = new
                 {
                     type = "object",
                     properties = new
                     {
-                        x = new { type = "number", minimum = -LiveUnits.MaxCoordinate, maximum = LiveUnits.MaxCoordinate },
-                        z = new { type = "number", minimum = -LiveUnits.MaxCoordinate, maximum = LiveUnits.MaxCoordinate },
-                        radius = new { type = "number", minimum = 0, maximum = LiveUnits.MaxCoordinate },
+                        x = new
+                        {
+                            type = "number",
+                            minimum = -LiveUnits.MaxCoordinate,
+                            maximum = LiveUnits.MaxCoordinate,
+                        },
+                        z = new
+                        {
+                            type = "number",
+                            minimum = -LiveUnits.MaxCoordinate,
+                            maximum = LiveUnits.MaxCoordinate,
+                        },
+                        radius = new
+                        {
+                            type = "number",
+                            minimum = 0,
+                            maximum = LiveUnits.MaxCoordinate,
+                        },
                     },
                     required = AreaRequired,
                     additionalProperties = false,
                 },
-            }, [], true
+            },
+            [],
+            true
         );
         yield return Spec(
             "editor_catalog",
@@ -1277,7 +2200,7 @@ internal sealed partial class Server(
         );
         yield return Spec(
             "editor_generate_catalog",
-            "Generate game-data catalogs (prototypes, gods, techs, god powers, terrain/water, mixes, footprints, normal+alternative editor UI XML and dialogs) from installed game archives with bundled CryBar. Run once per install/game update or when a tool reports metadata missing/stale; catalog tools work immediately afterwards (new action_* UI tools need MCP restart). No game connection. Skips when fresh unless force=true.",
+            "Generate game-data catalogs (prototypes, gods, techs, god powers, terrain/water, mixes, footprints, normal+alternative editor UI XML and dialogs) from installed game archives, plus the trigger exemplar index (shipped TR v12 campaign scenarios read in place; keyed on exe hash + campaign files; rebuilt alone when only it is stale) with bundled CryBar. Run once per install/game update or when a tool reports metadata missing/stale; catalog tools work immediately afterwards (new action_* UI tools need MCP restart). No game connection. Skips when fresh unless force=true.",
             Props(("force", "boolean")),
             [],
             false,
@@ -1286,11 +2209,17 @@ internal sealed partial class Server(
         );
         yield return Spec(
             "editor_xs_api",
-            "Look up the XS scripting API for AI (.xs personalities), random map and trigger scripts: engine syscalls (signatures, defaults, which script kinds may call them) and shipped library functions/classes/globals/rules (rm/lib, rm/lib2, ai/core, ai/human_assist) with include path, file:line and a short summary. Official syscall help and source comments are added from the local install when present. name=exact (case-insensitive); filter=space-separated terms over names/summaries; kind=any|syscall|function|class|global|rule|aiPlanConstant|constant (constant = cXxx names found as strings in the game exe by editor_generate_catalog, kept in local generated/xs_constants.json; names only, NOT verified as XS-visible); names=[...] (1..50 exact names, exclusive with name/filter/offset) returns compact records (kind, signature, include, library; detail=compact|full) plus missing[] with suggestions; context=any|ai|randomMap|trigger; library=library id or syscall group (e.g. kbfuncs); includeLocal default true; offset>=0, limit 1..100 (default 20). Read-only, no game connection.",
+            "Look up the XS scripting API for AI (.xs personalities), random map and trigger scripts: engine syscalls (signatures, defaults, which script kinds may call them) and shipped library functions/classes/globals/rules (rm/lib, rm/lib2, ai/core, ai/human_assist) with include path, file:line and a short summary. Official syscall help and source comments are added from the local install when present. name=exact (case-insensitive); filter=space-separated terms over names/summaries; kind=any|syscall|function|class|global|rule|aiPlanConstant|constant (constant = cXxx names found as strings in the game exe by editor_generate_catalog, kept in local generated/xs_constants.json; names only, NOT verified as XS-visible); names=[...] (1..50 exact names, exclusive with name/filter/offset) returns compact records (kind, signature, include, library; detail=compact|full) plus missing[] with suggestions; detail=compact also shortens filter/name search entries (default full); context=any|ai|randomMap|trigger; library=library id or syscall group (e.g. kbfuncs); includeLocal default true; offset>=0, limit 1..100 (default 20). Read-only, no game connection.",
             new Dictionary<string, object>
             {
                 ["name"] = new { type = "string" },
-                ["names"] = new { type = "array", items = new { type = "string" }, minItems = 1, maxItems = 50 },
+                ["names"] = new
+                {
+                    type = "array",
+                    items = new { type = "string" },
+                    minItems = 1,
+                    maxItems = 50,
+                },
                 ["detail"] = new { type = "string", @enum = XsApi.DetailModes },
                 ["filter"] = new { type = "string" },
                 ["kind"] = new { type = "string" },
@@ -1298,7 +2227,12 @@ internal sealed partial class Server(
                 ["library"] = new { type = "string" },
                 ["includeLocal"] = new { type = "boolean" },
                 ["offset"] = new { type = "integer", minimum = 0 },
-                ["limit"] = new { type = "integer", minimum = 1, maximum = 100 },
+                ["limit"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = 100,
+                },
             },
             [],
             true
@@ -1312,7 +2246,12 @@ internal sealed partial class Server(
                 ["name"] = new { type = "string" },
                 ["filter"] = new { type = "string" },
                 ["offset"] = new { type = "integer", minimum = 0 },
-                ["limit"] = new { type = "integer", minimum = 1, maximum = DialogCatalog.MaxLimit },
+                ["limit"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = DialogCatalog.MaxLimit,
+                },
             },
             [],
             true
@@ -1321,40 +2260,94 @@ internal sealed partial class Server(
         {
             var description = kind switch
             {
-                "prototypes" => "List exact prototypes: units, buildings, trees, resource nodes, decorations, wildlife, effects and other objects. Filter category/unitType/pantheon; base costs, stats, resources and train/build links. Flags are source data, NOT live editor placement proof.",
-                "gods" => "List major/minor gods and culture associations, starting units, age techs and direct unlock effects. Minor names are canonical age-tech IDs (e.g. ClassicalAgeAthena); labels are source string IDs, not translations.",
-                "technologies" => "List technologies/upgrades, base costs, prerequisites, effects and potential culture associations. Not current-player researchability.",
-                "godPowers" => "List shipped god-power definitions, types, costs, placement and created units. Potential culture links from tech grants; source-file variants retained. XML detail has full settings.",
-                "terrainTypes" => "List terrain texture identifiers, UI labels/classes, parent terrain types (passability groups) and settings. Names retain shipped backslashes; no guessed numeric IDs.",
-                "waterTypes" => "List lake/river/ocean water presets, exact names and settings. Optional XML detail includes rendering, terrain placement and other nested settings.",
+                "prototypes" =>
+                    "List exact prototypes: units, buildings, trees, resource nodes, decorations, wildlife, effects and other objects. Filter category/unitType/pantheon; base costs, stats, resources and train/build links. Flags are source data, NOT live editor placement proof.",
+                "gods" =>
+                    "List major/minor gods and culture associations, starting units, age techs and direct unlock effects. Minor names are canonical age-tech IDs (e.g. ClassicalAgeAthena); labels are source string IDs, not translations.",
+                "technologies" =>
+                    "List technologies/upgrades, base costs, prerequisites, effects and potential culture associations. Not current-player researchability.",
+                "godPowers" =>
+                    "List shipped god-power definitions, types, costs, placement and created units. Potential culture links from tech grants; source-file variants retained. XML detail has full settings.",
+                "terrainTypes" =>
+                    "List terrain texture identifiers, UI labels/classes, parent terrain types (passability groups) and settings. Names retain shipped backslashes; no guessed numeric IDs.",
+                "waterTypes" =>
+                    "List lake/river/ocean water presets, exact names and settings. Optional XML detail includes rendering, terrain placement and other nested settings.",
                 _ => throw new InvalidOperationException("Unknown game catalog kind."),
             };
-            yield return Spec(name, description
-                + " Read-only, no running game required. name=exact identifier; filter=name/label substring. offset>=0, limit=1..200 (default 50); includeDefinition=false by default. Missing/stale data: run editor_generate_catalog.",
-                GameDataCatalog.Properties(kind), [], true);
+            yield return Spec(
+                name,
+                description
+                    + " Read-only, no running game required. name=exact identifier; filter=name/label substring. offset>=0, limit=1..200 (default 50); includeDefinition=false by default. Missing/stale data: run editor_generate_catalog.",
+                GameDataCatalog.Properties(kind),
+                [],
+                true
+            );
         }
         // Changes OS foreground only (no editor/scene effect); repeat calls converge on the same state.
-        yield return Spec("editor_focus", "Focus/restore game window. Editor only.", [], [], destructive: false, idempotent: true);
+        yield return Spec(
+            "editor_focus",
+            "Focus/restore game window. Editor only.",
+            [],
+            [],
+            destructive: false,
+            idempotent: true
+        );
         yield return Spec(
             "editor_screenshot",
             "Capture foreground game client PNG. maxWidth default 1280; region [x,y,w,h] uses full-resolution client pixels, optional scale 1..4 nearest (output max 1600×1600). resolutionScale 0.1..1 (default 1) multiplies final output size (e.g. 0.6 = 60% width/height, ~36% pixels) after maxWidth/region/scale. Screenshots consume tokens: recommended to use resolutionScale <1 (e.g. 0.5-0.6) and/or small regions to save context/token cost; pixel coordinates you derive must be mapped back to full-resolution client pixels.",
             new Dictionary<string, object>
             {
-                ["maxWidth"] = new { type = "integer", minimum = 320, maximum = 2560 },
-                ["region"] = new { type = "array", minItems = 4, maxItems = 4, items = new { type = "integer" } },
-                ["scale"] = new { type = "integer", minimum = 1, maximum = 4 },
-                ["resolutionScale"] = new { type = "number", minimum = Ui.MinResolutionScale, maximum = Ui.MaxResolutionScale, @default = 1 },
+                ["maxWidth"] = new
+                {
+                    type = "integer",
+                    minimum = 320,
+                    maximum = 2560,
+                },
+                ["region"] = new
+                {
+                    type = "array",
+                    minItems = 4,
+                    maxItems = 4,
+                    items = new { type = "integer" },
+                },
+                ["scale"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = 4,
+                },
+                ["resolutionScale"] = new
+                {
+                    type = "number",
+                    minimum = Ui.MinResolutionScale,
+                    maximum = Ui.MaxResolutionScale,
+                    @default = 1,
+                },
             },
             []
         );
-        yield return Spec("editor_ui_read",
+        yield return Spec(
+            "editor_ui_read",
             "Read bounded foreground game-client region with embedded PP-OCRv6 tiny model. Supply region [x,y,w,h] or named field preset (players.<1-12>.<name|civ|control|aiPath|food|...>, agePopup.*, fileBrowser.*) for English normal (Scenario > Player Data) or alternative (Players Settings) UI at reviewed 2560×1440/1920×1080 or derived other 16:9 sizes 1280..2560 wide (layoutReviewed=false; OCR weaker at small sizes), auto-detected by panel pixel gates; optional scale 1..4. Returns OCR text/score/boxes, never proof of field state.",
             new Dictionary<string, object>
             {
-                ["region"] = new { type = "array", minItems = 4, maxItems = 4, items = new { type = "integer" } },
+                ["region"] = new
+                {
+                    type = "array",
+                    minItems = 4,
+                    maxItems = 4,
+                    items = new { type = "integer" },
+                },
                 ["field"] = new { type = "string" },
-                ["scale"] = new { type = "integer", minimum = 1, maximum = 4 },
-            }, []);
+                ["scale"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = 4,
+                },
+            },
+            []
+        );
         yield return Spec(
             "editor_mouse_move",
             "Move pointer to game-client pixel position; needed for pointer-dependent native tools.",

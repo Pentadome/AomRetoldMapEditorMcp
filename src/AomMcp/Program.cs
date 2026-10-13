@@ -3,8 +3,10 @@ using AomMcp;
 
 if (!OperatingSystem.IsWindows() || !Environment.Is64BitProcess)
     throw new PlatformNotSupportedException("Windows x64 required.");
+
 // Default from inspected local Steam installation; --exe overrides different library locations.
 var exe = @"C:\Program Files (x86)\Steam\steamapps\common\Age of Mythology Retold\AoMRT_s.exe";
+
 // Native filename comes from native/build.cmd; project copies it beside managed host.
 var bridge = Path.Combine(AppContext.BaseDirectory, "AomEditorBridge.dll");
 string? layoutPath = null,
@@ -95,6 +97,7 @@ if (selfTest)
     EditorView.SelfTest();
     TriggerCodec.SelfTest();
     CampaignTriggers.SelfTest();
+    ScenarioDependencies.SelfTest();
     CheckpointDocument.SelfTest();
     TriggerObjects.SelfTest();
     CheckpointUnits.SelfTest();
@@ -102,8 +105,10 @@ if (selfTest)
     AiInstaller.SelfTest();
     XsDiagnostics.SelfTest();
     XsConstants.SelfTest();
-            XsCheck.SelfTest();
-            HelpTools.SelfTest();
+    XsCheck.SelfTest();
+    XsScripts.SelfTest();
+    TriggerEdits.InjectionSelfTest();
+    HelpTools.SelfTest();
     PlayerSettings.SelfTest();
     StartupOrders.SelfTest();
     RuntimeProbes.SelfTest();
@@ -119,7 +124,9 @@ if (selfTest)
     native.SelfTest();
     if (localOnly)
     {
-        Console.WriteLine("Local self-tests passed; no installed game/catalog required. No game calls performed.");
+        Console.WriteLine(
+            "Local self-tests passed; no installed game/catalog required. No game calls performed."
+        );
         return;
     }
     var catalog = new Catalog(exe, ui);
@@ -146,6 +153,7 @@ if (generate != null)
     Generator.Generate(exe, generate, ui, pid);
     return;
 }
+
 // Host accepted-layout convention: executable SHA-256 filename; no stale-RVA/version-name fallback.
 layoutPath ??= Path.Combine(AppContext.BaseDirectory, "layouts", Layout.Hash(exe) + ".json");
 if (!File.Exists(layoutPath))

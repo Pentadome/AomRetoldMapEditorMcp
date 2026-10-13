@@ -8,5 +8,8 @@ Moved verbatim from AGENTS.md; served by `editor_help topic=xs`.
 ## Related tools added later
 
 - `editor_xs_diagnostics` reads the game's own MythLog compile errors (authoritative); `editor_xs_check` is an offline heuristic lint (calibrated against stock AI; empty result proves nothing).
+- Before a playtest, run `editor_xs_check scenarioPath="latest"` (or a saved `.mythscn` + `expectedSha256`): it checks every player AI path and every Triggers->XS Scripts entry with their includes, as the game resolves them (AI: profile `Game\AI` then `INSTALLPATH\game\ai`; trigger scripts: profile `trigger\` then the stock scripts in `Data.bar`). After renaming a script folder, missing scripts and stale includes show up here with similar-name suggestions.
+- Retold XS loops are C-style only: `for (int i = 0; i < n; i++)`. The legacy `for (i = 0; < n)` form fails to compile (MythLog 0172/0139); `editor_xs_check` reports it as `for-loop-form` with a rewrite.
+- Trigger scripts cannot call `ai*` syscalls and AI scripts cannot call `trigger*` ones; `editor_xs_check` reports `syscall-wrong-context` (context from the path, or `context=ai|trigger`). Trigger-script compile errors appear only as an in-game dialog, not in MythLog.
 - `editor_xs_api` accepts `names[]` (batch exact lookup), `kind=constant` (names scanned from the exe, unverified as XS-visible), `detail`, `fields`, `saveTo`.
 - `editor_install_ai` accepts `destinationRoot=campaign` (profile <id>/Game/AI/campaign/<subdir>/*.xs; replacing an existing file is the `force` flow with backup) and `lineEndings`.

@@ -29,8 +29,10 @@ internal sealed partial class Catalog
 {
     /// <summary>Gets supported native commands keyed by exact command name.</summary>
     public Dictionary<string, Command> Commands { get; } = new(StringComparer.Ordinal);
+
     /// <summary>Gets shipped editor actions keyed by their unique identifiers.</summary>
     public Dictionary<string, MenuAction> Actions { get; } = new(StringComparer.Ordinal);
+
     /// <summary>Core editing commands included even without UI prefixes or source references.</summary>
     // Host allowlist of native names found in installed executable help and game/config/editor.con;
     // these core editor commands lack the usual ui/gadget prefix (research/MCP-COVERAGE.md).
@@ -106,7 +108,12 @@ internal sealed partial class Catalog
         script = script.Trim();
         // Host limits: 8000-char shipped expressions fit beneath 16 KiB bridge capacity for ordinary
         // ASCII commands; byte length is rechecked by Bridge. NUL would terminate native char* early.
-        if (script.Length == 0 || script.Length > 8000 || script.Contains('\0') || RemovedScript(script))
+        if (
+            script.Length == 0
+            || script.Length > 8000
+            || script.Contains('\0')
+            || RemovedScript(script)
+        )
             return;
         // Host naming policy: MCP action IDs use ASCII letters/digits/underscore, max 90-char base;
         // duplicate IDs get suffixes starting at 2 because unsuffixed first occurrence already exists.
@@ -213,8 +220,7 @@ internal sealed partial class Catalog
     /// <param name="name">Native command name.</param>
     /// <returns>True when the name matches a guarded lifecycle or data-loss action.</returns>
     // Host data-loss guard derived from observed native names/editor.con, not engine permission metadata.
-    public static bool Confirmation(string name) =>
-        DestructiveCommandRegex().IsMatch(name);
+    public static bool Confirmation(string name) => DestructiveCommandRegex().IsMatch(name);
 
     /// <summary>Validates and escapes a string for a native command expression.</summary>
     /// <param name="value">Text up to 4096 characters with no control characters.</param>
@@ -237,7 +243,9 @@ internal sealed partial class Catalog
     public static string Build(Command command, JsonElement args)
     {
         if (RemovedCommand(command.Name))
-            throw new ArgumentException("Native loadScenario tool removed after game crash. Use editor Load Scenario UI.");
+            throw new ArgumentException(
+                "Native loadScenario tool removed after game crash. Use editor Load Scenario UI."
+            );
         ValidateObject(args, command.Parameters.Select(p => p.Name).Append("confirmDestructive"));
         if (
             Confirmation(command.Name)
@@ -279,7 +287,48 @@ internal sealed partial class Catalog
         var names = allowed.ToHashSet(StringComparer.Ordinal);
         foreach (var p in args.EnumerateObject())
             if (!names.Contains(p.Name))
-                throw new ArgumentException($"Unknown argument {p.Name}.");
+                throw new ArgumentException(UnknownArgument(p.Name, names));
+    }
+
+    /// <summary>"Unknown argument X." plus the closest valid name and the valid list (capped at 40 names).</summary>
+    internal static string UnknownArgument(
+        string name,
+        IReadOnlyCollection<string> allowed,
+        string prefix = ""
+    )
+    {
+        // Host synonym hints for names agents tried in sessions (outputPath on tools whose file argument is path).
+        string[] synonyms = name.ToLowerInvariant() switch
+        {
+            "outputpath"
+            or "output"
+            or "file"
+            or "filename"
+            or "filepath"
+            or "savepath"
+            or "destination" => ["path", "outputPath", "saveTo"],
+            "scenario" or "scenariofile" or "checkpoint" or "checkpointpath" =>
+            [
+                "scenarioPath",
+                "path",
+            ],
+            "sha" or "sha256" or "hash" or "expectedhash" => ["expectedSha256", "sha256"],
+            "id" or "unit" or "unitid" => ["unitId", "unitIds", "id"],
+            _ => [],
+        };
+        var guess =
+            synonyms.FirstOrDefault(allowed.Contains)
+            ?? GameDataCatalog.Suggest(name, allowed, 1).FirstOrDefault();
+        var list = allowed.Order(StringComparer.Ordinal).ToArray();
+        return $"Unknown argument {prefix}{name}."
+            + (guess is null ? "" : $" Did you mean {prefix}{guess}?")
+            + (
+                list.Length == 0
+                    ? " This tool takes no arguments."
+                    : " Valid arguments: "
+                        + string.Join(", ", list.Take(40))
+                        + (list.Length > 40 ? $", ... ({list.Length} total)." : ".")
+            );
     }
 
     // Type names come from embedded native help. XS vector uses three x/y/z components and
@@ -311,7 +360,10 @@ internal sealed partial class Catalog
         var text = single.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
         // "R" switches to exponent form (1E-08, 1E+20); spell such values out as plain decimals instead.
         return text.Contains('E')
-            ? ((double)single).ToString("0." + new string('#', 60), System.Globalization.CultureInfo.InvariantCulture)
+            ? ((double)single).ToString(
+                "0." + new string('#', 60),
+                System.Globalization.CultureInfo.InvariantCulture
+            )
             : text;
     }
 
@@ -366,13 +418,19 @@ internal sealed partial class Catalog
         // Host tool prefixes: editor_=typed native name, action_=original shipped expression;
         // Server strips seven chars. Annotation field names are defined by MCP ToolAnnotations.
         var gadgets = ShippedGadgetNames();
-        foreach (var c in Commands.Values.Where(c => !RemovedCommand(c.Name)
-            && (toolNames is null || toolNames.Contains("editor_" + c.Name)))
-            .OrderBy(c => c.Name, StringComparer.Ordinal))
+        foreach (
+            var c in Commands
+                .Values.Where(c =>
+                    !RemovedCommand(c.Name)
+                    && (toolNames is null || toolNames.Contains("editor_" + c.Name))
+                )
+                .OrderBy(c => c.Name, StringComparer.Ordinal)
+        )
             yield return new
             {
                 name = "editor_" + c.Name,
-                description = c.Help + GadgetVisibilityNote(c.Name, gadgets)
+                description = c.Help
+                    + GadgetVisibilityNote(c.Name, gadgets)
                     + $" Native {c.ReturnType}; reports dispatcher return only, not a captured value or independently verified effect. Editor mode required.",
                 inputSchema = Schema(c),
                 annotations = new
@@ -383,9 +441,14 @@ internal sealed partial class Catalog
                     openWorldHint = false,
                 },
             };
-        foreach (var a in Actions.Values.Where(a => !RemovedScript(a.Script)
-            && (toolNames is null || toolNames.Contains("action_" + a.Name)))
-            .OrderBy(a => a.Name, StringComparer.Ordinal))
+        foreach (
+            var a in Actions
+                .Values.Where(a =>
+                    !RemovedScript(a.Script)
+                    && (toolNames is null || toolNames.Contains("action_" + a.Name))
+                )
+                .OrderBy(a => a.Name, StringComparer.Ordinal)
+        )
             yield return new
             {
                 name = "action_" + a.Name,
@@ -412,11 +475,14 @@ internal sealed partial class Catalog
 
     /// <summary>Lists gadget names that shipped action expressions show, hide or toggle.</summary>
     /// <returns>Distinct ordinal-sorted names; empty when decoded editor XML was not loaded.</returns>
-    string[] ShippedGadgetNames() => Actions.Values
-        .SelectMany(a => GadgetVisibilityCallRegex().Matches(a.Script).Select(m => m.Groups[1].Value))
-        .Distinct(StringComparer.Ordinal)
-        .Order(StringComparer.Ordinal)
-        .ToArray();
+    string[] ShippedGadgetNames() =>
+        Actions
+            .Values.SelectMany(a =>
+                GadgetVisibilityCallRegex().Matches(a.Script).Select(m => m.Groups[1].Value)
+            )
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
 
     /// <summary>Explains gadget visibility commands in searchable terms; native help only says "makes real".</summary>
     /// <param name="name">Native command name.</param>
@@ -434,13 +500,17 @@ internal sealed partial class Catalog
         };
         if (effect is null)
             return "";
-        var note = $" {effect} the named UI gadget (dialog, panel, menu or window); real = visible, un-real = hidden.";
+        var note =
+            $" {effect} the named UI gadget (dialog, panel, menu or window); real = visible, un-real = hidden.";
         if (name.EndsWith("IfNotMP", StringComparison.Ordinal))
             note += " IfNotMP variant: name indicates it acts only outside multiplayer.";
         note += name == "gadgetUnreal" ? GadgetCloseNote : GadgetOpenNote;
         var listed = gadgets.Where(g => !GadgetNoteNames.Contains(g)).ToArray();
         if (listed.Length != 0)
-            note += " Other gadget names used by shipped editor actions: " + string.Join(", ", listed) + ".";
+            note +=
+                " Other gadget names used by shipped editor actions: "
+                + string.Join(", ", listed)
+                + ".";
         return note;
     }
 
@@ -458,7 +528,10 @@ internal sealed partial class Catalog
         ("ObjectiveEditor", "Scenario > Objectives"),
         ("ChapterEditor", "Scenario > Chapters"),
         ("ForbiddenUnitsTechsDlg", "Scenario > Forbidden Units/Techs"),
-        ("DiplomacyDialog", "Scenario > Diplomacy; alternative UI closes only with gadgetUnreal(\"PlayerDiplomacyDialog\")"),
+        (
+            "DiplomacyDialog",
+            "Scenario > Diplomacy; alternative UI closes only with gadgetUnreal(\"PlayerDiplomacyDialog\")"
+        ),
         ("AMapSizeDialog", "World > Map Size"),
         ("GodPowersGadget", "World > Invoke God Power"),
         ("DistanceCheckerGadget", "World > Distance Checker"),
@@ -472,7 +545,10 @@ internal sealed partial class Catalog
         ("AnimationEditorGadget", "Objects > Animation Viewer"),
         ("GarrisonEditorGadget", "Objects > Garrison Editor"),
         ("RelicEditorGadget", "Objects > Relic Editor"),
-        ("ATriggerGadget", "Trigger Editor; alternative UI closes only with gadgetUnreal(\"trEditor\")"),
+        (
+            "ATriggerGadget",
+            "Trigger Editor; alternative UI closes only with gadgetUnreal(\"trEditor\")"
+        ),
         ("ATrigGroupEditor", "Trigger Group Editor"),
         ("ATriggerArmyGadget", "Triggers > Army Editor"),
         ("ScriptManager", "Triggers > XS Scripts"),
@@ -485,7 +561,10 @@ internal sealed partial class Catalog
         ("AGameMinimap", "View > Toggle Minimap; visible by default, gadgetUnreal hides it"),
         ("GroupingSettingsDialog", "Save Prefab"),
         ("StringIdDialog", "Set StringID popup"),
-        ("PlayerEditMinorGodDlg", "bare Age Settings popup without player context; use Player Data's button"),
+        (
+            "PlayerEditMinorGodDlg",
+            "bare Age Settings popup without player context; use Player Data's button"
+        ),
         ("NewScenarioDialog", "same New Scenario window"),
     ];
 
@@ -510,30 +589,58 @@ internal sealed partial class Catalog
 
     internal static readonly string[] NoVisibleEffectGadgets =
     [
-        "HelpDialog", "waterColorDialog", "animgadget", "camEdit-position-window", "soundgadget", "SPCNoteDlg",
-        "ScenarioSummaryDialog", "CameraStartDlg", "MapElevationDialog",
+        "HelpDialog",
+        "waterColorDialog",
+        "animgadget",
+        "camEdit-position-window",
+        "soundgadget",
+        "SPCNoteDlg",
+        "ScenarioSummaryDialog",
+        "CameraStartDlg",
+        "MapElevationDialog",
     ];
 
     internal static readonly string[] AlternativeNoVisibleEffectGadgets =
     [
-        "MapSettings", "MapSizeSection", "BrushSelectorPanel", "PaintTerrainTool", "MoreCamTools", "Stats",
-        "TGEditor-Groups", "TGEditor-Triggers",
+        "MapSettings",
+        "MapSizeSection",
+        "BrushSelectorPanel",
+        "PaintTerrainTool",
+        "MoreCamTools",
+        "Stats",
+        "TGEditor-Groups",
+        "TGEditor-Triggers",
     ];
 
-    internal static readonly string[] ShownByDefaultGadgets = ["EditorMenu", "ToolBar", "TerraMode"];
+    internal static readonly string[] ShownByDefaultGadgets =
+    [
+        "EditorMenu",
+        "ToolBar",
+        "TerraMode",
+    ];
 
     // Alternative UI: these opened windows ignored gadgetUnreal(open name); the listed inner XML name closed them.
-    internal static readonly Dictionary<string, string> AlternativeCloseNames = new(StringComparer.Ordinal)
+    internal static readonly Dictionary<string, string> AlternativeCloseNames = new(
+        StringComparer.Ordinal
+    )
     {
         ["DiplomacyDialog"] = "PlayerDiplomacyDialog",
         ["ATriggerGadget"] = "trEditor",
     };
 
     static readonly HashSet<string> GadgetNoteNames = new(
-        VerifiedGadgets.Concat(NormalOnlyGadgets).Concat(AlternativeOnlyGadgets).Select(g => g.Name)
-            .Concat(NoVisibleEffectGadgets).Concat(AlternativeNoVisibleEffectGadgets).Concat(ShownByDefaultGadgets)
-            .Append("PlayerDataDialog").Append("Letterbox-topbar").Append("Letterbox-bottombar"),
-        StringComparer.Ordinal);
+        VerifiedGadgets
+            .Concat(NormalOnlyGadgets)
+            .Concat(AlternativeOnlyGadgets)
+            .Select(g => g.Name)
+            .Concat(NoVisibleEffectGadgets)
+            .Concat(AlternativeNoVisibleEffectGadgets)
+            .Concat(ShownByDefaultGadgets)
+            .Append("PlayerDataDialog")
+            .Append("Letterbox-topbar")
+            .Append("Letterbox-bottombar"),
+        StringComparer.Ordinal
+    );
 
     static string GadgetList(IEnumerable<(string Name, string Opens)> gadgets) =>
         string.Join("; ", gadgets.Select(g => $"{g.Name} ({g.Opens})"));
@@ -541,11 +648,14 @@ internal sealed partial class Catalog
     static readonly string GadgetOpenNote =
         " Live-verified in both normal and alternative UI (2560x1440, build 100.19.17020.0) to open populated windows, each closed again by gadgetUnreal with the same name unless noted: "
         + GadgetList(VerifiedGadgets)
-        + ". Normal UI only (no visible effect alone in alternative UI): " + GadgetList(NormalOnlyGadgets)
-        + ". Alternative UI only (no visible effect alone in normal UI, or absent there): " + GadgetList(AlternativeOnlyGadgets)
+        + ". Normal UI only (no visible effect alone in alternative UI): "
+        + GadgetList(NormalOnlyGadgets)
+        + ". Alternative UI only (no visible effect alone in normal UI, or absent there): "
+        + GadgetList(AlternativeOnlyGadgets)
         + ". Use these names, not inner XML panel names: PlayerDataDialog opens an EMPTY shell in normal UI (use PlayerEditDlg). No visible effect when opened alone in either UI: "
         + string.Join(", ", NoVisibleEffectGadgets)
-        + ". Alternative-UI XML names with no visible effect alone: " + string.Join(", ", AlternativeNoVisibleEffectGadgets)
+        + ". Alternative-UI XML names with no visible effect alone: "
+        + string.Join(", ", AlternativeNoVisibleEffectGadgets)
         + ". Shown by default (gadgetUnreal hides them, gadgetReal restores): EditorMenu and ToolBar (normal UI menu bar), TerraMode (alternative UI bottom terrain tool bar)"
         + ". Cinematics > Toggle Letterbox Bars runs gadgetToggle on Letterbox-topbar and Letterbox-bottombar (untested)"
         + ". Close with gadgetUnreal(same name) except where noted; uiCloseDialog did not close PlayerEditDlg and editMode(\"None\") did not close the alternative-UI Trigger Editor. The acknowledgement is not proof; check with a screenshot.";
@@ -570,79 +680,172 @@ internal sealed partial class Catalog
             }
             catch (ArgumentException) { }
         }
-        if (!Confirmation("saveScenario") || !Confirmation("uiLoadTriggers") || !Confirmation("uiSaveTriggers")
-            || !Confirmation("uiCoverTerrainWithWater") || !Confirmation("uiDeleteSelectedUnit")
-            || Confirmation("uiSetProtoCursor") || Confirmation("uiDeleteUnits"))
+        if (
+            !Confirmation("saveScenario")
+            || !Confirmation("uiLoadTriggers")
+            || !Confirmation("uiSaveTriggers")
+            || !Confirmation("uiCoverTerrainWithWater")
+            || !Confirmation("uiDeleteSelectedUnit")
+            || Confirmation("uiSetProtoCursor")
+            || Confirmation("uiDeleteUnits")
+        )
             throw new InvalidOperationException("Confirmation classification test failed.");
         RemovedCommandSelfTest();
         // Synthetic gadget name; search relies on open/close wording and listed names in descriptions.
-        if (!GadgetVisibilityNote("gadgetReal", ["FixtureDialog"]).Contains("Shows/opens", StringComparison.Ordinal)
-            || !GadgetVisibilityNote("gadgetUnreal", ["FixtureDialog"]).Contains("FixtureDialog", StringComparison.Ordinal)
-            || !GadgetVisibilityNote("gadgetReal", []).Contains("PlayerEditDlg (Scenario > Player Data)", StringComparison.Ordinal)
-            || !GadgetVisibilityNote("gadgetUnreal", []).Contains("gadgetUnreal(\"trEditor\")", StringComparison.Ordinal)
-            || !GadgetVisibilityNote("gadgetReal", []).Contains("ScreenshotDialog (Create a Screenshot)", StringComparison.Ordinal)
-            || !GadgetVisibilityNote("gadgetReal", []).Contains("EMPTY shell", StringComparison.Ordinal)
-            || GadgetVisibilityNote("gadgetReal", ["PlayerEditDlg"]).Contains("shipped editor actions", StringComparison.Ordinal)
-            || GadgetVisibilityNote("uiScenarioLoad", ["FixtureDialog"]).Length != 0)
+        if (
+            !GadgetVisibilityNote("gadgetReal", ["FixtureDialog"])
+                .Contains("Shows/opens", StringComparison.Ordinal)
+            || !GadgetVisibilityNote("gadgetUnreal", ["FixtureDialog"])
+                .Contains("FixtureDialog", StringComparison.Ordinal)
+            || !GadgetVisibilityNote("gadgetReal", [])
+                .Contains("PlayerEditDlg (Scenario > Player Data)", StringComparison.Ordinal)
+            || !GadgetVisibilityNote("gadgetUnreal", [])
+                .Contains("gadgetUnreal(\"trEditor\")", StringComparison.Ordinal)
+            || !GadgetVisibilityNote("gadgetReal", [])
+                .Contains("ScreenshotDialog (Create a Screenshot)", StringComparison.Ordinal)
+            || !GadgetVisibilityNote("gadgetReal", [])
+                .Contains("EMPTY shell", StringComparison.Ordinal)
+            || GadgetVisibilityNote("gadgetReal", ["PlayerEditDlg"])
+                .Contains("shipped editor actions", StringComparison.Ordinal)
+            || GadgetVisibilityNote("uiScenarioLoad", ["FixtureDialog"]).Length != 0
+        )
             throw new InvalidOperationException("Gadget description fixture failed.");
         // Synthetic native-help fixture; no game/file operation. Import must not bypass helper confirmation.
-        var loader = new Command("uiLoadTriggers", "void", [new("string", "filename")], "Synthetic fixture.");
+        var loader = new Command(
+            "uiLoadTriggers",
+            "void",
+            [new("string", "filename")],
+            "Synthetic fixture."
+        );
         try
         {
             Build(loader, JsonSerializer.SerializeToElement(new { filename = "fixture" }));
-            throw new InvalidOperationException("Native trigger confirmation fixture did not refuse.");
+            throw new InvalidOperationException(
+                "Native trigger confirmation fixture did not refuse."
+            );
         }
         catch (ArgumentException) { }
-        if (Build(loader, JsonSerializer.SerializeToElement(new { filename = "fixture", confirmDestructive = true })) != "uiLoadTriggers(\"fixture\")")
-            throw new InvalidOperationException("Confirmed native trigger expression fixture failed.");
+        if (
+            Build(
+                loader,
+                JsonSerializer.SerializeToElement(
+                    new { filename = "fixture", confirmDestructive = true }
+                )
+            ) != "uiLoadTriggers(\"fixture\")"
+        )
+            throw new InvalidOperationException(
+                "Confirmed native trigger expression fixture failed."
+            );
     }
 
     static void RemovedCommandSelfTest()
     {
         // Synthetic installed-help/UI/hotkey sources, never a game connection or real scenario load.
-        var temporary = Path.Combine(Path.GetTempPath(), "aom-removed-command-" + Guid.NewGuid().ToString("N", System.Globalization.CultureInfo.InvariantCulture));
+        var temporary = Path.Combine(
+            Path.GetTempPath(),
+            "aom-removed-command-"
+                + Guid.NewGuid().ToString("N", System.Globalization.CultureInfo.InvariantCulture)
+        );
         Directory.CreateDirectory(Path.Combine(temporary, "game", "config"));
         var ui = Path.Combine(temporary, "ui");
         Directory.CreateDirectory(ui);
         try
         {
             var exe = Path.Combine(temporary, "fixture.exe");
-            File.WriteAllText(exe, "void loadScenario(string scenarioName): unsafe\0void uiScenarioLoad(): safe\0", Encoding.Latin1);
-            File.WriteAllText(Path.Combine(temporary, "game", "config", "editor.con"),
-                """map("L", "editor", "loadScenario(\"fixture\")")""");
-            File.WriteAllText(Path.Combine(ui, "fixture.xml"),
-                """<root><gadget name="Unsafe"><command>uiClearSelection(); LOADSCENARIO ("fixture")</command></gadget><gadget name="LoadButton"><command>uiScenarioLoad</command></gadget></root>""");
+            File.WriteAllText(
+                exe,
+                "void loadScenario(string scenarioName): unsafe\0void uiScenarioLoad(): safe\0",
+                Encoding.Latin1
+            );
+            File.WriteAllText(
+                Path.Combine(temporary, "game", "config", "editor.con"),
+                """map("L", "editor", "loadScenario(\"fixture\")")"""
+            );
+            File.WriteAllText(
+                Path.Combine(ui, "fixture.xml"),
+                """<root><gadget name="Unsafe"><command>uiClearSelection(); LOADSCENARIO ("fixture")</command></gadget><gadget name="LoadButton"><command>uiScenarioLoad</command></gadget></root>"""
+            );
             var catalog = new Catalog(exe, ui);
-            if (Extra.Contains("loadScenario") || catalog.Commands.ContainsKey("loadScenario")
-                || !catalog.Commands.ContainsKey("uiScenarioLoad") || catalog.Actions.Count != 1
-                || !catalog.Actions.ContainsKey("LoadButton"))
-                throw new InvalidOperationException("Removed command source-filter fixture failed.");
+            if (
+                Extra.Contains("loadScenario")
+                || catalog.Commands.ContainsKey("loadScenario")
+                || !catalog.Commands.ContainsKey("uiScenarioLoad")
+                || catalog.Actions.Count != 1
+                || !catalog.Actions.ContainsKey("LoadButton")
+            )
+                throw new InvalidOperationException(
+                    "Removed command source-filter fixture failed."
+                );
             // Even stale/injected metadata cannot restore exposure or typed dispatch.
-            var removed = new Command("loadScenario", "void", [new("string", "scenarioName")], "Removed fixture.");
+            var removed = new Command(
+                "loadScenario",
+                "void",
+                [new("string", "scenarioName")],
+                "Removed fixture."
+            );
             catalog.Commands.Add(removed.Name, removed);
-            catalog.Actions.Add("LegacyLoad", new("LegacyLoad", "LegacyLoad", "loadScenario(\"fixture\")", "fixture.xml"));
+            catalog.Actions.Add(
+                "LegacyLoad",
+                new("LegacyLoad", "LegacyLoad", "loadScenario(\"fixture\")", "fixture.xml")
+            );
             var tools = JsonSerializer.SerializeToElement(catalog.Tools());
-            if (tools.EnumerateArray().Any(t => t.GetProperty("name").GetString() is "editor_loadScenario" or "action_LegacyLoad"))
-                throw new InvalidOperationException("Removed command stale-metadata exposure fixture failed.");
-            if (!tools.EnumerateArray().Any(t => t.GetProperty("name").GetString() == "action_LoadButton"
-                    && t.GetProperty("description").GetString()!.Contains("`uiScenarioLoad`", StringComparison.Ordinal)))
-                throw new InvalidOperationException("Action expression description fixture failed.");
+            if (
+                tools
+                    .EnumerateArray()
+                    .Any(t =>
+                        t.GetProperty("name").GetString()
+                            is "editor_loadScenario"
+                                or "action_LegacyLoad"
+                    )
+            )
+                throw new InvalidOperationException(
+                    "Removed command stale-metadata exposure fixture failed."
+                );
+            if (
+                !tools
+                    .EnumerateArray()
+                    .Any(t =>
+                        t.GetProperty("name").GetString() == "action_LoadButton"
+                        && t.GetProperty("description")
+                            .GetString()!
+                            .Contains("`uiScenarioLoad`", StringComparison.Ordinal)
+                    )
+            )
+                throw new InvalidOperationException(
+                    "Action expression description fixture failed."
+                );
             foreach (var name in new[] { "loadScenario", "LOADSCENARIO" })
             {
                 try
                 {
-                    Build(removed with { Name = name }, JsonSerializer.SerializeToElement(new { scenarioName = "fixture", confirmDestructive = true }));
-                    throw new InvalidOperationException("Removed command dispatch fixture did not refuse.");
+                    Build(
+                        removed with
+                        {
+                            Name = name,
+                        },
+                        JsonSerializer.SerializeToElement(
+                            new { scenarioName = "fixture", confirmDestructive = true }
+                        )
+                    );
+                    throw new InvalidOperationException(
+                        "Removed command dispatch fixture did not refuse."
+                    );
                 }
                 catch (ArgumentException) { }
             }
         }
-        finally { Directory.Delete(temporary, true); }
+        finally
+        {
+            Directory.Delete(temporary, true);
+        }
     }
 
     // Shipped expressions spell these calls gadgetReal/gadgetUnReal/gadgetUnreal/gadgetToggle("Name");
     // group 1 is the literal gadget name.
-    [GeneratedRegex(@"\bgadget(?:Real|Unreal|Toggle)(?:IfNotMP)?\s*\(\s*""([^""\\]+)""", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(
+        @"\bgadget(?:Real|Unreal|Toggle)(?:IfNotMP)?\s*\(\s*""([^""\\]+)""",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant
+    )]
     private static partial Regex GadgetVisibilityCallRegex();
 
     // Native/XS identifier spelling observed in shipped expressions (ASCII letters/digits/underscore).
@@ -666,13 +869,19 @@ internal sealed partial class Catalog
 
     [GeneratedRegex(@"^(string|float|int|bool|vector)\s+([A-Za-z_][A-Za-z_0-9]*)$")]
     private static partial Regex ParameterDeclarationRegex();
+
     [GeneratedRegex("""map\s*\(\s*"([^"]*)"\s*,\s*"([^"]*)"\s*,\s*"((?:\\.|[^"\\])*)"\s*\)""")]
     private static partial Regex HotkeyBindingRegex();
+
     // Host confirmation policy: names observed in native help/editor controls imply data loss or exit.
     // Live uiLoadTriggers replaces the whole set; uiSaveTriggers overwrites its profile-relative output.
     // Native help: uiCoverTerrainWithWater flattens/paints the entire map; uiDeleteSelectedUnit deletes the selection.
-    [GeneratedRegex("(saveScenario|LoadTriggers|SaveTriggers|NewScenario|NewMap|Quit|Exit|Restart|ResetMap|ResizeMap|DeleteAll|DeleteSelectedUnit|CoverTerrainWithWater)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(
+        "(saveScenario|LoadTriggers|SaveTriggers|NewScenario|NewMap|Quit|Exit|Restart|ResetMap|ResizeMap|DeleteAll|DeleteSelectedUnit|CoverTerrainWithWater)",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant
+    )]
     private static partial Regex DestructiveCommandRegex();
+
     [GeneratedRegex("[^A-Za-z0-9_]")]
     private static partial Regex InvalidActionNameCharacterRegex();
 }

@@ -52,6 +52,10 @@ Some tools look up game data, like exact unit names for a pantheon, gods, techs 
 
 After a playtest, `editor_xs_diagnostics` reads the game's own XS compile errors from `MythLog.txt`, and `editor_xs_check` is an offline heuristic lint (it never replaces the game log). `editor_help` serves detailed topic guides and `editor_scenario_digest` summarizes a saved scenario in one call. Bulky read tools accept `fields` and `saveTo` to keep results small.
 
+To share a finished scenario, `editor_build_campaign` packages saved scenarios as a campaign mod for the Campaigns menu. It also copies the AI and trigger scripts they need from your profile, so the mod works with nothing else installed. Rerun it with `operation=update` after changes.
+
+To hand the agent positions, write object notes in the editor and save: `editor_unit_notes scenarioPath="latest"` reads them from your newest save and groups near-identical notes. Trigger edits keep track of the export they started from, so an import given that base refuses when the editor's triggers changed in the meantime.
+
 For writing AI, random map and trigger scripts, `editor_xs_api` looks up engine functions and the game's shipped script libraries. The project ships only their signatures and its own short summaries; the game's official help text is read from your install.
 
 ## Good to know
@@ -59,7 +63,7 @@ For writing AI, random map and trigger scripts, `editor_xs_api` looks up engine 
 - **Offline editor only.** Never use it in multiplayer.
 - **Save your work first.** The agent can change and delete things. Edits aren't atomic, and a failed step isn't rolled back.
 - **Game updates** can break support until the project is updated for the new build. Unknown versions are refused instead of guessed.
-- The server starts with a smaller **core** tool set (83 tools). From core the agent can still find and call any of the 900+ **full** tools through `editor_search_tools` and `editor_call`, or switch to the full set when needed.
+- The server starts with a smaller **core** tool set (84 tools). From core the agent can still find and call any of the 900+ **full** tools through `editor_search_tools` and `editor_call`, or switch to the full set when needed.
 - Normal and alternative editor UIs are both supported. Best tested at 2560×1440 and 1920×1080.
 
 ## More docs
