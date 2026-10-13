@@ -2580,6 +2580,55 @@ internal sealed partial class Server
             WorldAreaRequired
         );
         yield return Spec(
+            "editor_camera",
+            "Camera zoom/pitch with live pose readback (zoom = native distance along the view direction to world plane y=0, groundDistance = to the terrain hit, pitchDegrees, yawDegrees, target). operation get | zoom (distance 10..250 via native cameraMaxZoomSet, one corrective dispatch, verified within 0.5; not clamped like the wheel) | pitch (degrees 30..89 via cameraPitchAngle; may reset yaw) | reset (cameraZoomReset + cameraPitchReset, observed defaults 75 / 47°). Mouse-wheel facts reported: positive editor_mouse_wheel steps zoom in, 4 units per notch, clamped 29..85, animated (reads during the animation can fail; retry after ~1.5 s). Camera only.",
+            new Dictionary<string, object>
+            {
+                ["operation"] = new { type = "string", @enum = CameraOperations },
+                ["distance"] = new
+                {
+                    type = "number",
+                    minimum = MinZoom,
+                    maximum = MaxZoom,
+                },
+                ["degrees"] = new
+                {
+                    type = "number",
+                    minimum = MinPitch,
+                    maximum = MaxPitch,
+                },
+            },
+            ["operation"]
+        );
+        yield return Spec(
+            "editor_capture",
+            "Frame a world rectangle and capture it: minimap-center on it, zoom (native, closed loop on projected corners) until the four corners fill the render viewport minus margin (0..0.4, default 0.05), capture, then restore zoom and center (restore default true). Returns an image plus JSON (fits, atLimit, fitSteps poses, framed/before/restored poses), or with saveTo (absolute NEW .png) the full-resolution client saved, returning {savedTo, sha256, width, height}. Areas too big for zoom 250 stop atLimit; tile them with several calls (no stitching). UI panels stay visible (uiToggleUI had no effect in the editor). Normal or alternative UI (minimap geometry auto-detected). Camera only.",
+            new Dictionary<string, object>(area)
+            {
+                ["margin"] = new
+                {
+                    type = "number",
+                    minimum = 0,
+                    maximum = MaxMargin,
+                },
+                ["restore"] = new { type = "boolean" },
+                ["saveTo"] = new { type = "string" },
+                ["maxWidth"] = new
+                {
+                    type = "integer",
+                    minimum = 320,
+                    maximum = Ui.MaxCaptureWidth,
+                },
+                ["resolutionScale"] = new
+                {
+                    type = "number",
+                    minimum = Ui.MinResolutionScale,
+                    maximum = Ui.MaxResolutionScale,
+                },
+            },
+            WorldAreaRequired
+        );
+        yield return Spec(
             "editor_overview",
             "Screenshot annotated with live unit IDs (yellow origin cross + white ID label) for visible objects, plus a JSON legend (id, proto, player, pixel, position, heading). Filters: player, proto substring; maxLabels 1..300 (default 80); maxWidth 320..2560 (default 1280); labelScale 1..4. resolutionScale 0.1..1 (default 1) multiplies output size after maxWidth (0.6 = 60% width/height, ~36% pixels); markers/labels are drawn after scaling so they stay readable. Images consume tokens: recommended to use resolutionScale <1 (e.g. 0.5-0.6) to save context/token cost. Legend pixels stay full-resolution client pixels; imageScale = image/client ratio. includeHelpers (default false): aura/effect/projectile helper objects (shipped proto NotSelectable+NotPlayerPlaceable, or runtime proto absent from proto.xml) are hidden and summarized in hiddenHelpers; true draws them with cyan cross/ID. Stacked labels 'id/id' (each ID in its own color; legend stackedWith): helpers join nearest regular object within 1.5 world units; objects of same kind within 0.25 share a label. Read-only.",
             new Dictionary<string, object>

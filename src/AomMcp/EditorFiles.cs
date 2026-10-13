@@ -188,6 +188,9 @@ internal static class EditorFiles
 
     static readonly string[] ApplyHashes = ["expectedSha256", "expectedLiveSha256"];
 
+    /// <summary>editor_triggers apply scripts modes: warn (report lastKnown only) or restore (Script Manager re-include).</summary>
+    internal static readonly string[] TriggerScriptModes = ["warn", "restore"];
+
     internal static void PreflightTriggers(JsonElement args)
     {
         var operation = args.GetProperty("operation").GetString();
@@ -220,6 +223,7 @@ internal static class EditorFiles
                 "expectedBasePath",
                 "expectedBaseSha256",
                 "confirmDestructive",
+                "scripts",
             ],
             _ => throw new ArgumentException("Unknown trigger operation."),
         };

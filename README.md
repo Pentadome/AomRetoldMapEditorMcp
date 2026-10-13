@@ -65,6 +65,7 @@ For writing AI, random map and trigger scripts, `editor_xs_api` looks up engine 
 - **Game updates** can break support until the project is updated for the new build. Unknown versions are refused instead of guessed.
 - The server starts with a smaller **core** tool set (84 tools). From core the agent can still find and call any of the 900+ **full** tools through `editor_search_tools` and `editor_call`, or switch to the full set when needed.
 - Normal and alternative editor UIs are both supported. Best tested at 2560×1440 and 1920×1080.
+- **Focus.** Screenshots and screen reads work while another window (e.g. your terminal) is in front. Tools that click or type bring the game to the front first. If Windows refuses that (`FOCUS_NOT_GRANTED`), set `AOM_MCP_FOCUS=assertive` in the server environment: it tries harder (including briefly minimising a terminal) and hands focus back to your previous window after each call or batch. `editor_focus` keeps the game in front.
 
 ## More docs
 

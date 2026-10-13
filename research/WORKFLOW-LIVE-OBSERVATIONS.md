@@ -83,3 +83,22 @@ Three new reviewed profiles were researched manually with exact full-resolution 
 | ptn1920a | normal 1920×1080 (Play `(1894,44)`) | 9966f71e… | 8a8ae231… | 3ddb48ed… |
 
 Quit path is identical across UIs at a given size: gear → Paused Quit → YES (2560: `(2528,28)`/`(1280,1008)`/`(1074,782)`; 1920: `(1896,21)`/`(960,756)`/`(805,586)`). The alt-2560 start gate fails closed on the normal UI. Compilation, runtime telemetry and gameplay correctness remain unverified.
+
+## Focus-free capture and focus tiers (C1, 2026-10-13)
+
+Build 100.19.17020.0, normal editor UI, 2560×1440 client (`MythRetold` window). Alternative UI not tested; the capture path does not depend on UI kind.
+
+- **PrintWindow capture.** `PrintWindow(hwnd, dc, PW_CLIENTONLY|PW_RENDERFULLCONTENT)` with the game foreground was pixel-identical to the screen-DC copy (0 of 3,686,400 pixels differed). With a topmost 1400×900 magenta window covering the client, PrintWindow still returned the clean editor frame, and `editor_screenshot` (via MCP) returned it while the cover stayed foreground. `Ui.CapturePixels` now tries PrintWindow first without focusing (validation only). It falls back to the old focused screen copy when the window is minimised, PrintWindow fails, or the frame is all black. Every pixel gate (UI-kind detection, dialog state, playtest profile) uses this path.
+- **Base focus tier.** With Windows Terminal foreground, `editor_focus` in default mode activated the game in ~0.6 s (SetForegroundWindow / AttachThreadInput). No lease is taken by default.
+- **`AOM_MCP_FOCUS=assertive`.** Opt-in tiers after the base tier fails: SwitchToThisWindow; a VK_F24 tap then SetForegroundWindow; minimise a terminal foreground (WindowsTerminal/conhost/OpenConsole/pwsh/powershell/cmd), focus, restore on release. The base tier always succeeded from this harness, so **the extra tiers were not reached live** (untested).
+- **Focus lease.** In assertive mode the window that was foreground before a connection took focus is restored when the connection (one call, or a whole `editor_batch`) is disposed. A plain SetForegroundWindow back to Windows Terminal was refused (foreground lock). Tapping VK_F24 first made it succeed: terminal → game at 0.67 s → terminal at 0.70 s. `editor_focus` drops the lease so the game stays foreground.
+
+## XS Scripts list (C3, 2026-10-13)
+
+Normal UI, 2560x1440, build 100.19.17020.0, scratch scenario with 0 triggers. Script Manager = `gadgetReal("ScriptManager")`, inner window `scriptsDlg`, default position bounds [1052, 192, 454, 604]; list control rect [1075, 356, 410, 235].
+
+- **Include accepts anything.** Typing `zzprobe\does_not_exist.xs` into `scriptsNameEdit` and clicking Include Script listed it; the editor does not check that the file exists. `editor_xs_scripts include` therefore reports `resolution` (profile `trigger\` or stock archive; mod folders not searched).
+- **OCR of backslashes.** `om10\om10_diffbonus.xs` reads as `om10lom10_diffbonus.xs` in the list and in the name field, so `editor_dialog_act setText` refused `TEXT_NOT_VERIFIED`. Text comparison now treats every path separator as possibly read as nothing or one of `l`/`i`/`1` (`DialogState.SameText`; other glyphs exact).
+- **Rows and removal.** Rows are 31 px apart (centers y 386, 417). A click on a row selects it (no visible highlight); Remove Script removed exactly that row, leaving the others in order.
+- **Import reset confirmed.** `editor_triggers apply` (autoBackup) of `research/defense-probe.trg` emptied a one-row list: `scripts="restore"` had to include `om10\om10_diffbonus.xs` again (`action: included`), and the final readback matched. `lastKnown` came from the newest profile save (trigtemp.xs had no include lines).
+- **Not tested.** Alternative UI (no Script Manager signature; refused before input), moved Script Manager windows, lists longer than the 7 visible rows (`mayBeTruncated`), and persistence after save (check with `editor_xs_check scenarioPath="latest"`).

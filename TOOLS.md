@@ -1,6 +1,6 @@
 # Complete Age of Mythology Retold editor MCP tool reference
 
-**Current full: 934 tools = 82 helpers + 434 native commands + 418 shipped editor actions. Default core: 84 = 75 core helpers (incl. `editor_unit_notes`) + nine essential native commands; `editor_call` reaches every other tool from core.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Twelve world editing helpers (core): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
+**Current full: 937 tools = 85 helpers + 434 native commands + 418 shipped editor actions. Default core: 87 = 78 core helpers (incl. `editor_unit_notes`) + nine essential native commands; `editor_call` reaches every other tool from core.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Fourteen world editing helpers (core, incl. `editor_camera`/`editor_capture`): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
 
 Authoritative source: production `aom-retold-editor` `0.1.0` `tools/list` with `--toolset full`, protocol `2025-11-25`. Executable SHA-256: `dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff`.
 
@@ -8,6 +8,8 @@ The catalog below is a historical generated reference from an earlier 28-helper 
 
 ## Recent additions (see live `tools/list` for schemas)
 
+- `editor_xs_scripts` (core): list/verify/include/remove the open scenario's Triggers -> XS Scripts list through the Script Manager dialog, OCR-verified; `editor_triggers apply scripts="restore"` snapshots the list, applies, re-includes the `lastKnown` names that were listed and verifies. Normal UI at the calibrated size only (alternative UI refused before input, untested).
+- `editor_camera` (core): get/zoom/pitch/reset of the editor camera (native `cameraMaxZoomSet`/`cameraPitchAngle`, verified by pose readback). `editor_capture` (core): one framed screenshot of a world rectangle (center + zoom fit, restores the view; `saveTo` writes a full-resolution PNG). `editor_screenshot saveTo` writes the full client PNG.
 - `editor_xs_diagnostics`: reads MythLog.txt XS compile errors (load segmentation, de-duplicated) and the trigtemp.xs rule index.
 - Saved-file readers `editor_unit_notes` (now also core), `editor_scenario_diff`, `editor_players`, `editor_scenario_digest` accept `"latest"` with optional hash pins (echoed with `modifiedUtc`). `editor_unit_notes`: `noteGroups`, `liveMatch`, `fields`/`saveTo`. `editor_scenario_digest`: XS Scripts list, per-player `missingIncludes`, embedded-TR trigger summary.
 - Trigger library: `editor_generate_catalog` also writes `generated/trigger_exemplars.json` (install campaign scenarios, TR v12 only); `editor_trigger_elements library=true` lists those locations (with `sourcePath`/`sourceSha256`) and `encodingProven` per parameter. `editor_trigger_edit` `copyEffects` accepts `sourcePath`+`sourceSha256` (other `.trg` or TR v12 `.mythscn`), and `copyValues` sets proven single-value parameters of copied effects (`UNPROVEN_VARTYPE` otherwise).

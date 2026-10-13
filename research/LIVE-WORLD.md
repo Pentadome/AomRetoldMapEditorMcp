@@ -133,9 +133,30 @@ holds the alternative-UI minimap gate. The profile `UserProfile.xml` option
 | `editor_elevation` | elevation/elevationsample/smooth tools; set = bump + bisected slope sample + test dab + 2 serpentine passes + touch-up dabs |
 | `editor_transform_unit` | exact selection, moveunit drag, `uiRotateSelection(±1)` steps verified by heading readback |
 | `editor_terrain_catalog` | live texture/water/forest/cliff/lighting/civ tables; generated mixes; edit-mode table |
+| `editor_camera` | pose readback (`zoom` = native distance to plane y=0, `groundDistance`, pitch, yaw, target); `cameraMaxZoomSet` / `cameraPitchAngle` / resets with readback verification |
+| `editor_capture` | minimap-center on a world area, native zoom loop on projected corners until they fill the viewport minus margin, capture (image or `saveTo` new full-resolution `.png`), restore zoom + center |
 | `editor_overview` | screenshot + projected unit IDs; `resolutionScale` 0.1..1 shrinks image (labels drawn after scaling, legend pixels stay full-resolution). Helpers (shipped proto `NotSelectable`+`NotPlayerPlaceable`, or runtime proto absent from proto.xml such as `MythUnitDamageAuraGuardians`) hidden by default (`hiddenHelpers`); `includeHelpers=true` shows cyan cross/ID. Labels stack `id/id`: helper joins nearest regular object within 1.5 world units (live auras drift 0.04..0.62 from hero), same-kind objects within 0.25 share. Live-verified 9 Atalanta+aura pairs |
 
 Live verification (2026-10-07, normal UI, 256×256 map): texture by sampling and by palette OCR (row 127 "Greek Dirt 2"),
 mix "Greek Grass 1" (OCR-verified label), water GreekLake, forest GreekOak (29 objects), cliff "Greek Grass";
 elevation set 3.0 / 5.0 / 6.5 (all 110 area nodes within 0.05 after touch-up; ring bleed reported), flatten,
 smooth; House move (error 0.02) + rotate to 270 (quantized from 186.65) and placement with heading 90 (exact).
+
+## Camera zoom and pitch (live probe 2026-10-13, build 100.19.17020.0, normal UI, 2560×1440)
+
+- Default pose: pitch 47°, yaw 45°, native zoom 75, FOV 0.698 rad.
+- `cameraMaxZoomSet(z)` sets the camera distance along the view ray to the **world plane y=0**, exactly and
+  unclamped (2, 30, 60, 80, 120, 250 applied in one dispatch). Evidence: zoom 75 and 120 matched
+  `position.y / sin(pitch)` within 0.01 while the terrain under the view center was y=4 (terrain-hit distance
+  69.53 at zoom 75). The ground pivot does not move. `cameraZoomReset` returns to 75.
+- `cameraPitchAngle(a)` sets pitch about the same pivot (60, 70, 89 tested; zoom kept, yaw stayed 45 from the
+  default yaw). The terrain point under the view center drifts slightly at steep pitch. `cameraPitchReset` → 47°.
+- Mouse wheel (`editor_mouse_wheel` with pointer over the scene): **positive steps zoom in**, 4 units per notch,
+  clamped to 29..85, animated. A pose read during the animation fails with "Map/camera changed during query";
+  a read ~1.5 s later succeeds. `editor_camera` therefore uses the native command, not the wheel.
+- `uiToggleUI` (toggled at zoom 250, screenshot, toggled back, screenshot): both frames identical — top menu bar
+  and minimap stayed. No UI-hiding capture option is offered.
+- `editor_capture` on a 100×100 area: zoom 75 (extent 7.01) → 250 (clamped, 0.76) → 205.84 (0.98, fits);
+  saved 2560×1440 PNG; restore returned zoom 75 and the center within the 3-unit minimap tolerance (~1.8 drift).
+  Alternative UI: not live-tested for these two tools; they only use the minimap path of `editor_camera_look_at`,
+  which is verified on both UIs, plus native commands.

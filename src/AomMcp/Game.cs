@@ -228,20 +228,12 @@ internal sealed class Game : IDisposable
     /// <exception cref="InvalidOperationException">Window identity, mode, or foreground activation is invalid.</exception>
     public void Focus(bool requireEditor = true)
     {
-        if (
-            Process.HasExited
-            || Win.GetWindowThreadProcessId(Window, out var owner) != Thread
-            || owner != Pid
-        )
-            throw new InvalidOperationException(
-                "Game window/process changed; no operation executed."
-            );
-        if (requireEditor)
-            _ = Editor();
+        Validate(requireEditor);
         if (Win.IsIconic(Window))
             _ = Win.ShowWindow(Window, 9); // winuser.h SW_RESTORE=9; returns previous visibility, not success.
         if (Win.GetForegroundWindow() == Window)
             return;
+        var previous = Win.GetForegroundWindow();
         TryForeground();
         // Host activation budget: 25 polls x 20 ms = 500 ms; chosen for queued WM_ACTIVATE,
         // not a guarantee that Windows will grant foreground access (live focus tests).
@@ -262,8 +254,171 @@ internal sealed class Game : IDisposable
             )
                 System.Threading.Thread.Sleep(20);
         }
+        if (Win.GetForegroundWindow() != Window && Assertive)
+            attempts += TryAssertive();
         if (Win.GetForegroundWindow() != Window)
             throw new FocusRefusedException(attempts, ForegroundProcessName());
+        // Focus lease (assertive mode only): the first window we took focus from gets it back on Dispose.
+        if (Assertive && _leaseWindow == 0 && previous != 0 && previous != Window)
+            _leaseWindow = previous;
+    }
+
+    /// <summary>Checks the window still belongs to the connected process/thread (and optionally the editor) without focusing.</summary>
+    /// <param name="requireEditor">True when an active editor context is required.</param>
+    /// <exception cref="InvalidOperationException">Window identity or mode is invalid.</exception>
+    public void Validate(bool requireEditor = true)
+    {
+        if (
+            Process.HasExited
+            || Win.GetWindowThreadProcessId(Window, out var owner) != Thread
+            || owner != Pid
+        )
+            throw new InvalidOperationException(
+                "Game window/process changed; no operation executed."
+            );
+        if (requireEditor)
+            _ = Editor();
+    }
+
+    /// <summary>Environment variable selecting the focus policy.</summary>
+    public const string FocusVariable = "AOM_MCP_FOCUS";
+
+    /// <summary><see cref="FocusVariable"/> value enabling the extra focus tiers and the focus lease.</summary>
+    public const string AssertiveFocus = "assertive";
+
+    /// <summary>True when <see cref="FocusVariable"/> is <see cref="AssertiveFocus"/> (read per call; default off).</summary>
+    public static bool Assertive =>
+        string.Equals(
+            Environment.GetEnvironmentVariable(FocusVariable),
+            AssertiveFocus,
+            StringComparison.OrdinalIgnoreCase
+        );
+
+    /// <summary>Process names treated as terminals by the minimise tier (Windows Terminal, console host, shells).</summary>
+    static readonly string[] TerminalProcesses =
+    [
+        "WindowsTerminal",
+        "conhost",
+        "OpenConsole",
+        "pwsh",
+        "powershell",
+        "cmd",
+    ];
+
+    /// <summary>Unassigned virtual key VK_F24 (winuser.h 0x87) tapped so this process counts as the last input source.</summary>
+    const ushort UnassignedKey = 0x87;
+
+    /// <summary>winuser.h INPUT_KEYBOARD.</summary>
+    const uint KeyboardInput = 1;
+
+    /// <summary>winuser.h KEYEVENTF_KEYUP.</summary>
+    const uint KeyUpFlag = 2;
+
+    /// <summary>AMD64 sizeof(INPUT) (see <see cref="Win.Input"/>).</summary>
+    const int InputSize = 40;
+
+    /// <summary>winuser.h SW_MINIMIZE.</summary>
+    const int MinimizeCommand = 6;
+
+    /// <summary>winuser.h SW_RESTORE.</summary>
+    const int RestoreCommand = 9;
+
+    /// <summary>Per-tier activation wait: polls of <see cref="PollMs"/> (host choice, same budget as the base tier).</summary>
+    const int TierPolls = 25,
+        PollMs = 20;
+
+    /// <summary>Window that held the foreground before this connection took it (assertive mode); restored on Dispose.</summary>
+    nint _leaseWindow;
+
+    /// <summary>True when the minimise tier minimised <see cref="_leaseWindow"/>; Dispose restores it first.</summary>
+    bool _leaseMinimized;
+
+    /// <summary>Opt-in focus tiers (AOM_MCP_FOCUS=assertive): SwitchToThisWindow, F24 tap + SetForegroundWindow, minimise a terminal.</summary>
+    /// <returns>Number of tiers tried.</returns>
+    /// <remarks>The F24 tap goes to whichever window has focus (no game input); input to the game still requires it to be foreground.</remarks>
+    int TryAssertive()
+    {
+        var tiers = 0;
+        bool Wait()
+        {
+            for (var i = 0; i < TierPolls && Win.GetForegroundWindow() != Window; i++)
+                System.Threading.Thread.Sleep(PollMs);
+            return Win.GetForegroundWindow() == Window;
+        }
+        tiers++;
+        Win.SwitchToThisWindow(Window, true);
+        if (Wait())
+            return tiers;
+        tiers++;
+        TapUnassigned();
+        TryForeground();
+        if (Wait())
+            return tiers;
+        var foreground = Win.GetForegroundWindow();
+        var name = ForegroundProcessName();
+        if (
+            foreground == 0
+            || name is null
+            || !TerminalProcesses.Contains(name, StringComparer.OrdinalIgnoreCase)
+        )
+            return tiers;
+        tiers++;
+        _ = Win.ShowWindow(foreground, MinimizeCommand);
+        _leaseWindow = foreground;
+        _leaseMinimized = true;
+        TryForeground();
+        if (!Wait())
+            Win.SwitchToThisWindow(Window, true);
+        _ = Wait();
+        return tiers;
+    }
+
+    /// <summary>Taps VK_F24 so Windows treats this process as the last input source (foreground-lock exemption).</summary>
+    /// <remarks>No application binds F24; the tap reaches whichever window currently has keyboard focus.</remarks>
+    static void TapUnassigned()
+    {
+        Win.Input[] tap =
+        [
+            new()
+            {
+                Type = KeyboardInput,
+                Key = new Win.Key { Vk = UnassignedKey },
+            },
+            new()
+            {
+                Type = KeyboardInput,
+                Key = new Win.Key { Vk = UnassignedKey, Flags = KeyUpFlag },
+            },
+        ];
+        _ = Win.SendInput((uint)tap.Length, tap, InputSize);
+    }
+
+    /// <summary>Drops the focus lease so Dispose leaves the game foreground (explicit editor_focus requests).</summary>
+    public void KeepFocus()
+    {
+        _leaseWindow = 0;
+        _leaseMinimized = false;
+    }
+
+    /// <summary>Gives the foreground back to the leased window (restoring it if the terminal tier minimised it); best effort.</summary>
+    void ReleaseLease()
+    {
+        var window = _leaseWindow;
+        _leaseWindow = 0;
+        if (window == 0 || !Win.IsWindow(window))
+            return;
+        if (_leaseMinimized)
+            _ = Win.ShowWindow(window, RestoreCommand);
+        if (Win.GetForegroundWindow() != Window)
+            return; // Someone else took the foreground meanwhile; leave it.
+        // Live 2026-10-13: a plain SetForegroundWindow back to Windows Terminal was refused (foreground lock);
+        // the F24 tap first makes it succeed.
+        TapUnassigned();
+        Activate(window);
+        for (var i = 0; i < TierPolls && Win.GetForegroundWindow() != window; i++)
+            System.Threading.Thread.Sleep(PollMs);
+        if (Win.GetForegroundWindow() != window)
+            Win.SwitchToThisWindow(window, true);
     }
 
     static readonly int[] FocusBackoffMs = [150, 400];
@@ -287,9 +442,13 @@ internal sealed class Game : IDisposable
         }
     }
 
-    void TryForeground()
+    void TryForeground() => Activate(Window);
+
+    /// <summary>SetForegroundWindow, retried with this thread's input queue attached to the current foreground thread.</summary>
+    /// <param name="target">Window to activate.</param>
+    static void Activate(nint target)
     {
-        if (!Win.SetForegroundWindow(Window))
+        if (!Win.SetForegroundWindow(target))
         {
             // Host buffer 64 bytes covers AMD64 MSG (48); HWND/filter zeros mean all thread messages,
             // PM_NOREMOVE=0 initializes this thread's input queue before AttachThreadInput (Win32).
@@ -302,7 +461,7 @@ internal sealed class Game : IDisposable
                 && Win.AttachThreadInput(own, foreground, true);
             try
             {
-                _ = Win.SetForegroundWindow(Window);
+                _ = Win.SetForegroundWindow(target);
             }
             finally
             {
@@ -329,6 +488,7 @@ internal sealed class Game : IDisposable
     /// <summary>Releases the process handle and process wrapper without closing the game.</summary>
     public void Dispose()
     {
+        ReleaseLease();
         Handle.Dispose();
         Process.Dispose();
     }

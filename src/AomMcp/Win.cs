@@ -149,6 +149,23 @@ internal static class Win
     [DllImport("user32.dll")]
     internal static extern int ShowWindow(nint window, int mode);
 
+    /// <summary>Undocumented-but-exported focus switch (user32 SwitchToThisWindow); used only by the opt-in assertive focus tier.</summary>
+    [DllImport("user32.dll")]
+    internal static extern void SwitchToThisWindow(
+        nint window,
+        [MarshalAs(UnmanagedType.Bool)] bool altTab
+    );
+
+    /// <summary>Copies a window's own rendered content into a DC, independent of overlapping windows (user32 PrintWindow).</summary>
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool PrintWindow(nint window, nint dc, uint flags);
+
+    /// <summary>True while the handle names an existing window (user32 IsWindow).</summary>
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool IsWindow(nint window);
+
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool IsIconic(nint window);

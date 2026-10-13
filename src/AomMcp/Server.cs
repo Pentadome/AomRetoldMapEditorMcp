@@ -442,7 +442,7 @@ internal sealed partial class Server(
                     stagingPath = (string?)null,
                     destinationPath = (string?)null,
                     nextAction = noInput
-                        ? "Bring editor window foreground manually; no input sent. Inspect state before proceeding."
+                        ? "Bring editor window foreground manually (or start the server with AOM_MCP_FOCUS=assertive); no input sent. Inspect state before proceeding."
                     : safeInspection
                         ? "Correct unsupported values/format; no native command or file write occurred."
                     : passedPreflight
@@ -807,7 +807,19 @@ internal sealed partial class Server(
         PreflightWorkflow(name, args);
         PreflightScene(name, args);
         PreflightWorld(name, args);
+        if (CameraNames.Contains(name))
+            PreflightCamera(name, args);
+        if (name == "editor_screenshot" && args.TryGetProperty("saveTo", out var shotPath))
+        {
+            _ = EditorFiles.ApprovedNewPath(shotPath.GetString()!, PngExtension);
+            if (ScreenshotSizing.Any(k => args.TryGetProperty(k, out _)))
+                throw new ArgumentException(
+                    "saveTo writes the full-resolution client; omit maxWidth/region/scale/resolutionScale."
+                );
+        }
         PreflightDialog(name, args);
+        if (name == XsScriptsTool)
+            PreflightXsScripts(args);
         PreflightScript(name, args);
         if (name == "editor_set_diplomacy" && args.GetProperty("operation").GetString() == "apply")
             PlayerWorkflow.PreflightApply(args, exe);
@@ -842,8 +854,12 @@ internal sealed partial class Server(
             return InvokeScene(name, args, batchGame);
         if (WorldNames.Contains(name))
             return InvokeWorld(name, args, batchGame);
+        if (CameraNames.Contains(name))
+            return InvokeCamera(name, args, batchGame);
         if (DialogNames.Contains(name))
             return InvokeDialog(name, args, batchGame);
+        if (name == XsScriptsTool)
+            return InvokeXsScripts(args, batchGame);
         if (ScriptNames.Contains(name))
             return InvokeScript(name, args);
         if (name == "editor_search_tools")
@@ -875,7 +891,7 @@ internal sealed partial class Server(
                 triggerEditing = "editor_trigger_list reads bounded TR v12 exports with player/arg/references filters. editor_trigger_player_parity audits template→target gaps. editor_trigger_edit previews/writes NEW-file patch/clone or up to 64 distinct-trigger edits in one output (value/label replacements, condition/effect removal, duplicates); requires source SHA and expected names, verifies unrelated records. editor_triggers apply requires reviewed live export/hash; game round-trip compared semantically. XS compile/runtime effects unproven.",
                 playerSettings = "editor_players/editor_player_dependency_audit read game-written checkpoints (stances 1 ally, 2 enemy, 3 neutral; 0 self/unset). editor_set_diplomacy changes batches directed cells with per-click RGB gates and one final checkpoint. editor_player_settings supports reviewed fields in both UIs (alternative Players Settings or normal Scenario > Player Data, auto-detected), including AI path via profile Game\\AI (or stock game\\ai) file browser; startAge changes can reset minor gods, requiring observedOnly assertions. Apply is pinned to 2560x1440 or 1920x1080 and requires backups. Player name compares the editable display name. Direct AI-name text entry did not persist. Neither proves XS runtime.",
                 sceneTools = "Core world-space helpers: editor_place_at_world/editor_apply_layout (world X/Z, observed unitIds, optional heading), editor_camera_look_at (minimap closed loop, normal or alternative UI auto-detected; reviewed 2560x1440/1920x1080 layouts, other 16:9 clients 1280..2560 wide get read-only derived geometry with layoutReviewed=false: camera/occluders/OCR presets, world helpers, palette selection untested, writers stay pinned), editor_view_info/editor_ui_state, editor_units_snapshot/diff (undo/redo reidentification), editor_scene_summary, editor_check_footprints, editor_terrain_grid, editor_delete_units (tuple-verified, confirmDestructive). Not saved; no retries.",
-                worldTools = "Core world helpers (research/LIVE-WORLD.md): editor_terrain_info (tile texture/water/passability), editor_live_players (name/team/civ/age/diplomacy without checkpoint), editor_edit_mode (read/enter/exit tool mode, UI kind, paint selections), editor_paint_world (texture/mix/water/forest/cliff along world points), editor_elevation (set/flatten/smooth area), editor_transform_unit (move/rotate with 22.5° steps), editor_terrain_catalog (textures/water/forest/cliff/mixes/lighting/civs/editModes), editor_camera_frame, editor_overview (ID-annotated screenshot), editor_resource_balance, editor_mirror_units, editor_scatter. Strokes use the current brush; verify reports included.",
+                worldTools = "Core world helpers (research/LIVE-WORLD.md): editor_terrain_info (tile texture/water/passability), editor_live_players (name/team/civ/age/diplomacy without checkpoint), editor_edit_mode (read/enter/exit tool mode, UI kind, paint selections), editor_paint_world (texture/mix/water/forest/cliff along world points), editor_elevation (set/flatten/smooth area), editor_transform_unit (move/rotate with 22.5° steps), editor_terrain_catalog (textures/water/forest/cliff/mixes/lighting/civs/editModes), editor_camera_frame, editor_camera (get/zoom/pitch/reset with readback; wheel: positive steps zoom in, clamped 29..85), editor_capture (fit a world area by zoom, capture or saveTo .png, restore camera), editor_overview (ID-annotated screenshot), editor_resource_balance, editor_mirror_units, editor_scatter. Strokes use the current brush; verify reports included.",
                 scenarioEditing = "Never edit .mythscn directly. Use game editor, game-writer checkpoints and normal Load Scenario UI; native loadScenario disabled after crash.",
                 aiScripts = "Computer-player .xs personality must be under active-profile Games\\Age of Mythology Retold\\<id>\\Game\\AI (or its subdirectory); stock scripts/includes resolve from INSTALLPATH\\game\\ai. Profile <id>\\ai (without Game) is not used. Triggers belong in active-profile trigger directory; use filename stems for uiLoadTriggers/uiSaveTriggers.",
                 exportRecovery = "On unknown export outcome, use editor_export_recovery inspect on reported staging path. Recover only to a new file with expectedSha256; no second native dispatch.",
@@ -1088,18 +1104,29 @@ internal sealed partial class Server(
                 (command, a) => _bridge.Execute(game, Catalog.Build(_catalog.Commands[command], a))
             );
         if (name == "editor_triggers")
-            return EditorFiles.Triggers(
-                game,
-                args,
-                (command, a) => _bridge.Execute(game, Catalog.Build(_catalog.Commands[command], a))
-            );
+        {
+            object Apply() =>
+                EditorFiles.Triggers(
+                    game,
+                    args,
+                    (command, a) =>
+                        _bridge.Execute(game, Catalog.Build(_catalog.Commands[command], a))
+                );
+            return
+                args.TryGetProperty("scripts", out var mode) && mode.GetString() == RestoreScripts
+                ? ApplyWithScriptRestore(game, args, Apply)
+                : Apply();
+        }
         if (name == "editor_focus")
         {
             game.Focus();
+            game.KeepFocus();
             return game.State();
         }
         if (name == "editor_ui_read")
             return UiRead.Query(game, args, _layout.ExeSha256);
+        if (name == "editor_screenshot" && args.TryGetProperty("saveTo", out var saveTo))
+            return SaveScreenshot(game, saveTo.GetString()!);
         if (name == "editor_screenshot")
         {
             // Host default 1280 px is half the tested 2560-wide client; region uses full-resolution pixels.
@@ -1112,7 +1139,7 @@ internal sealed partial class Server(
             return new ImageResult(
                 Ui.Screenshot(
                     game,
-                    Int(args, "maxWidth", 1280),
+                    Int(args, "maxWidth", Ui.DefaultScreenshotWidth),
                     region,
                     Int(args, "scale", 1),
                     resolutionScale
@@ -2052,7 +2079,7 @@ internal sealed partial class Server(
         );
         yield return Spec(
             "editor_triggers",
-            "Inspect/validate/legacy-patch strict TR v12 single Always/CodeSnippet controllers; editor_trigger_list/edit handles read-only campaign/preview/new-file patch/clone. export verifies game-writer staging; apply replaces whole trigger set only after expectedSha256 for prepared file AND expectedLivePath/expectedLiveSha256 of reviewed game export; fresh game-written backup must match its trigger/camera semantics (export basenames differ). confirmDestructive=true, guarded round-trip of body/cameras (export-basename metadata may differ). No XS effect/persistence proof; no retry/rollback. autoBackup=true takes the backup itself (no expectedLive*); add expectedBasePath/expectedBaseSha256 (editor_trigger_edit basePath/baseSha256) so a live trigger set changed since that export is refused with LIVE_SOURCE_CHANGED listing differing triggers; without them lostUpdateCheck=\"skipped\". Import RESETS the scenario's Triggers->XS Scripts list (.trg carries none): inspect/validate/apply return xsScripts {warning, lastKnown (trigtemp.xs includes + newest profile save), sources, reAdd}; re-add the scripts before playtesting.",
+            "Inspect/validate/legacy-patch strict TR v12 single Always/CodeSnippet controllers; editor_trigger_list/edit handles read-only campaign/preview/new-file patch/clone. export verifies game-writer staging; apply replaces whole trigger set only after expectedSha256 for prepared file AND expectedLivePath/expectedLiveSha256 of reviewed game export; fresh game-written backup must match its trigger/camera semantics (export basenames differ). confirmDestructive=true, guarded round-trip of body/cameras (export-basename metadata may differ). No XS effect/persistence proof; no retry/rollback. autoBackup=true takes the backup itself (no expectedLive*); add expectedBasePath/expectedBaseSha256 (editor_trigger_edit basePath/baseSha256) so a live trigger set changed since that export is refused with LIVE_SOURCE_CHANGED listing differing triggers; without them lostUpdateCheck=\"skipped\". Import RESETS the scenario's Triggers->XS Scripts list (.trg carries none): inspect/validate/apply return xsScripts {warning, lastKnown (trigtemp.xs includes + newest profile save), sources, reAdd}; re-add the scripts before playtesting. apply scripts=\"restore\" (default \"warn\") reads the Script Manager list first, then re-includes every lastKnown name that matched a listed row and verifies by OCR readback (result {apply, scriptRestore {snapshot, restored, unrestorable, list, verified}}); normal UI at the calibrated size only (otherwise refused before the apply, no input), unrestorable rows must be re-added by hand (editor_xs_scripts).",
             new Dictionary<string, object>
             {
                 ["operation"] = new { type = "string", @enum = TriggerOperations },
@@ -2075,6 +2102,7 @@ internal sealed partial class Server(
                     description = "autoBackup only: editor_trigger_edit basePath. The fresh backup must match it (lost-update check) or LIVE_SOURCE_CHANGED, nothing imported.",
                 },
                 ["expectedBaseSha256"] = new { type = "string" },
+                ["scripts"] = new { type = "string", @enum = EditorFiles.TriggerScriptModes },
             },
             ["operation", "path"]
         );
@@ -2286,7 +2314,7 @@ internal sealed partial class Server(
         // Changes OS foreground only (no editor/scene effect); repeat calls converge on the same state.
         yield return Spec(
             "editor_focus",
-            "Focus/restore game window. Editor only.",
+            "Focus/restore game window and keep it foreground. Editor only. With AOM_MCP_FOCUS=assertive other input tools return focus to the previous window afterwards; this one does not.",
             [],
             [],
             destructive: false,
@@ -2294,7 +2322,7 @@ internal sealed partial class Server(
         );
         yield return Spec(
             "editor_screenshot",
-            "Capture foreground game client PNG. maxWidth default 1280; region [x,y,w,h] uses full-resolution client pixels, optional scale 1..4 nearest (output max 1600×1600). resolutionScale 0.1..1 (default 1) multiplies final output size (e.g. 0.6 = 60% width/height, ~36% pixels) after maxWidth/region/scale. Screenshots consume tokens: recommended to use resolutionScale <1 (e.g. 0.5-0.6) and/or small regions to save context/token cost; pixel coordinates you derive must be mapped back to full-resolution client pixels.",
+            "Capture game client PNG (PrintWindow: no focus needed, covering windows do not leak in; falls back to a focused screen copy). saveTo (absolute NEW .png path, no overwrite) writes the full-resolution client instead and returns only {savedTo, sha256, width, height, bytes}; it excludes maxWidth/region/scale/resolutionScale. maxWidth default 1280; region [x,y,w,h] uses full-resolution client pixels, optional scale 1..4 nearest (output max 1600×1600). resolutionScale 0.1..1 (default 1) multiplies final output size (e.g. 0.6 = 60% width/height, ~36% pixels) after maxWidth/region/scale. Screenshots consume tokens: recommended to use resolutionScale <1 (e.g. 0.5-0.6) and/or small regions to save context/token cost; pixel coordinates you derive must be mapped back to full-resolution client pixels.",
             new Dictionary<string, object>
             {
                 ["maxWidth"] = new
@@ -2323,12 +2351,13 @@ internal sealed partial class Server(
                     maximum = Ui.MaxResolutionScale,
                     @default = 1,
                 },
+                ["saveTo"] = new { type = "string" },
             },
             []
         );
         yield return Spec(
             "editor_ui_read",
-            "Read bounded foreground game-client region with embedded PP-OCRv6 tiny model. Supply region [x,y,w,h] or named field preset (players.<1-12>.<name|civ|control|aiPath|food|...>, agePopup.*, fileBrowser.*) for English normal (Scenario > Player Data) or alternative (Players Settings) UI at reviewed 2560×1440/1920×1080 or derived other 16:9 sizes 1280..2560 wide (layoutReviewed=false; OCR weaker at small sizes), auto-detected by panel pixel gates; optional scale 1..4. Returns OCR text/score/boxes, never proof of field state.",
+            "Read bounded game-client region with embedded PP-OCRv6 tiny model. Supply region [x,y,w,h] or named field preset (players.<1-12>.<name|civ|control|aiPath|food|...>, agePopup.*, fileBrowser.*) for English normal (Scenario > Player Data) or alternative (Players Settings) UI at reviewed 2560×1440/1920×1080 or derived other 16:9 sizes 1280..2560 wide (layoutReviewed=false; OCR weaker at small sizes), auto-detected by panel pixel gates; optional scale 1..4. Returns OCR text/score/boxes, never proof of field state.",
             new Dictionary<string, object>
             {
                 ["region"] = new
@@ -2409,6 +2438,7 @@ internal sealed partial class Server(
             yield return world;
         foreach (var dialog in DialogExtras())
             yield return dialog;
+        yield return XsScriptsSpec();
         foreach (var script in ScriptExtras())
             yield return script;
     }

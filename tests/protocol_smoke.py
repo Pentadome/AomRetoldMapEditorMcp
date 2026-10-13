@@ -1206,12 +1206,30 @@ try:
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
     expected_core = (helper_names - (workflow_names - core_workflow)) | core_native
-    assert len(expected_core) == 84 and len(names) == 934
-    assert {'editor_dialog_state', 'editor_dialog_act'} <= expected_core
+    assert len(expected_core) == 87 and len(names) == 937
+    assert {'editor_dialog_state', 'editor_dialog_act', 'editor_xs_scripts'} <= expected_core
+    # XS Scripts list preflight refuses before any game connection.
+    preflight_refusal_xs = [
+        {'operation': 'include', 'names': ['a.xs']},
+        {'operation': 'include', 'confirmDestructive': True},
+        {'operation': 'remove', 'names': ['a.xs', 'b.xs'], 'confirmDestructive': True},
+        {'operation': 'include', 'names': ['../a.xs'], 'confirmDestructive': True},
+        {'operation': 'include', 'names': ['a.txt'], 'confirmDestructive': True},
+        {'operation': 'verify'},
+    ]
+    for args in preflight_refusal_xs:
+        assert tool('editor_xs_scripts', args)['isError'], args
+    assert tool('editor_triggers', {'operation': 'apply', 'path': 'C:/x.trg', 'scripts': 'bogus'})['isError']
     world_tools = {'editor_terrain_info', 'editor_live_players', 'editor_edit_mode', 'editor_paint_world', 'editor_elevation',
                    'editor_transform_unit', 'editor_terrain_catalog', 'editor_camera_frame', 'editor_overview',
-                   'editor_resource_balance', 'editor_mirror_units', 'editor_scatter'}
+                   'editor_resource_balance', 'editor_mirror_units', 'editor_scatter', 'editor_camera', 'editor_capture'}
     assert world_tools <= expected_core, world_tools - expected_core
+    # Camera/capture preflight refuses before any game connection.
+    for args in ({'operation': 'zoom'}, {'operation': 'pitch'}, {'operation': 'zoom', 'distance': 5}):
+        assert tool('editor_camera', args)['isError']
+    assert tool('editor_capture', {'minX': 10, 'minZ': 10, 'maxX': 5, 'maxZ': 20})['isError']
+    assert tool('editor_capture', {'minX': 1, 'minZ': 1, 'maxX': 5, 'maxZ': 5, 'saveTo': 'relative.png'})['isError']
+    assert tool('editor_screenshot', {'saveTo': 'C:/missing-dir-aommcp/x.png'})['isError']
     scene_tools = {'editor_camera_look_at', 'editor_view_info', 'editor_ui_state', 'editor_place_at_world',
                    'editor_units_snapshot', 'editor_units_diff', 'editor_scene_summary', 'editor_delete_units',
                    'editor_check_footprints', 'editor_terrain_grid', 'editor_apply_layout'}

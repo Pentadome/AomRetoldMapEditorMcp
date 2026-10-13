@@ -14,7 +14,8 @@ internal static class XsScripts
         "The .trg format carries no Triggers -> XS Scripts list, and importing triggers (apply / uiLoadTriggers) resets the scenario's list: "
         + "functions from those scripts stop compiling until the scripts are re-added. Check the list before playtesting.";
     internal const string ReAdd =
-        "Re-add each lastKnown name in the editor: Triggers -> XS Scripts (editor_dialogs / editor_dialog_act), "
+        "Re-add each lastKnown name: editor_xs_scripts operation=include (or apply with scripts=\"restore\"; normal UI only), "
+        + "by hand in Triggers -> XS Scripts otherwise, "
         + "then save. Verify with editor_xs_check scenarioPath=\"latest\" after saving.";
     const long MaxTrigtempBytes = 2_000_000;
 

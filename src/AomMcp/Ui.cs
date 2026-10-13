@@ -27,7 +27,16 @@ internal static class Ui
         return new Win.Input
         {
             Type = 1, // winuser.h INPUT_KEYBOARD=1.
-            Key = new Win.Key { Scan = (ushort)(scan & 0xff), Flags = 8u | (up ? 2u : 0u) | ((scan & 0xff00) != 0 || key is >= 0x21 and <= 0x28 or 0x2d or 0x2e ? 1u : 0u) },
+            Key = new Win.Key
+            {
+                Scan = (ushort)(scan & 0xff),
+                Flags =
+                    8u
+                    | (up ? 2u : 0u)
+                    | (
+                        (scan & 0xff00) != 0 || key is >= 0x21 and <= 0x28 or 0x2d or 0x2e ? 1u : 0u
+                    ),
+            },
         };
     }
 
@@ -111,14 +120,24 @@ internal static class Ui
         var path = new List<(int X, int Y)>();
         for (var s = 1; s < points.Count; s++)
         {
-            var (ax, ay) = points[s - 1]; var (bx, by) = points[s];
-            var n = Math.Max(1, (int)Math.Ceiling(Math.Sqrt((double)(bx - ax) * (bx - ax) + (double)(by - ay) * (by - ay)) / 20));
-            for (var i = 1; i <= n; i++) path.Add((ax + (bx - ax) * i / n, ay + (by - ay) * i / n));
+            var (ax, ay) = points[s - 1];
+            var (bx, by) = points[s];
+            var n = Math.Max(
+                1,
+                (int)
+                    Math.Ceiling(
+                        Math.Sqrt((double)(bx - ax) * (bx - ax) + (double)(by - ay) * (by - ay))
+                            / 20
+                    )
+            );
+            for (var i = 1; i <= n; i++)
+                path.Add((ax + (bx - ax) * i / n, ay + (by - ay) * i / n));
         }
         if (path.Count < 20)
         {
             var last = path.Count > 0 ? path[^1] : points[0];
-            while (path.Count < 20) path.Add(last); // Stationary dwell keeps the press visible for frame-polled tools.
+            while (path.Count < 20)
+                path.Add(last); // Stationary dwell keeps the press visible for frame-polled tools.
         }
         // Without a settle the press could land at the stale previous pointer position (observed: first drag
         // segment started away from x1,y1; 80 ms was not always enough for brush tools). Empirical, not engine.
@@ -222,7 +241,11 @@ internal static class Ui
             "END" => 0x23,
             "PGUP" or "PAGEUP" => 0x21,
             "PGDN" or "PAGEDOWN" => 0x22,
-            _ => throw new ArgumentException("Unsupported key '" + name + "'. Use A-Z, 0-9, F1-F12, ESC, ENTER, TAB, SPACE, LEFT/UP/RIGHT/DOWN, DELETE, BACKSPACE, HOME, END, PGUP, PGDN."),
+            _ => throw new ArgumentException(
+                "Unsupported key '"
+                    + name
+                    + "'. Use A-Z, 0-9, F1-F12, ESC, ENTER, TAB, SPACE, LEFT/UP/RIGHT/DOWN, DELETE, BACKSPACE, HOME, END, PGUP, PGDN."
+            ),
         };
     }
 
@@ -255,47 +278,82 @@ internal static class Ui
     /// <param name="game">Validated game connection; editor mode is not required for observation.</param>
     /// <param name="maxWidth">Maximum output width from 320 to 2560 pixels; no upscaling.</param>
     /// <returns>PNG bytes at the client's aspect ratio.</returns>
-    /// <remarks>Captures screen pixels, so overlays must not cover the game client.</remarks>
+    /// <remarks>Reads the window's own surface via PrintWindow without focusing; falls back to a focused screen copy.</remarks>
     public static byte[] Screenshot(Game game, int maxWidth) => Screenshot(game, maxWidth, null, 1);
 
-    /// <summary>Host token-saving policy: 0.1..1 multiplies final output size; 1 keeps prior behavior.</summary>
-    public const double MinResolutionScale = 0.1, MaxResolutionScale = 1;
+    /// <summary>Host capture width cap (tested 2560-wide client).</summary>
+    internal const int MaxCaptureWidth = 2560;
 
-    public static byte[] Screenshot(Game game, int maxWidth, int[]? region, int scale, double resolutionScale = 1)
+    /// <summary>Host default screenshot width: half the tested 2560-wide client.</summary>
+    internal const int DefaultScreenshotWidth = 1280;
+
+    /// <summary>Host token-saving policy: 0.1..1 multiplies final output size; 1 keeps prior behavior.</summary>
+    public const double MinResolutionScale = 0.1,
+        MaxResolutionScale = 1;
+
+    public static byte[] Screenshot(
+        Game game,
+        int maxWidth,
+        int[]? region,
+        int scale,
+        double resolutionScale = 1
+    )
     {
-        if (scale is < 1 or > 4) throw new ArgumentException("Screenshot scale must be 1..4.");
-        if (region is null && scale != 1) throw new ArgumentException("scale requires region.");
-        if (!double.IsFinite(resolutionScale) || resolutionScale < MinResolutionScale || resolutionScale > MaxResolutionScale)
+        if (scale is < 1 or > 4)
+            throw new ArgumentException("Screenshot scale must be 1..4.");
+        if (region is null && scale != 1)
+            throw new ArgumentException("scale requires region.");
+        if (
+            !double.IsFinite(resolutionScale)
+            || resolutionScale < MinResolutionScale
+            || resolutionScale > MaxResolutionScale
+        )
             throw new ArgumentException("Screenshot resolutionScale must be 0.1..1.");
         // Full frame: GDI HALFTONE scales once straight to the reduced size (no second resample).
-        var (width, height, pixels) = CapturePixels(game, region is null ? maxWidth : 2560, region is null ? resolutionScale : 1);
-        if (region is null) return Png(width, height, pixels);
+        var (width, height, pixels) = CapturePixels(
+            game,
+            region is null ? maxWidth : 2560,
+            region is null ? resolutionScale : 1
+        );
+        if (region is null)
+            return Png(width, height, pixels);
         var (clientWidth, clientHeight) = ClientSize(game);
         if (clientWidth != width || clientHeight != height)
-            throw new ArgumentException("Region requires full-resolution client ≤2560 pixels wide.");
+            throw new ArgumentException(
+                "Region requires full-resolution client ≤2560 pixels wide."
+            );
         var crop = CropZoom(pixels, width, height, region, scale);
         var small = Downscale(crop.Bgra, crop.Width, crop.Height, resolutionScale);
         return Png(small.Width, small.Height, small.Bgra);
     }
 
     /// <summary>Area-average (box) downscale of BGRA pixels; factor 1 returns the input unchanged.</summary>
-    internal static (int Width, int Height, byte[] Bgra) Downscale(byte[] pixels, int width, int height, double factor)
+    internal static (int Width, int Height, byte[] Bgra) Downscale(
+        byte[] pixels,
+        int width,
+        int height,
+        double factor
+    )
     {
-        if (factor >= 1) return (width, height, pixels);
-        int w = Math.Max(1, (int)Math.Round(width * factor)), h = Math.Max(1, (int)Math.Round(height * factor));
+        if (factor >= 1)
+            return (width, height, pixels);
+        int w = Math.Max(1, (int)Math.Round(width * factor)),
+            h = Math.Max(1, (int)Math.Round(height * factor));
         var dest = new byte[checked(w * h * 4)];
         Span<int> sum = stackalloc int[4];
         for (var row = 0; row < h; row++)
         {
-            int y0 = row * height / h, y1 = Math.Max(y0 + 1, (row + 1) * height / h);
+            int y0 = row * height / h,
+                y1 = Math.Max(y0 + 1, (row + 1) * height / h);
             for (var col = 0; col < w; col++)
             {
-                int x0 = col * width / w, x1 = Math.Max(x0 + 1, (col + 1) * width / w);
+                int x0 = col * width / w,
+                    x1 = Math.Max(x0 + 1, (col + 1) * width / w);
                 sum.Clear();
                 for (var y = y0; y < y1; y++)
-                    for (var x = x0; x < x1; x++)
-                        for (var c = 0; c < 4; c++)
-                            sum[c] += pixels[(y * width + x) * 4 + c];
+                for (var x = x0; x < x1; x++)
+                for (var c = 0; c < 4; c++)
+                    sum[c] += pixels[(y * width + x) * 4 + c];
                 var count = (y1 - y0) * (x1 - x0);
                 for (var c = 0; c < 4; c++)
                     dest[(row * w + col) * 4 + c] = (byte)((sum[c] + count / 2) / count);
@@ -310,30 +368,62 @@ internal static class Ui
         return (rect.Right, rect.Bottom);
     }
 
-    internal static (int Width, int Height, byte[] Bgra) CropZoom(byte[] pixels, int width, int height, int[] region, int scale)
+    internal static (int Width, int Height, byte[] Bgra) CropZoom(
+        byte[] pixels,
+        int width,
+        int height,
+        int[] region,
+        int scale
+    )
     {
-        if (region.Length != 4 || scale is < 1 or > 4) throw new ArgumentException("Region [x,y,w,h] and scale 1..4 required.");
+        if (region.Length != 4 || scale is < 1 or > 4)
+            throw new ArgumentException("Region [x,y,w,h] and scale 1..4 required.");
         var (x, y, w, h) = (region[0], region[1], region[2], region[3]);
-        if (x < 0 || y < 0 || w < 1 || h < 1 || (long)x + w > width || (long)y + h > height
-            || (long)w * scale > 1600 || (long)h * scale > 1600 || pixels.Length != checked(width * height * 4))
-            throw new ArgumentException($"Screenshot crop outside client/output bounds: region must lie inside the {width}x{height} client and width/height x scale must be <=1600 output pixels.");
+        if (
+            x < 0
+            || y < 0
+            || w < 1
+            || h < 1
+            || (long)x + w > width
+            || (long)y + h > height
+            || (long)w * scale > 1600
+            || (long)h * scale > 1600
+            || pixels.Length != checked(width * height * 4)
+        )
+            throw new ArgumentException(
+                $"Screenshot crop outside client/output bounds: region must lie inside the {width}x{height} client and width/height x scale must be <=1600 output pixels."
+            );
         var dest = new byte[checked(w * scale * h * scale * 4)];
         for (var row = 0; row < h * scale; row++)
-            for (var col = 0; col < w * scale; col++)
-                pixels.AsSpan(((y + row / scale) * width + x + col / scale) * 4, 4)
-                    .CopyTo(dest.AsSpan((row * w * scale + col) * 4, 4));
+        for (var col = 0; col < w * scale; col++)
+            pixels
+                .AsSpan(((y + row / scale) * width + x + col / scale) * 4, 4)
+                .CopyTo(dest.AsSpan((row * w * scale + col) * 4, 4));
         return (w * scale, h * scale, dest);
     }
 
-    internal static (int Width, int Height, byte[] Bgra) CapturePixels(Game game, int maxWidth, double resolutionScale = 1)
+    internal static (int Width, int Height, byte[] Bgra) CapturePixels(
+        Game game,
+        int maxWidth,
+        double resolutionScale = 1
+    )
     {
         // Host output/allocation policy: 320..2560 px, default 1280 in Server; 2560 matches tested client.
         // 80 ms below allows focus/render to settle; timing is empirical, not a GDI requirement.
         if (maxWidth is < 320 or > 2560)
             throw new ArgumentException("Screenshot maxWidth 320..2560.");
-        if (!double.IsFinite(resolutionScale) || resolutionScale < MinResolutionScale || resolutionScale > MaxResolutionScale)
+        if (
+            !double.IsFinite(resolutionScale)
+            || resolutionScale < MinResolutionScale
+            || resolutionScale > MaxResolutionScale
+        )
             throw new ArgumentException("Screenshot resolutionScale must be 0.1..1.");
-        game.Focus(requireEditor: false); // Read-only observation also works during playtest.
+        // Focus-free first: PrintWindow reads the game's own surface, so other windows never leak in
+        // (live 2026-10-13: pixel-identical to the screen copy while foreground, unchanged under a topmost cover).
+        game.Validate(requireEditor: false); // Read-only observation also works during playtest.
+        if (!Win.IsIconic(game.Window) && WindowPixels(game, maxWidth, resolutionScale) is { } own)
+            return own;
+        game.Focus(requireEditor: false);
         Thread.Sleep(80);
         Win.Check(Win.GetClientRect(game.Window, out var rect), "GetClientRect");
         var origin = new Win.Point();
@@ -411,6 +501,108 @@ internal static class Ui
         }
     }
 
+    /// <summary>winuser.h PW_CLIENTONLY | PW_RENDERFULLCONTENT (Windows 8.1+, reads DirectX/DWM content).</summary>
+    const uint PrintClientFull = 1 | 2;
+
+    /// <summary>wingdi.h SRCCOPY raster operation.</summary>
+    const uint SourceCopy = 0x00cc0020;
+
+    /// <summary>wingdi.h HALFTONE stretch mode.</summary>
+    const int Halftone = 4;
+
+    /// <summary>sizeof(BITMAPINFOHEADER) (wingdi.h); also the header's own size field.</summary>
+    const int BitmapHeaderSize = 40;
+
+    /// <summary>BITMAPINFOHEADER offsets (wingdi.h): width, height (negative = top-down), planes, bit count.</summary>
+    const int HeaderWidth = 4,
+        HeaderHeight = 8,
+        HeaderPlanes = 12,
+        HeaderBits = 14;
+
+    /// <summary>32-bit BGRA pixels.</summary>
+    const short BgraBits = 32;
+
+    /// <summary>Client pixels via PrintWindow without focus; null when the call fails or returns an all-black frame.</summary>
+    /// <param name="game">Validated game connection.</param>
+    /// <param name="maxWidth">Maximum output width (already bounds-checked).</param>
+    /// <param name="resolutionScale">Output size factor (already bounds-checked).</param>
+    static (int Width, int Height, byte[] Bgra)? WindowPixels(
+        Game game,
+        int maxWidth,
+        double resolutionScale
+    )
+    {
+        Win.Check(Win.GetClientRect(game.Window, out var rect), "GetClientRect");
+        int sw = rect.Right,
+            sh = rect.Bottom;
+        if (sw < 1 || sh < 1)
+            return null;
+        int width = Math.Max(1, (int)Math.Round(Math.Min(sw, maxWidth) * resolutionScale)),
+            height = Math.Max(1, sh * width / sw);
+        nint screen = Win.GetDC(0),
+            full = Win.CreateCompatibleDC(screen),
+            fullBitmap = Win.CreateCompatibleBitmap(screen, sw, sh),
+            dc = Win.CreateCompatibleDC(screen),
+            bitmap = Win.CreateCompatibleBitmap(screen, width, height);
+        nint oldFull = 0,
+            old = 0;
+        try
+        {
+            if (screen == 0 || full == 0 || fullBitmap == 0 || dc == 0 || bitmap == 0)
+                return null;
+            oldFull = Win.SelectObject(full, fullBitmap);
+            old = Win.SelectObject(dc, bitmap);
+            if (
+                oldFull is 0 or -1
+                || old is 0 or -1
+                || !Win.PrintWindow(game.Window, full, PrintClientFull)
+            )
+                return null;
+            // Same HALFTONE (4) + brush-origin reset and SRCCOPY as the screen path, so scaled output matches it.
+            Win.Check(
+                Win.SetStretchBltMode(dc, Halftone) != 0 && Win.SetBrushOrgEx(dc, 0, 0, 0),
+                "Set halftone scaling"
+            );
+            Win.Check(
+                Win.StretchBlt(dc, 0, 0, width, height, full, 0, 0, sw, sh, SourceCopy),
+                "Scale window capture"
+            );
+            Win.SelectObject(dc, old);
+            old = 0;
+            var header = new byte[BitmapHeaderSize];
+            BinaryPrimitives.WriteInt32LittleEndian(header, BitmapHeaderSize);
+            BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(HeaderWidth), width);
+            BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(HeaderHeight), -height);
+            BinaryPrimitives.WriteInt16LittleEndian(header.AsSpan(HeaderPlanes), 1);
+            BinaryPrimitives.WriteInt16LittleEndian(header.AsSpan(HeaderBits), BgraBits);
+            var pixels = new byte[checked(width * height * 4)];
+            if (Win.GetDIBits(dc, bitmap, 0, (uint)height, pixels, header, 0) != height)
+                return null;
+            // An all-black frame means the window had nothing to give (e.g. not yet composed); use the screen path.
+            for (var i = 0; i < pixels.Length; i += 4)
+                if ((pixels[i] | pixels[i + 1] | pixels[i + 2]) != 0)
+                    return (width, height, pixels);
+            return null;
+        }
+        finally
+        {
+            if (oldFull is not 0 and not -1)
+                Win.SelectObject(full, oldFull);
+            if (old is not 0 and not -1)
+                Win.SelectObject(dc, old);
+            if (fullBitmap != 0)
+                Win.DeleteObject(fullBitmap);
+            if (bitmap != 0)
+                Win.DeleteObject(bitmap);
+            if (full != 0)
+                Win.DeleteDC(full);
+            if (dc != 0)
+                Win.DeleteDC(dc);
+            if (screen != 0)
+                Win.Check(Win.ReleaseDC(0, screen) != 0, "Release screen DC");
+        }
+    }
+
     // PNG is three small chunks; stdlib zlib keeps screenshot transport dependency-free.
     internal static byte[] Png(int width, int height, byte[] bgra)
     {
@@ -477,17 +669,74 @@ internal static class Ui
         // Test fixture: one red BGRA pixel; PNG signature matches spec above.
         // Enter scan=0x1c (PC scan set 1); End down=SCANCODE|EXTENDED=9, up adds KEYUP=11.
         var png = Png(1, 1, [0, 0, 255, 0]);
-        var crop = CropZoom([0, 0, 0, 0, 0, 0, 255, 0, 0, 255, 0, 0, 0, 0, 0, 0], 2, 2, [1, 0, 1, 1], 2);
-        if (crop.Width != 2 || crop.Height != 2 || crop.Bgra.Length != 16
+        var crop = CropZoom(
+            [0, 0, 0, 0, 0, 0, 255, 0, 0, 255, 0, 0, 0, 0, 0, 0],
+            2,
+            2,
+            [1, 0, 1, 1],
+            2
+        );
+        if (
+            crop.Width != 2
+            || crop.Height != 2
+            || crop.Bgra.Length != 16
             || !crop.Bgra.AsSpan(0, 4).SequenceEqual(new byte[] { 0, 0, 255, 0 })
-            || !crop.Bgra.AsSpan(12, 4).SequenceEqual(new byte[] { 0, 0, 255, 0 }))
-            throw new InvalidOperationException("Screenshot region/nearest scale self-test failed.");
+            || !crop.Bgra.AsSpan(12, 4).SequenceEqual(new byte[] { 0, 0, 255, 0 })
+        )
+            throw new InvalidOperationException(
+                "Screenshot region/nearest scale self-test failed."
+            );
         // 4x2 fixture: left 2x2 block blue=0/200 averages 100, right block constant 50; 0.5 -> 2x1.
-        var half = Downscale([0, 0, 0, 0, 200, 0, 0, 0, 50, 0, 0, 0, 50, 0, 0, 0,
-                              200, 0, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 50, 0, 0, 0], 4, 2, 0.5);
-        if (half.Width != 2 || half.Height != 1 || half.Bgra[0] != 100 || half.Bgra[4] != 50
-            || Downscale(png, 1, 1, 1).Bgra != png || Downscale([1, 2, 3, 4], 1, 1, 0.1).Width != 1)
-            throw new InvalidOperationException("Screenshot resolutionScale downscale self-test failed.");
+        var half = Downscale(
+            [
+                0,
+                0,
+                0,
+                0,
+                200,
+                0,
+                0,
+                0,
+                50,
+                0,
+                0,
+                0,
+                50,
+                0,
+                0,
+                0,
+                200,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                50,
+                0,
+                0,
+                0,
+                50,
+                0,
+                0,
+                0,
+            ],
+            4,
+            2,
+            0.5
+        );
+        if (
+            half.Width != 2
+            || half.Height != 1
+            || half.Bgra[0] != 100
+            || half.Bgra[4] != 50
+            || Downscale(png, 1, 1, 1).Bgra != png
+            || Downscale([1, 2, 3, 4], 1, 1, 0.1).Width != 1
+        )
+            throw new InvalidOperationException(
+                "Screenshot resolutionScale downscale self-test failed."
+            );
         if (
             !png.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 })
             || VirtualKey("F12") != 0x7b
