@@ -198,6 +198,9 @@ internal static class TriggerEdits
 
     internal static void Preflight(JsonElement args)
     {
+        foreach (var key in TopKeysRequired)
+            if (!args.TryGetProperty(key, out _))
+                throw new ArgumentException($"Missing required argument '{key}'.");
         var batch = args.TryGetProperty("edits", out var list);
         if (batch)
         {
@@ -362,8 +365,21 @@ internal static class TriggerEdits
         }
     }
 
+    /// <summary>Keys every edit (single-operation arguments or one edits[] entry) must carry.</summary>
+    static readonly string[] EditKeysRequired = ["operation", "triggerId", "expectedName"];
+
+    /// <summary>Top-level keys every editor_trigger_edit call must carry.</summary>
+    static readonly string[] TopKeysRequired = ["path", "expectedSha256"];
+
+    /// <summary>Checks one edit's required and allowed keys and value shapes.</summary>
+    /// <param name="entry">Single-operation arguments or one edits[] entry.</param>
     static void ValidateEdit(JsonElement entry)
     {
+        foreach (var key in EditKeysRequired)
+            if (!entry.TryGetProperty(key, out _))
+                throw new ArgumentException(
+                    $"Missing required argument '{key}' (each edit needs operation patch|clone, triggerId and expectedName)."
+                );
         Catalog.ValidateObject(
             entry,
             [

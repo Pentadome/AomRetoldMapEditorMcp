@@ -613,6 +613,8 @@ try:
     assert tool('editor_trigger_edit', {'path': edit_args['path'], 'expectedSha256': edit_args['expectedSha256'],
                                         'edits': [{**per_edit, 'allowRawXsInjection': True}]})['isError']  # top-level only
     assert tool('editor_trigger_edit', {**edit_args, 'expectedSha256': '0' * 64})['isError']
+    no_op = tool('editor_trigger_edit', {k: v for k, v in edit_args.items() if k != 'operation'})
+    assert no_op['isError'] and "'operation'" in json.dumps(no_op['structuredContent']), no_op  # named, not KeyNotFound
     # autoBackup replaces the reviewed live export: passing both, or a stale prepared hash, must refuse before any game call.
     auto_args = {'operation': 'apply', 'path': str(original), 'expectedSha256': listed['structuredContent']['sha256'], 'autoBackup': True, 'confirmDestructive': True, 'scripts': 'ignore'}
     assert tool('editor_triggers', {**auto_args, 'expectedLivePath': str(original)})['isError']
