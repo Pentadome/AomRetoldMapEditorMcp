@@ -188,8 +188,9 @@ internal static class EditorFiles
 
     static readonly string[] ApplyHashes = ["expectedSha256", "expectedLiveSha256"];
 
-    /// <summary>editor_triggers apply scripts modes: warn (report lastKnown only) or restore (Script Manager re-include).</summary>
-    internal static readonly string[] TriggerScriptModes = ["warn", "restore"];
+    /// <summary>editor_triggers apply scripts modes: restore (Script Manager re-include) or ignore (report lastKnown only).
+    /// One is required when lastKnown is non-empty (plan A1).</summary>
+    internal static readonly string[] TriggerScriptModes = ["restore", "ignore"];
 
     internal static void PreflightTriggers(JsonElement args)
     {
@@ -257,7 +258,16 @@ internal static class EditorFiles
             if (operation == "apply")
             {
                 Confirm(args, "confirmDestructive");
-                _ = ProfileDirectory(args, "trigger");
+                var triggerDirectory = ProfileDirectory(args, "trigger");
+                if (!args.TryGetProperty("scripts", out _))
+                {
+                    var (known, _) = XsScripts.LastKnown(triggerDirectory);
+                    if (known.Length > 0)
+                        throw new ArgumentException(
+                            $"Import resets the Triggers -> XS Scripts list and lastKnown is not empty ({string.Join(", ", known.Select(k => k.Name))}): "
+                                + "pass scripts=\"restore\" (re-include through the Script Manager, normal UI) or scripts=\"ignore\" (re-add by hand)."
+                        );
+                }
                 var auto =
                     args.TryGetProperty("autoBackup", out var autoFlag) && autoFlag.GetBoolean();
                 if (

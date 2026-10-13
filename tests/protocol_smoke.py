@@ -190,6 +190,8 @@ def assert_workflow_tools():
             assert sha(other) == registered['expectedProfileSha256'], registered
             assert success('editor_playtest', {'operation': 'preview', 'profilePath': str(other), 'expectedProfileSha256': registered['expectedProfileSha256']})['reviewed'], registered
         refusal('editor_playtest', {'operation': 'quit', 'token': 'foreign_host', 'confirmQuit': True})
+        refusal('editor_playtest', {'operation': 'dismiss', 'token': 'foreign_host', 'confirmDismiss': True})
+        refusal('editor_playtest', {'operation': 'dismiss', 'token': 'foreign_host'})
         caps = success('editor_capabilities', {})['workflowTools']
         assert set(caps['names']) == workflow_names - core_workflow and caps['alsoInCore'] == sorted(core_workflow) and caps['playtest']['available'] and caps['playtest']['profileCount'] == 4 and not caps['telemetry']['available'], caps
 
@@ -612,7 +614,7 @@ try:
                                         'edits': [{**per_edit, 'allowRawXsInjection': True}]})['isError']  # top-level only
     assert tool('editor_trigger_edit', {**edit_args, 'expectedSha256': '0' * 64})['isError']
     # autoBackup replaces the reviewed live export: passing both, or a stale prepared hash, must refuse before any game call.
-    auto_args = {'operation': 'apply', 'path': str(original), 'expectedSha256': listed['structuredContent']['sha256'], 'autoBackup': True, 'confirmDestructive': True}
+    auto_args = {'operation': 'apply', 'path': str(original), 'expectedSha256': listed['structuredContent']['sha256'], 'autoBackup': True, 'confirmDestructive': True, 'scripts': 'ignore'}
     assert tool('editor_triggers', {**auto_args, 'expectedLivePath': str(original)})['isError']
     assert tool('editor_triggers', {**auto_args, 'expectedSha256': '0' * 64})['isError']
     # Lost-update check: base pins go together, only with autoBackup, and a stale base hash refuses before any game call.
@@ -627,6 +629,9 @@ try:
     assert controller['serializationRoundTripVerified']
     xs_scripts = controller['xsScripts']  # import resets Triggers->XS Scripts; lastKnown depends on the local profile
     assert 'resets' in xs_scripts['warning'] and xs_scripts['reAdd'] and isinstance(xs_scripts['lastKnown'], list) and xs_scripts['sources'], xs_scripts
+    if xs_scripts['lastKnown']:  # a scripts choice is required before any game call
+        no_choice = {k: v for k, v in auto_args.items() if k != 'scripts'}
+        assert 'scripts=' in json.dumps(tool('editor_triggers', no_choice))
     assert controller['triggers'][0]['name'] == 'Defense_Controller'
     with tempfile.TemporaryDirectory(prefix='aom-trigger-test-') as temporary:
         output = pathlib.Path(temporary) / 'patched.trg'

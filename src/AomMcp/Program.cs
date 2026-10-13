@@ -115,6 +115,7 @@ if (selfTest)
     RuntimeReport.SelfTest();
     RuntimeTelemetry.SelfTest();
     PlaytestWorkflow.SelfTest();
+    PlaytestDialogs.SelfTest();
     ExportFormats.SelfTest();
     EditorFiles.SelfTest();
     ScenarioChecks.SelfTest();

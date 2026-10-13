@@ -102,3 +102,14 @@ Normal UI, 2560x1440, build 100.19.17020.0, scratch scenario with 0 triggers. Sc
 - **Rows and removal.** Rows are 31 px apart (centers y 386, 417). A click on a row selects it (no visible highlight); Remove Script removed exactly that row, leaving the others in order.
 - **Import reset confirmed.** `editor_triggers apply` (autoBackup) of `research/defense-probe.trg` emptied a one-row list: `scripts="restore"` had to include `om10\om10_diffbonus.xs` again (`action: included`), and the final readback matched. `lastKnown` came from the newest profile save (trigtemp.xs had no include lines).
 - **Not tested.** Alternative UI (no Script Manager signature; refused before input), moved Script Manager windows, lists longer than the 7 visible rows (`mayBeTruncated`), and persistence after save (check with `editor_xs_check scenarioPath="latest"`).
+
+## Playtest compile gate (C4, 2026-10-13)
+
+Build 100.19.17020.0, normal editor UI, 2560x1440, scratch scenario with one active trigger `C4_BadFor` whose code snippet is `for (int i = 0; < 3) { trChatSend(0, "c4 loop"); }`.
+
+- **Dialog.** Play wrote `trigger\trigtemp.xs` (the bad `for` at line 14) and showed a modal "Trigger Error." dialog with one OK button (title y 421, OK (1281,1004)), text: `trigtemp.xs(14): XS: Error 0172: ')' is not a valid operator.`, `... Error: parseExpression failed.`, `... Error 0139: parseForLoop failed.`, `... Error 0273: could not parse the code for '_C4_BadFor' rule.`, `XS: Error: could not compile file 'trigtemp.xs'.`
+- **MythLog has none of it.** The playtest load (`~testing.mythscn`) logged 0 diagnostics; trigger compile errors exist only in the dialog. S2/S3 saw the same (their `om10\om10_diffbonus.xs(158)` 0172 also came from the dialog).
+- **OCR.** PaddleOCR reads the game's old-style numerals as letters (`o172`, `oi39`); `PlaytestDialogs` maps o/O to 0 and i/I/l to 1 in codes and line numbers. Unscaled reads (scale 1) are clean; a tile edge through a line garbles it, so tiles overlap by 100 px and edge lines are taken from the neighbour tile.
+- **Flow.** `editor_playtest start` returned `state:"dialog"` with five parsed entries and the trigtemp excerpt; `dismiss` re-read the dialog, clicked OK and reached the playing gate (the game plays on with the trigger missing); `inspect` and `quit` then returned to the editor. Runs `c4run2`/`c4run3`.
+- **Quit hover.** In `c4run2` the Paused-menu Quit click was lost (gate matched, no confirm within 15 s; session became unknown, recovered by hand). With the hover settle raised from 80 ms to 300 ms, `c4run3` quit cleanly. Cause not proven.
+- **Not tested.** Alternative UI and 1920x1080 dialog reads, AI error dialogs (kind `AIError` is assumed by analogy), dialogs with Next/Close, several dialogs in a row, runtime (non-compile) error dialogs during play.
