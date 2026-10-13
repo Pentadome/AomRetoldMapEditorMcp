@@ -51,7 +51,7 @@ internal sealed partial class Server
             XsScriptsTool,
             "Read or edit the open scenario's Triggers -> XS Scripts list through the Script Manager dialog (opened if needed and closed again unless keepOpen). "
                 + "operation=list (OCR rows) | verify (names = the complete expected list; verified=true only when each name matches exactly one row and nothing else is listed) | "
-                + "include (types each missing name into the name field, clicks Include Script, verifies one new matching row; already listed names are skipped; result.resolution says whether the name resolves under the profile trigger\\ folder or the stock archive; confirmDestructive=true) | "
+                + "include (types each missing name into the name field, clicks Include Script, verifies one new matching row; already listed names are skipped; result.resolution says whether the name resolves under the profile trigger\\ folder, an enabled mod's trigger\\ folder (mods\\myth-mod-status.json) or the stock archive; confirmDestructive=true) | "
                 + "remove (exactly one name; clicks its row, then Remove Script, verifies the list lost only that row; confirmDestructive=true). "
                 + "Names are relative .xs paths as the editor lists them, e.g. om10\\om10_diffbonus.xs. The editor accepts names that do not exist. Changes stay in the open scenario until it is saved. "
                 + "Live-verified on the normal UI at 2560x1440; the alternative UI and moved windows are not calibrated and are refused before any input (re-add by hand there). "
@@ -267,7 +267,7 @@ internal sealed partial class Server
             mayBeTruncated = read.MayBeTruncated,
         };
 
-    /// <summary>Where a trigger script name resolves for the editor (profile trigger\ or stock archive; mods are not searched).</summary>
+    /// <summary>Where a trigger script name resolves for the editor: profile trigger\, enabled mods' trigger\ (registry order), stock archive.</summary>
     /// <param name="name">Relative script name.</param>
     object ScriptResolution(string name)
     {
@@ -280,6 +280,19 @@ internal sealed partial class Server
                 from = "profile",
                 path = Path.Combine(profile, relative),
             };
+        foreach (var mod in ScenarioDependencies.EnabledModTriggers())
+        {
+            var path = Path.Combine(mod.Trigger, relative);
+            if (File.Exists(path))
+                return new
+                {
+                    resolved = true,
+                    from = "mod",
+                    path,
+                    mod = mod.Title,
+                    note = "Found under an enabled mod's trigger\\ folder; a playtest compiled such an include (live 2026-10-13). Precedence over profile/stock copies is unverified.",
+                };
+        }
         if (roots.StockTrigger(relative))
             return new
             {
@@ -292,7 +305,7 @@ internal sealed partial class Server
             resolved = false,
             from = "missing",
             path = (string?)null,
-            note = "Not under the profile trigger\\ folder or the stock archive. Mod trigger\\ folders are not searched (which roots the editor uses for mods is unverified); the editor itself accepts any name.",
+            note = "Not under the profile trigger\\ folder, an enabled mod's trigger\\ folder or the stock archive. The editor accepts any name, but Play then fails with a Trigger Error dialog (XS Error 0123: failed to open file; live 2026-10-13).",
         };
     }
 

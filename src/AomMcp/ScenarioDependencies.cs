@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace AomMcp;
@@ -139,6 +140,86 @@ internal static partial class ScenarioDependencies
             AiScripts.InstalledRoot(exe),
             stock
         );
+    }
+
+    /// <summary>Mod registry file inside the profile mods folder (observed build 100.19.17020.0: Mods[] with Title, Path, Priority, Enabled).</summary>
+    const string ModStatusFile = "myth-mod-status.json";
+
+    /// <summary>Largest mod registry read (observed file is about 1 KB per mod).</summary>
+    const int MaxModStatusBytes = 1 << 20;
+
+    /// <summary>One enabled mod's existing trigger\ folder.</summary>
+    /// <param name="Title">Mod title from the registry.</param>
+    /// <param name="Priority">Registry priority (ordering meaning unverified).</param>
+    /// <param name="Trigger">Absolute trigger\ folder.</param>
+    internal sealed record ModTrigger(string Title, int Priority, string Trigger);
+
+    /// <summary>
+    /// Existing trigger\ folders of mods marked Enabled in the profile mod registry, ordered by Priority. Live 2026-10-13: a
+    /// playtest compiled include "om10\om10_diffbonus.xs" present only under the enabled subscribed mod's trigger\ (a missing
+    /// name fails with XS Error 0123). Disabled mods and the precedence between profile, mods and stock are unverified.
+    /// Never throws; an unreadable registry yields none.
+    /// </summary>
+    internal static ModTrigger[] EnabledModTriggers()
+    {
+        var home = ScenarioFiles.ProfileHome();
+        if (home is null)
+            return [];
+        var mods = Path.GetFullPath(Path.Combine(home, "mods"));
+        try
+        {
+            var status = new FileInfo(Path.Combine(mods, ModStatusFile));
+            if (!status.Exists || status.Length > MaxModStatusBytes)
+                return [];
+            using var doc = JsonDocument.Parse(File.ReadAllBytes(status.FullName));
+            if (
+                !doc.RootElement.TryGetProperty("Mods", out var list)
+                || list.ValueKind != JsonValueKind.Array
+            )
+                return [];
+            var found = new List<ModTrigger>();
+            foreach (var mod in list.EnumerateArray())
+            {
+                if (
+                    mod.ValueKind != JsonValueKind.Object
+                    || !mod.TryGetProperty("Enabled", out var enabled)
+                    || enabled.ValueKind != JsonValueKind.True
+                    || !mod.TryGetProperty("Path", out var rel)
+                    || rel.GetString() is not { Length: > 0 } relative
+                    || Path.IsPathRooted(relative)
+                )
+                    continue;
+                var trigger = Path.GetFullPath(Path.Combine(mods, relative, "trigger"));
+                if (
+                    !trigger.StartsWith(
+                        mods + Path.DirectorySeparatorChar,
+                        StringComparison.OrdinalIgnoreCase
+                    ) || !Directory.Exists(trigger)
+                )
+                    continue;
+                var title =
+                    mod.TryGetProperty("Title", out var t) && t.ValueKind == JsonValueKind.String
+                        ? t.GetString() ?? relative
+                        : relative;
+                var priority =
+                    mod.TryGetProperty("Priority", out var p) && p.TryGetInt32(out var n)
+                        ? n
+                        : int.MaxValue;
+                found.Add(new(title, priority, trigger));
+            }
+            return [.. found.OrderBy(m => m.Priority)];
+        }
+        catch (Exception e)
+            when (e
+                    is IOException
+                        or UnauthorizedAccessException
+                        or JsonException
+                        or ArgumentException
+                        or NotSupportedException
+            )
+        {
+            return [];
+        }
     }
 
     /// <summary>Missing files in the include closure below one root (the root itself excluded). ai roots accept a PL aiPath.</summary>

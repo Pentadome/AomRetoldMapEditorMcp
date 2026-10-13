@@ -447,6 +447,8 @@ internal static partial class XsDiagnostics
                 "Symbol not found; declare it, include the file that declares it before use, or check spelling (editor_xs_api names=[...]).",
             "0135" or "0165" =>
                 "Expression in a rule/condition could not be parsed; check the identifiers it uses are declared before the rule.",
+            "0123" =>
+                "Include file could not be opened: the name is not under the profile trigger\\ (or Game\\AI) folder, an enabled mod or the stock files. Check spelling and backslashes; a mod must be enabled (live 2026-10-13).",
             "0139" =>
                 "for-loop header could not be parsed. Retold XS uses C-style for (int i = 0; i < n; i++); the form for (int i = 0; < n) fails with 0172 + 0139 (live 2026-10-13).",
             _ => null,
