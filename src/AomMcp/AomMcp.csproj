@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -10,7 +10,11 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Independently game-written TR v12 controller fixture; pinned SHA-256 in TriggerCodec. -->
-    <None Include="../../research/defense-code-sample.trg" Link="trigger-controller-template.trg" CopyToOutputDirectory="PreserveNewest" />
+    <None
+      Include="../../research/defense-code-sample.trg"
+      Link="trigger-controller-template.trg"
+      CopyToOutputDirectory="PreserveNewest"
+    />
     <PackageReference Include="ModelContextProtocol.Core" Version="2.2.0" />
     <PackageReference Include="Sdcb.SimdPaddleOCR" Version="1.4.2" />
     <PackageReference Include="Sdcb.SimdPaddleOCR.Models.ChineseV6Tiny" Version="1.0.0" />
@@ -37,14 +41,57 @@
       Condition="'$(IncludeGameCatalog)' != 'false' and Exists('../../generated/dialogs.json')"
     />
     <!-- Signature-only XS API plus own-words library summaries (maintainer refresh via the build-xs-api option). -->
-    <None Include="../../xs/*.json" Link="xs/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="../../uilayouts/*.json" Link="uilayouts/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="../../tests/fixtures/ocr-*.bgra" Link="fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="../../tests/fixtures/playtest-ui-evidence*.json" Link="fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None
+      Include="../../xs/*.json"
+      Link="xs/%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+    />
+    <None
+      Include="../../uilayouts/*.json"
+      Link="uilayouts/%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+    />
+    <None
+      Include="../../tests/fixtures/ocr-*.bgra"
+      Link="fixtures/%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+    />
+    <None
+      Include="../../tests/fixtures/playtest-ui-evidence*.json"
+      Link="fixtures/%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+    />
     <None
       Include="../../layouts/*.json"
       Link="layouts/%(Filename)%(Extension)"
       CopyToOutputDirectory="PreserveNewest"
     />
   </ItemGroup>
+  <Target
+    Name="Husky"
+    AfterTargets="Restore"
+    Condition="'$(HUSKY)' != 0"
+    Inputs="..\..\.config\dotnet-tools.json"
+    Outputs="..\..\.husky\_\install.stamp"
+  >
+    <Exec
+      Command="dotnet tool restore"
+      StandardOutputImportance="Low"
+      StandardErrorImportance="High"
+    />
+    <Exec
+      Command="dotnet husky install"
+      StandardOutputImportance="Low"
+      StandardErrorImportance="High"
+      WorkingDirectory="..\.."
+    />
+    <Touch
+      Files="..\..\.husky\_\install.stamp"
+      AlwaysCreate="true"
+      Condition="Exists('..\..\.husky\_')"
+    />
+    <ItemGroup>
+      <FileWrites Include="..\..\.husky\_\install.stamp" />
+    </ItemGroup>
+  </Target>
 </Project>
