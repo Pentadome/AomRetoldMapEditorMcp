@@ -1906,6 +1906,21 @@ internal static class DialogState
 
     // ---------------- self-test ----------------
 
+    /// <summary>Self-test sample: a script name as typed (project script om10\om10_diffbonus.xs).</summary>
+    const string SampleDiffBonus = "om10\\om10_diffbonus.xs";
+
+    /// <summary>Self-test sample: another script name as typed.</summary>
+    const string SampleModifiers = "om10\\om10_wrket_modifiers.xs";
+
+    /// <summary>Self-test sample: how the alternative-UI list clipped and OCR-read <see cref="SampleDiffBonus"/> (live 2026-10-14).</summary>
+    const string SampleDiffBonusClippedRead = "om 10\\om 10 diff";
+
+    /// <summary>Self-test sample: a read shorter than <see cref="MinPrefixChars"/> normalized characters.</summary>
+    const string SampleTooShortRead = "om";
+
+    /// <summary>Self-test sample: the popup field's visible part of <see cref="SampleModifiers"/>, OCR-misread (live 2026-10-14).</summary>
+    const string SampleModifiersFieldRead = "wrket _modifiers.x$";
+
     internal static void SelfTest()
     {
         var sets = LoadAll(Path.Combine(AppContext.BaseDirectory, "uilayouts"));
@@ -1958,11 +1973,11 @@ internal static class DialogState
             );
         // Clipped list rows (alternative UI) match by start; popup text by containment (live OCR reads 2026-10-14).
         if (
-            !StartsText("om10\\om10_diffbonus.xs", "om 10\\om 10 diff")
-            || StartsText("om10\\om10_wrket_modifiers.xs", "om 10\\om 10 diff")
-            || StartsText("om10\\om10_diffbonus.xs", "om")
-            || !InsideText("om10\\om10_wrket_modifiers.xs", "wrket _modifiers.x$")
-            || InsideText("om10\\om10_diffbonus.xs", "wrket _modifiers.x$")
+            !StartsText(SampleDiffBonus, SampleDiffBonusClippedRead)
+            || StartsText(SampleModifiers, SampleDiffBonusClippedRead)
+            || StartsText(SampleDiffBonus, SampleTooShortRead)
+            || !InsideText(SampleModifiers, SampleModifiersFieldRead)
+            || InsideText(SampleDiffBonus, SampleModifiersFieldRead)
         )
             throw new InvalidDataException("Clipped-text matching changed.");
         // Geometry: NewScenarioDialog size1024 [332,284,700,552] maps to [830,533,920,502] at 2560x1440 (observed [836,536,906,494]).
