@@ -1,0 +1,153 @@
+{
+ "schema": 1,
+ "uiKind": "alternative",
+ "width": 2560,
+ "height": 1440,
+ "frame": [
+  1280,
+  720
+ ],
+ "buildHash": "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff",
+ "tolerance": 10,
+ "openFraction": 0.8,
+ "partialFraction": 0.4,
+ "notes": "Open-dialog pixel signature, alternative English editor UI at 2560x1440 (build 100.19.17020.0), ScriptManager only (other alternative dialogs are not calibrated). Points are [x,y,r,g,b] in the 1280x720 host screenshot frame; bounds are [x,y,w,h] full-resolution client pixels of the default (unmoved) window. Calibrated live 2026-10-14: gadgetReal/gadgetUnreal at three camera poses (rotations 0, +240, -240 wheel units); the 18 points are opaque (identical across poses), differ from the closed frame and avoid the list area. Own pose 1.00, closed frames 0.00. Frames were downscaled offline with a box filter, so the live ScreenProbe score is the real check.",
+ "dialogs": {
+  "ScriptManager": {
+   "bounds": [
+    552,
+    130,
+    360,
+    458
+   ],
+   "points": [
+    [
+     286,
+     90,
+     15,
+     16,
+     18
+    ],
+    [
+     319,
+     91,
+     15,
+     16,
+     18
+    ],
+    [
+     346,
+     101,
+     15,
+     16,
+     18
+    ],
+    [
+     392,
+     114,
+     29,
+     29,
+     29
+    ],
+    [
+     413,
+     67,
+     27,
+     27,
+     27
+    ],
+    [
+     452,
+     73,
+     28,
+     28,
+     28
+    ],
+    [
+     279,
+     169,
+     15,
+     16,
+     18
+    ],
+    [
+     425,
+     166,
+     15,
+     16,
+     18
+    ],
+    [
+     446,
+     133,
+     15,
+     16,
+     18
+    ],
+    [
+     279,
+     197,
+     15,
+     16,
+     18
+    ],
+    [
+     425,
+     231,
+     15,
+     16,
+     18
+    ],
+    [
+     432,
+     204,
+     28,
+     20,
+     16
+    ],
+    [
+     279,
+     264,
+     15,
+     16,
+     18
+    ],
+    [
+     324,
+     291,
+     15,
+     16,
+     18
+    ],
+    [
+     337,
+     287,
+     15,
+     16,
+     18
+    ],
+    [
+     374,
+     288,
+     15,
+     16,
+     18
+    ],
+    [
+     421,
+     289,
+     15,
+     16,
+     18
+    ],
+    [
+     426,
+     273,
+     15,
+     16,
+     18
+    ]
+   ]
+  }
+ }
+}

@@ -395,10 +395,44 @@ internal static class DialogState
     /// <paramref name="typed"/> to read as nothing or one thin glyph (same substitution for all; other glyphs exact).</summary>
     /// <param name="typed">Text that was typed or is expected.</param>
     /// <param name="read">OCR text.</param>
-    internal static bool SameText(string typed, string read)
+    internal static bool SameText(string typed, string read) =>
+        MatchesVariant(typed, Norm(read), (candidate, observed) => candidate == observed);
+
+    /// <summary>Shortest normalized OCR prefix <see cref="StartsText"/> accepts (fewer characters match too many names).</summary>
+    internal const int MinPrefixChars = 4;
+
+    /// <summary>True when OCR text is a cut-off start of typed text: <see cref="SameText"/>'s separator tolerance, but the
+    /// read may be shorter (a list column clipped it). At least <see cref="MinPrefixChars"/> normalized characters are required.</summary>
+    /// <param name="typed">Text that was typed or is expected.</param>
+    /// <param name="read">OCR text of a possibly clipped row.</param>
+    internal static bool StartsText(string typed, string read) =>
+        Norm(read) is { Length: >= MinPrefixChars } observed
+        && MatchesVariant(
+            typed,
+            observed,
+            (candidate, seen) => candidate.StartsWith(seen, StringComparison.Ordinal)
+        );
+
+    /// <summary>True when OCR text lies inside typed text (a text field shows only the part around its caret, and OCR may drop or
+    /// misread the last glyph): same separator tolerance as <see cref="SameText"/>, at least <see cref="MinPrefixChars"/>
+    /// normalized characters.</summary>
+    /// <param name="typed">Text that was typed.</param>
+    /// <param name="read">OCR text of the field.</param>
+    internal static bool InsideText(string typed, string read) =>
+        Norm(read) is { Length: >= MinPrefixChars } observed
+        && MatchesVariant(
+            typed,
+            observed,
+            (candidate, seen) => candidate.Contains(seen, StringComparison.Ordinal)
+        );
+
+    /// <summary>Tries the typed text as is, then with every path separator replaced by each OCR read glyph.</summary>
+    /// <param name="typed">Text that was typed or is expected.</param>
+    /// <param name="observed">Normalized OCR text.</param>
+    /// <param name="compare">Comparison of a normalized typed variant with the normalized OCR text.</param>
+    static bool MatchesVariant(string typed, string observed, Func<string, string, bool> compare)
     {
-        var observed = Norm(read);
-        if (Norm(typed) == observed)
+        if (compare(Norm(typed), observed))
             return true;
         if (typed.IndexOfAny(Separators) < 0)
             return false;
@@ -411,7 +445,7 @@ internal static class DialogState
                     glyph,
                     StringComparison.Ordinal
                 );
-            if (Norm(candidate) == observed)
+            if (compare(Norm(candidate), observed))
                 return true;
         }
         return false;
@@ -1903,6 +1937,34 @@ internal static class DialogState
                 throw new InvalidDataException(
                     $"Signature {rival.Gadget} matches NewScenarioGadget points."
                 );
+        // Alternative-UI ScriptManager signature: loads, scores open on its own points, and is not NewScenarioGadget.
+        var alternative =
+            sets.SingleOrDefault(s => s.UiKind == "alternative" && s.Width == 2560)
+            ?? throw new InvalidDataException(
+                "Alternative-UI dialog signature file missing from uilayouts."
+            );
+        var scripts = alternative.Dialogs["ScriptManager"];
+        var altRgb = new byte[1280 * 720 * 3];
+        foreach (var p in scripts.Points)
+        {
+            var o = (p[1] * 1280 + p[0]) * 3;
+            altRgb[o] = (byte)p[2];
+            altRgb[o + 1] = (byte)p[3];
+            altRgb[o + 2] = (byte)p[4];
+        }
+        if (Score(new ScreenProbe.Frame(altRgb, 1280, 720), scripts, alternative).State != "open")
+            throw new InvalidDataException(
+                "Alternative ScriptManager signature failed on its own points."
+            );
+        // Clipped list rows (alternative UI) match by start; popup text by containment (live OCR reads 2026-10-14).
+        if (
+            !StartsText("om10\\om10_diffbonus.xs", "om 10\\om 10 diff")
+            || StartsText("om10\\om10_wrket_modifiers.xs", "om 10\\om 10 diff")
+            || StartsText("om10\\om10_diffbonus.xs", "om")
+            || !InsideText("om10\\om10_wrket_modifiers.xs", "wrket _modifiers.x$")
+            || InsideText("om10\\om10_diffbonus.xs", "wrket _modifiers.x$")
+        )
+            throw new InvalidDataException("Clipped-text matching changed.");
         // Geometry: NewScenarioDialog size1024 [332,284,700,552] maps to [830,533,920,502] at 2560x1440 (observed [836,536,906,494]).
         if (ToClient([332, 284, 700, 552], 2560, 1440) is not [830, 533, 920, 502])
             throw new InvalidDataException("size1024 mapping changed.");

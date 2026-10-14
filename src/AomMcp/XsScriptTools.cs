@@ -28,6 +28,20 @@ internal sealed partial class Server
     /// <summary>editor_dialog_state geometry mode of an open default-position dialog (pixel actions need it).</summary>
     const string NominalGeometry = "nominal";
 
+    /// <summary>uiKind of the alternative editor UI (editor_dialog_state).</summary>
+    const string AlternativeUi = "alternative";
+
+    /// <summary>Alternative UI: button that opens the "New Script Name" popup (child gadget Add-dialog; ui_scripts_dlg.xml).</summary>
+    const string ScriptAddControl = "scriptsInsert";
+
+    /// <summary>Alternative UI: popup caption control and its text (ui_scripts_dlg.xml NewName-TXT, label "New Script Name").</summary>
+    const string AltPopupCaptionControl = "NewName-TXT",
+        AltPopupCaption = "New Script Name";
+
+    /// <summary>Alternative UI: height of the "Scripts list" caption inside the list control rect, in client pixels
+    /// (live 2560x1440, 2026-10-14: control y 206, first row text at y about 279, list body from y 246).</summary>
+    const int AltListHeaderPx = 41;
+
     /// <summary>Script list row pitch in client pixels (live: rows at y 386 and 417 on 2560x1440).</summary>
     const int ScriptRowPitch = 31;
 
@@ -54,7 +68,8 @@ internal sealed partial class Server
                 + "include (types each missing name into the name field, clicks Include Script, verifies one new matching row; already listed names are skipped; result.resolution says whether the name resolves under the profile trigger\\ folder, an enabled mod's trigger\\ folder (mods\\myth-mod-status.json) or the stock archive; confirmDestructive=true) | "
                 + "remove (exactly one name; clicks its row, then Remove Script, verifies the list lost only that row; confirmDestructive=true). "
                 + "Names are relative .xs paths as the editor lists them, e.g. om10\\om10_diffbonus.xs. The editor accepts names that do not exist. Changes stay in the open scenario until it is saved. "
-                + "Live-verified on the normal UI at 2560x1440; the alternative UI and moved windows are not calibrated and are refused before any input (re-add by hand there). "
+                + "Live-verified on the normal UI at 2560x1440 and on the alternative UI at 2560x1440 (list, include, remove, verify; result.list.uiKind says which). The alternative UI has no name field: include presses Add Script, types into its 'New Script Name' popup and clicks the confirm button, and its list clips long names, so rows match by their start and verify reports prefixMatched instead of verified. "
+                + "Other client sizes and moved windows are refused before any input (re-add by hand there); 1920x1080 is untested. "
                 + "OCR is evidence (a backslash often reads as 'l'); after saving, editor_xs_check scenarioPath=\"latest\" is authoritative. editor_triggers apply scripts=\"restore\" uses this to undo the import's list reset. Failures carry code/nativeDispatched/outcomeUnknown/nextAction; never retry blindly.",
             new Dictionary<string, object>
             {
@@ -130,7 +145,14 @@ internal sealed partial class Server
     /// <param name="List">Client rect of the list control.</param>
     /// <param name="Rows">OCR'd rows top to bottom.</param>
     /// <param name="MayBeTruncated">True when the rows fill the visible list (more may be scrolled out of view).</param>
-    sealed record ScriptListRead(string UiKind, int[] List, ScriptRow[] Rows, bool MayBeTruncated);
+    /// <param name="Clipped">True when row text is clipped by the list column (alternative UI), so names match by start only.</param>
+    sealed record ScriptListRead(
+        string UiKind,
+        int[] List,
+        ScriptRow[] Rows,
+        bool MayBeTruncated,
+        bool Clipped
+    );
 
     /// <summary>Runs editor_dialog_state/act in-process with the same guards as the public tools.</summary>
     /// <param name="game">Validated editor connection.</param>
@@ -187,7 +209,8 @@ internal sealed partial class Server
     /// <summary>Client rect of a named control in a dialog entry, or null.</summary>
     /// <param name="dialog">Dialog entry with controls.</param>
     /// <param name="control">Control name.</param>
-    static int[]? ControlRect(JsonElement dialog, string control) =>
+    /// <param name="includeHidden">Also accept controls hidden by default (children of a popup that is open now).</param>
+    static int[]? ControlRect(JsonElement dialog, string control, bool includeHidden = false) =>
         dialog.TryGetProperty("controls", out var controls)
             ? controls
                 .EnumerateArray()
@@ -195,9 +218,10 @@ internal sealed partial class Server
                     c.GetProperty("name").GetString() == control
                     && c.TryGetProperty("rect", out var r)
                     && r.ValueKind == JsonValueKind.Array
-                    && !(
-                        c.TryGetProperty("defaultHidden", out var h)
-                        && h.ValueKind == JsonValueKind.True
+                    && (
+                        includeHidden
+                        || !c.TryGetProperty("defaultHidden", out var h)
+                        || h.ValueKind != JsonValueKind.True
                     )
                 )
                 .Select(c =>
@@ -236,26 +260,44 @@ internal sealed partial class Server
             throw new WorkflowFailure(
                 "UI_LAYOUT_UNREVIEWED",
                 "ui-preflight",
-                $"Script Manager not detected at calibrated geometry (uiKind={uiKind}). Dialog signatures are calibrated for the normal UI at 2560x1440; "
-                    + "the alternative UI and moved windows are not. No input sent.",
+                $"Script Manager not detected at calibrated geometry (uiKind={uiKind}). Dialog signatures exist for the normal and alternative UI at 2560x1440 only; "
+                    + "other client sizes and moved windows are refused. No input sent.",
                 false,
                 false,
-                "Normal UI: close and reopen the dialog at its default position. Alternative UI: Triggers -> XS Scripts by hand (editor_dialog_act open gadget=ScriptManager + editor_screenshot), then verify with editor_xs_check scenarioPath=\"latest\" after saving."
+                "Close and reopen the dialog at its default position, or use a 2560x1440 client. Otherwise edit Triggers -> XS Scripts by hand (editor_dialog_act open gadget=ScriptManager + editor_screenshot), then verify with editor_xs_check scenarioPath=\"latest\" after saving."
             );
+        var alternative = uiKind == AlternativeUi;
+        if (alternative)
+            list = [list[0], list[1] + AltListHeaderPx, list[2], list[3] - AltListHeaderPx];
         var rows = UiRead
             .Lines(game, list)
             .Where(l => l.Text.Trim().Length > 0)
             .OrderBy(l => l.Y)
             .Select(l => new ScriptRow(l.Text.Trim(), l.X, l.Y))
             .ToArray();
-        return new ScriptListRead(uiKind, list, rows, rows.Length >= list[3] / ScriptRowPitch);
+        return new ScriptListRead(
+            uiKind,
+            list,
+            rows,
+            rows.Length >= list[3] / ScriptRowPitch,
+            alternative
+        );
     }
 
     /// <summary>Rows matching a name (separator-tolerant OCR comparison).</summary>
     /// <param name="read">List read.</param>
     /// <param name="name">Expected name.</param>
     static ScriptRow[] Matching(ScriptListRead read, string name) =>
-        [.. read.Rows.Where(r => DialogState.SameText(name, r.Text))];
+        [.. read.Rows.Where(r => RowMatches(read, name, r))];
+
+    /// <summary>Whether a row reads as the name: whole text, or (clipped rows) its start.</summary>
+    /// <param name="read">List read the row came from.</param>
+    /// <param name="name">Expected name.</param>
+    /// <param name="row">One row.</param>
+    static bool RowMatches(ScriptListRead read, string name, ScriptRow row) =>
+        read.Clipped
+            ? DialogState.StartsText(name, row.Text)
+            : DialogState.SameText(name, row.Text);
 
     /// <summary>JSON-friendly list read.</summary>
     /// <param name="read">List read.</param>
@@ -265,6 +307,7 @@ internal sealed partial class Server
             uiKind = read.UiKind,
             rows = read.Rows.Select(r => r.Text).ToArray(),
             mayBeTruncated = read.MayBeTruncated,
+            rowsClipped = read.Clipped,
         };
 
     /// <summary>Where a trigger script name resolves for the editor: profile trigger\, enabled mods' trigger\ (registry order), stock archive.</summary>
@@ -309,6 +352,117 @@ internal sealed partial class Server
         };
     }
 
+    /// <summary>Alternative UI: opens the "New Script Name" popup (press scriptsInsert), checks it by OCR, types the name and
+    /// clicks its confirm button. The popup's controls are hidden by default, so the generic dialog click/setText refuse them;
+    /// this uses the mapped control rects of the open nominal dialog (live 2560x1440, 2026-10-14) and verifies by OCR only the
+    /// popup caption and that the visible part of the field lies inside the typed name. Never presses TAB/ENTER.</summary>
+    /// <param name="game">Validated editor connection.</param>
+    /// <param name="name">Exact name to include.</param>
+    void AlternativeAddName(Game game, string name)
+    {
+        Dialog(
+            game,
+            true,
+            new
+            {
+                gadget = ScriptGadget,
+                action = "press",
+                control = ScriptAddControl,
+                confirmDestructive = true,
+            }
+        );
+        Thread.Sleep(ScriptSettleMs);
+        var state = Dialog(game, false, new { gadget = ScriptGadget, controls = true });
+        var dialog = ScriptDialog(state);
+        var caption = dialog is { } c1 ? ControlRect(c1, AltPopupCaptionControl, true) : null;
+        var field = dialog is { } c2 ? ControlRect(c2, ScriptNameControl, true) : null;
+        var confirm = dialog is { } c3 ? ControlRect(c3, ScriptIncludeControl, true) : null;
+        if (caption is null || field is null || confirm is null)
+            throw new WorkflowFailure(
+                "UI_LAYOUT_UNREVIEWED",
+                "ui-preflight",
+                "Script Manager popup controls were not located; no text typed.",
+                false,
+                false,
+                "Screenshot the Script Manager; add the name by hand."
+            );
+        if (
+            !DialogState
+                .Norm(UiRead.Text(game, caption))
+                .Contains(DialogState.Norm(AltPopupCaption), StringComparison.Ordinal)
+        )
+            throw new WorkflowFailure(
+                "POPUP_NOT_OPEN",
+                "ui-preflight",
+                $"The '{AltPopupCaption}' popup was not read at {string.Join(",", caption)} after pressing Add Script; no text typed.",
+                false,
+                false,
+                "Screenshot the Script Manager; no input beyond the Add Script press was sent."
+            );
+        if (DialogState.Norm(UiRead.Text(game, field)).Length > 0)
+            throw new WorkflowFailure(
+                "POPUP_FIELD_NOT_EMPTY",
+                "ui-preflight",
+                "The popup's name field is not empty; no text typed.",
+                false,
+                false,
+                "Screenshot the Script Manager and clear the field by hand."
+            );
+        RequireNoCursor(game);
+        Ui.SettledClick(game, field[0] + field[2] / 2, field[1] + field[3] / 2, "left");
+        Thread.Sleep(ScriptSettleMs);
+        Ui.Text(game, name);
+        Thread.Sleep(ScriptSettleMs);
+        var tail = UiRead.Text(game, field);
+        if (!DialogState.InsideText(name, tail))
+            throw new WorkflowFailure(
+                "TEXT_NOT_VERIFIED",
+                "verify",
+                $"Typed '{name}' into the popup name field but OCR reads '{tail}' (not part of the typed name); the confirm button was not clicked.",
+                true,
+                true,
+                "Screenshot the popup; it may still be open with the text in it. Do not retype blindly."
+            );
+        Ui.SettledClick(game, confirm[0] + confirm[2] / 2, confirm[1] + confirm[3] / 2, "left");
+    }
+
+    /// <summary>Alternative UI: clicks the icon-only Remove Script button at the center of its mapped control rect (the generic
+    /// click refuses unlabeled buttons without OCR anchors). Only after the dialog scored open at nominal geometry (the state read).</summary>
+    /// <param name="game">Validated editor connection.</param>
+    void AlternativeClickRemove(Game game)
+    {
+        var state = Dialog(game, false, new { gadget = ScriptGadget, controls = true });
+        var rect = ScriptDialog(state) is { } dialog
+            ? ControlRect(dialog, ScriptRemoveControl)
+            : null;
+        if (rect is null)
+            throw new WorkflowFailure(
+                "UI_LAYOUT_UNREVIEWED",
+                "ui-preflight",
+                "Remove Script button rect not located after selecting the row; the button was not clicked.",
+                false,
+                false,
+                "Screenshot the Script Manager; remove the row by hand."
+            );
+        RequireNoCursor(game);
+        Ui.SettledClick(game, rect[0] + rect[2] / 2, rect[1] + rect[3] / 2, "left");
+        ParkPointer(game, state);
+    }
+
+    /// <summary>Moves the pointer to the middle of the client area (terrain) and waits, so a button tooltip does not cover the
+    /// list (live 2026-10-14: the "Remove Script" tooltip stays over the list while the pointer rests on the button).</summary>
+    /// <param name="game">Validated editor connection.</param>
+    /// <param name="state">editor_dialog_state result with the client size.</param>
+    static void ParkPointer(Game game, JsonElement state)
+    {
+        var client = state.GetProperty("client");
+        game.Move(
+            client.GetProperty("width").GetInt32() / 2,
+            client.GetProperty("height").GetInt32() / 2
+        );
+        Thread.Sleep(ScriptSettleMs);
+    }
+
     /// <summary>Includes names missing from the open list; verifies each by readback.</summary>
     /// <param name="game">Validated editor connection.</param>
     /// <param name="names">Exact names to include.</param>
@@ -326,33 +480,39 @@ internal sealed partial class Server
                         name,
                         action = "alreadyListed",
                         verified = true,
+                        fullNameVerified = !before.Clipped,
                     }
                 );
                 continue;
             }
-            Dialog(
-                game,
-                true,
-                new
-                {
-                    gadget = ScriptGadget,
-                    action = "setText",
-                    control = ScriptNameControl,
-                    text = name,
-                    confirmDestructive = true,
-                }
-            );
-            Dialog(
-                game,
-                true,
-                new
-                {
-                    gadget = ScriptGadget,
-                    action = "click",
-                    control = ScriptIncludeControl,
-                    confirmDestructive = true,
-                }
-            );
+            if (before.UiKind == AlternativeUi)
+                AlternativeAddName(game, name);
+            else
+            {
+                Dialog(
+                    game,
+                    true,
+                    new
+                    {
+                        gadget = ScriptGadget,
+                        action = "setText",
+                        control = ScriptNameControl,
+                        text = name,
+                        confirmDestructive = true,
+                    }
+                );
+                Dialog(
+                    game,
+                    true,
+                    new
+                    {
+                        gadget = ScriptGadget,
+                        action = "click",
+                        control = ScriptIncludeControl,
+                        confirmDestructive = true,
+                    }
+                );
+            }
             Thread.Sleep(ScriptSettleMs);
             var after = ReadScripts(game);
             var added =
@@ -372,6 +532,7 @@ internal sealed partial class Server
                     name,
                     action = "included",
                     verified = true,
+                    fullNameVerified = !after.Clipped,
                     rows = after.Rows.Length,
                 }
             );
@@ -413,7 +574,7 @@ internal sealed partial class Server
                         .Select(n => new { name = n, rows = Matching(read, n).Length })
                         .ToArray();
                     var unexpected = read
-                        .Rows.Where(r => !names.Any(n => DialogState.SameText(n, r.Text)))
+                        .Rows.Where(r => !names.Any(n => RowMatches(read, n, r)))
                         .Select(r => r.Text)
                         .ToArray();
                     var ok =
@@ -425,7 +586,8 @@ internal sealed partial class Server
                         list = ListJson(read),
                         expected = operation == "verify" || names.Length > 0 ? expected : null,
                         unexpected = operation == "verify" ? unexpected : null,
-                        verified = operation == "verify" ? ok : (bool?)null,
+                        verified = operation == "verify" ? ok && !read.Clipped : (bool?)null,
+                        prefixMatched = operation == "verify" && read.Clipped ? ok : (bool?)null,
                         openedHere = opened,
                         limitation = ScriptListLimitation,
                     };
@@ -460,17 +622,20 @@ internal sealed partial class Server
                         );
                     RequireNoCursor(game);
                     Ui.Click(game, rows[0].X, rows[0].Y, "left");
-                    Dialog(
-                        game,
-                        true,
-                        new
-                        {
-                            gadget = ScriptGadget,
-                            action = "click",
-                            control = ScriptRemoveControl,
-                            confirmDestructive = true,
-                        }
-                    );
+                    if (before.UiKind == AlternativeUi)
+                        AlternativeClickRemove(game);
+                    else
+                        Dialog(
+                            game,
+                            true,
+                            new
+                            {
+                                gadget = ScriptGadget,
+                                action = "click",
+                                control = ScriptRemoveControl,
+                                confirmDestructive = true,
+                            }
+                        );
                     Thread.Sleep(ScriptSettleMs);
                     var after = ReadScripts(game);
                     var removed =
@@ -478,8 +643,8 @@ internal sealed partial class Server
                         && after.Rows.Length == before.Rows.Length - 1
                         && before
                             .Rows.Where(r => r != rows[0])
-                            .Select(r => r.Text)
-                            .SequenceEqual(after.Rows.Select(r => r.Text));
+                            .Select(r => DialogState.Norm(r.Text))
+                            .SequenceEqual(after.Rows.Select(r => DialogState.Norm(r.Text)));
                     if (!removed)
                         throw new WorkflowFailure(
                             "REMOVE_NOT_VERIFIED",
@@ -532,7 +697,7 @@ internal sealed partial class Server
             .Select(k => k.Name)
             .ToArray();
         var unrestorable = snapshot
-            .Rows.Where(r => !known.Any(k => DialogState.SameText(k.Name, r.Text)))
+            .Rows.Where(r => !known.Any(k => RowMatches(snapshot, k.Name, r)))
             .Select(r => r.Text)
             .ToArray();
         var applied = apply();
@@ -544,6 +709,7 @@ internal sealed partial class Server
                 restored = Array.Empty<object>(),
                 unrestorable,
                 verified = unrestorable.Length == 0 && !snapshot.MayBeTruncated,
+                prefixOnly = snapshot.Clipped,
             };
         else
         {
@@ -559,6 +725,11 @@ internal sealed partial class Server
                     unrestorable,
                     list = ListJson(final),
                     verified = unrestorable.Length == 0
+                        && !snapshot.MayBeTruncated
+                        && restore.All(n => Matching(final, n).Length == 1)
+                        && !final.Clipped,
+                    prefixMatched = final.Clipped
+                        && unrestorable.Length == 0
                         && !snapshot.MayBeTruncated
                         && restore.All(n => Matching(final, n).Length == 1),
                 };

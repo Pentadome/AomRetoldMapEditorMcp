@@ -35,6 +35,10 @@ Raw JSON, screenshots, original/edited snapshots, trigger exports and temporary 
 - Original/final trigger exports: 60 bytes, SHA-256 `e2a132f74440d758c56904bc95eb6dbaab20ebc3562e605653884af6eae50858`.
 - Inactive supplied/imported/UI-reloaded controller: SHA-256 `b6acc4ed294b858caea7d4be60c90cce810a877f2a43ca21fb07a2f8263610b4`.
 
+## XS Scripts follow-up (2026-10-14)
+
+`editor_xs_scripts` and `editor_triggers apply scripts="restore"` now run on this UI at 2560x1440 (details in `WORKFLOW-LIVE-OBSERVATIONS.md`): ScriptManager signature in `uilayouts/dialogs-alt-en-2560x1440.json`; names are matched by their start because the list clips them.
+
 ## Untested / unresolved
 
 Water, forest, cliff, wall, terrain-copy/paste, cinematics, lighting value edits, complex trigger shapes, XS execution, gameplay entry/exit and full remaining-tool semantic coverage remain unverified. Native reload crash remains undiagnosed; tool removal is mitigation, not a root-cause fix. Any reintroduction requires separate diagnosis and explicitly authorized retest; do not label full alternative-UI support on the strength of tool exposure or dispatcher acknowledgements.

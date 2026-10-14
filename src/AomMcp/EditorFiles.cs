@@ -265,7 +265,7 @@ internal static class EditorFiles
                     if (known.Length > 0)
                         throw new ArgumentException(
                             $"Import resets the Triggers -> XS Scripts list and lastKnown is not empty ({string.Join(", ", known.Select(k => k.Name))}): "
-                                + "pass scripts=\"restore\" (re-include through the Script Manager, normal UI) or scripts=\"ignore\" (re-add by hand)."
+                                + "pass scripts=\"restore\" (re-include through the Script Manager, normal or alternative UI at 2560x1440) or scripts=\"ignore\" (re-add by hand)."
                         );
                 }
                 var auto =
