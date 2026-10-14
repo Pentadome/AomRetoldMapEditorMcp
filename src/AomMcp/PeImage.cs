@@ -13,8 +13,10 @@ internal sealed class PeImage
 
     /// <summary>Gets the executable's complete on-disk bytes.</summary>
     public byte[] Bytes { get; }
+
     /// <summary>Gets section headers parsed from the PE image.</summary>
     public Section[] Sections { get; }
+
     /// <summary>Gets the PE image's mapped size in bytes.</summary>
     public int ImageSize { get; }
 

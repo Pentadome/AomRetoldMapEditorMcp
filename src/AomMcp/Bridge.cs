@@ -13,6 +13,7 @@ internal sealed class Bridge : IDisposable
     internal const int PacketSize = 16560,
         PayloadOffset = 176,
         PayloadCapacity = 16384;
+
     // Host-chosen ASCII "AOMC" numeric tag, not a game constant; must match native/EditorBridge.cpp Magic.
     internal const uint Magic = 0x414f4d43;
 
@@ -273,7 +274,9 @@ internal sealed class Bridge : IDisposable
 /// <param name="code">Refusal code assigned by native/EditorBridge.cpp.</param>
 /// <param name="command">Refused command text; it was NOT dispatched.</param>
 internal sealed class BridgeRefusal(uint code, string command)
-    : InvalidOperationException($"No command executed: bridge refusal {code} ({Bridge.Reason(code)}). Refused command: {command}")
+    : InvalidOperationException(
+        $"No command executed: bridge refusal {code} ({Bridge.Reason(code)}). Refused command: {command}"
+    )
 {
     internal uint Code { get; } = code;
     internal string Command { get; } = command;

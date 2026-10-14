@@ -10,6 +10,7 @@ using System.Text.Json;
 // must match research/HookSmoke/bridge/EditorProbe.cpp Magic/MessageName (distinct from production ABI).
 const uint magic = 0x414f4d50;
 const string messageName = "AomEditorProbe.Handshake.v2";
+
 // Observed Steam installation and inspected build SHA-256; see research/hook-evidence.json.
 const string gameExe =
     @"C:\Program Files (x86)\Steam\steamapps\common\Age of Mythology Retold\AoMRT_s.exe";
@@ -18,6 +19,7 @@ if (!Environment.Is64BitProcess || args.Length is < 2 or > 3)
     throw new ArgumentException(
         "Usage (x64): HookSmoke <EditorProbe.dll> <game-pid | --self-test> [fixed-action]"
     );
+
 // Private probe operation IDs defined in EditorProbe.cpp Result/RunOperation:
 // 0=identity only, 1=echo, 2=prepare Greek villager, 3=place once, 4=clear preview/finish.
 var operation =

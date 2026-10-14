@@ -28,8 +28,12 @@ internal sealed class BarArchive : IDisposable
     /// <summary>Decompresses one entry and decodes XMB to text XML (same as CLI export --decompress --convert).</summary>
     public void ExportXml(string path, string outputFile)
     {
-        var entry = _entries.TryGetValue(path, out var e) ? e : throw new FileNotFoundException("BAR entry missing: " + path);
-        using var data = entry.ReadDataDecompressedPooled(_stream) ?? throw new InvalidDataException("Failed to decompress " + path);
+        var entry = _entries.TryGetValue(path, out var e)
+            ? e
+            : throw new FileNotFoundException("BAR entry missing: " + path);
+        using var data =
+            entry.ReadDataDecompressedPooled(_stream)
+            ?? throw new InvalidDataException("Failed to decompress " + path);
         var bytes = path.EndsWith(".xmb", StringComparison.OrdinalIgnoreCase)
             ? ConversionHelper.ConvertXmbToXmlBytes(data.Span) ?? data.Span.ToArray()
             : data.Span.ToArray();

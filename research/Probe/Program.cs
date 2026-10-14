@@ -9,6 +9,7 @@ using Microsoft.Win32.SafeHandles;
 
 // SHA-256 of inspected AoMRT_s.exe 100.19.17020.0; research/evidence.json pins this one build.
 const string knownHash = "dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff";
+
 // Observed local Steam installation; positional exe-path overrides it.
 const string defaultExe =
     @"C:\Program Files (x86)\Steam\steamapps\common\Age of Mythology Retold\AoMRT_s.exe";
@@ -46,6 +47,7 @@ var sections = headers
         flags = s.SectionCharacteristics.ToString(),
     })
     .ToArray();
+
 // Candidate editor/XS names from installed documentation/help; counting an anchor does not prove
 // registration or callable ABI (xsExecute was a searched hypothesis, not an established evaluator).
 var anchors = new[]
