@@ -872,15 +872,12 @@ internal static class PlayerSettings
             .ToArray();
         if (missing.Length > 0)
             throw new ArgumentException(
-                "apply requires new backup paths, existing verificationDirectory and profile directories; missing: "
+                "apply requires existing verificationDirectory and profile directories; missing: "
                     + string.Join(", ", missing)
                     + "."
             );
-        _ = EditorFiles.ApprovedNewPath(
-            args.GetProperty("backupScenarioPath").GetString()!,
-            ".mythscn"
-        );
-        _ = EditorFiles.ApprovedNewPath(args.GetProperty("backupTriggerPath").GetString()!, ".trg");
+        _ = PlayerWorkflow.BackupScenario(args, false);
+        _ = PlayerWorkflow.BackupTrigger(args, false);
     }
 
     internal static object Execute(
@@ -931,14 +928,8 @@ internal static class PlayerSettings
         if (op != "apply" || game is null)
             throw new ArgumentException("operation: preview/verify/apply.");
         PreflightApply(args);
-        var backup = EditorFiles.ApprovedNewPath(
-            args.GetProperty("backupScenarioPath").GetString()!,
-            ".mythscn"
-        );
-        var trigger = EditorFiles.ApprovedNewPath(
-            args.GetProperty("backupTriggerPath").GetString()!,
-            ".trg"
-        );
+        var backup = PlayerWorkflow.BackupScenario(args, true);
+        var trigger = PlayerWorkflow.BackupTrigger(args, true);
         var dir = Path.GetDirectoryName(
             EditorFiles.LocalPath(
                 Path.Combine(

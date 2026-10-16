@@ -357,11 +357,10 @@ internal static class PlayerWorkflow
         };
     }
 
-    /// <summary>Apply arguments naming new backups, verification directory and profile directories.</summary>
+    /// <summary>Required apply arguments: verification directory and profile directories. Backup names are optional
+    /// (<see cref="BackupScenario"/>/<see cref="BackupTrigger"/>).</summary>
     internal static readonly string[] ApplyPathFields =
     [
-        "backupScenarioPath",
-        "backupTriggerPath",
         "verificationDirectory",
         "scenarioProfileDirectory",
         "triggerProfileDirectory",
@@ -386,27 +385,17 @@ internal static class PlayerWorkflow
             .ToArray();
         if (missing.Length > 0)
             throw new ArgumentException(
-                "apply requires new backup paths, existing verificationDirectory and profile directories; missing: "
+                "apply requires existing verificationDirectory and profile directories; missing: "
                     + string.Join(", ", missing)
                     + "."
             );
-        foreach (
-            var (field, extension) in new[]
-            {
-                ("backupScenarioPath", ".mythscn"),
-                ("backupTriggerPath", ".trg"),
-            }
-        )
-            _ = EditorFiles.ApprovedNewPath(args.GetProperty(field).GetString()!, extension);
         if (
-            args.GetProperty("scenarioPath")
-                .GetString()!
-                .Equals(
-                    args.GetProperty("backupScenarioPath").GetString(),
-                    StringComparison.OrdinalIgnoreCase
-                )
+            EditorFiles
+                .LocalPath(args.GetProperty("scenarioPath").GetString()!)
+                .Equals(BackupScenario(args, false), StringComparison.OrdinalIgnoreCase)
         )
             throw new ArgumentException("Backup path must differ from source checkpoint.");
+        _ = BackupTrigger(args, false);
         var directory = EditorFiles.LocalPath(
             Path.Combine(
                 args.GetProperty("verificationDirectory").GetString()!,
@@ -449,6 +438,46 @@ internal static class PlayerWorkflow
             ]
             : [forward];
     }
+
+    /// <summary>Scenario backup inside &lt;id&gt;\scenario_backup (sibling of scenarioProfileDirectory); optional backupScenarioPath names it.</summary>
+    /// <param name="args">Apply arguments with scenarioProfileDirectory.</param>
+    /// <param name="create">Create folder and require a new file (apply) or validate only (preflight).</param>
+    /// <returns>New backup checkpoint path.</returns>
+    internal static string BackupScenario(JsonElement args, bool create) =>
+        EditorFiles.BackupPath(
+            args,
+            "backupScenarioPath",
+            EditorFiles.ProfileHomeOf(
+                EditorFiles.ProfileDirectory(
+                    ProfileArgs(args.GetProperty("scenarioProfileDirectory").GetString()!),
+                    "scenario"
+                )
+            ),
+            EditorFiles.ScenarioBackupFolder,
+            ".mythscn",
+            "backup",
+            create
+        );
+
+    /// <summary>Trigger backup inside &lt;id&gt;\trigger_backup (sibling of triggerProfileDirectory); optional backupTriggerPath names it.</summary>
+    /// <param name="args">Apply arguments with triggerProfileDirectory.</param>
+    /// <param name="create">Create folder and require a new file (apply) or validate only (preflight).</param>
+    /// <returns>New backup trigger export path.</returns>
+    internal static string BackupTrigger(JsonElement args, bool create) =>
+        EditorFiles.BackupPath(
+            args,
+            "backupTriggerPath",
+            EditorFiles.ProfileHomeOf(
+                EditorFiles.ProfileDirectory(
+                    ProfileArgs(args.GetProperty("triggerProfileDirectory").GetString()!),
+                    "trigger"
+                )
+            ),
+            EditorFiles.TriggerBackupFolder,
+            ".trg",
+            "backup",
+            create
+        );
 
     static JsonElement ProfileArgs(string directory) =>
         JsonSerializer.SerializeToElement(new { profileDirectory = directory });
@@ -530,14 +559,8 @@ internal static class PlayerWorkflow
         var changes = args.TryGetProperty("changes", out _)
             ? Matrix(args, source)
             : LegacyChanges(args);
-        var backupScenario = EditorFiles.ApprovedNewPath(
-            args.GetProperty("backupScenarioPath").GetString()!,
-            ".mythscn"
-        );
-        var backupTrigger = EditorFiles.ApprovedNewPath(
-            args.GetProperty("backupTriggerPath").GetString()!,
-            ".trg"
-        );
+        var backupScenario = BackupScenario(args, true);
+        var backupTrigger = BackupTrigger(args, true);
         var verifyDir = Path.GetDirectoryName(
             EditorFiles.LocalPath(
                 Path.Combine(

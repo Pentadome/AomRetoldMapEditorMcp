@@ -226,13 +226,11 @@ internal static partial class AiInstaller
                 _ = RequiredHash(args, "expectedReceiptSha256");
                 _ = RequiredHash(args, "expectedInstalledSha256");
                 EditorFiles.Confirm(args, "confirmDestructive");
-                _ = EditorFiles.ApprovedNewPath(args.GetProperty("backupPath").GetString()!, ".xs");
             }
             else if (Force(args))
             {
                 _ = RequiredHash(args, "expectedInstalledSha256");
                 EditorFiles.Confirm(args, "confirmDestructive");
-                _ = EditorFiles.ApprovedNewPath(args.GetProperty("backupPath").GetString()!, ".xs");
             }
         }
     }
@@ -391,7 +389,11 @@ internal static partial class AiInstaller
                 ["ownershipReceiptPath"] = oldReceipt,
                 ["expectedReceiptSha256"] = Layout.Hash(oldReceipt),
                 ["expectedInstalledSha256"] = old,
-                ["backupPath"] = Path.Combine(directory, "backup-two.xs"),
+                ["backupPath"] = Path.Combine(
+                    directory,
+                    EditorFiles.AiBackupFolder,
+                    "backup-two.xs"
+                ),
             };
             Refuse(() => Execute(Json(update), exe));
             update["confirmDestructive"] = true;
@@ -417,6 +419,22 @@ internal static partial class AiInstaller
                     exe
                 )
             );
+            // Backups outside profile <id>\ai_backup are refused before staging/destination writes.
+            Refuse(() =>
+                Execute(
+                    Json(
+                        new Dictionary<string, object>(update)
+                        {
+                            ["backupPath"] = Path.Combine(directory, "backup-outside.xs"),
+                        }
+                    ),
+                    exe
+                )
+            );
+            if (Layout.Hash(destination) != old)
+                throw new InvalidOperationException(
+                    "Refused AI backup path changed the destination."
+                );
             var second = Json(Execute(Json(update), exe));
             if (
                 Layout.Hash((string)update["backupPath"]) != old
@@ -429,7 +447,11 @@ internal static partial class AiInstaller
             var third = new Dictionary<string, object>(update)
             {
                 ["stagingPath"] = Path.Combine(directory, "stage-three.xs"),
-                ["backupPath"] = Path.Combine(directory, "backup-three.xs"),
+                ["backupPath"] = Path.Combine(
+                    directory,
+                    EditorFiles.AiBackupFolder,
+                    "backup-three.xs"
+                ),
                 ["receiptPath"] = Path.Combine(managed, ".receipts", "three.json"),
                 ["ownershipReceiptPath"] = (string)update["receiptPath"],
                 ["expectedReceiptSha256"] = Layout.Hash((string)update["receiptPath"]),
@@ -494,7 +516,11 @@ internal static partial class AiInstaller
                 ["force"] = true,
                 ["expectedInstalledSha256"] = unregisteredHash,
                 ["stagingPath"] = Path.Combine(directory, "stage-forced.xs"),
-                ["backupPath"] = Path.Combine(directory, "backup-forced.xs"),
+                ["backupPath"] = Path.Combine(
+                    directory,
+                    EditorFiles.AiBackupFolder,
+                    "backup-forced.xs"
+                ),
                 ["receiptPath"] = Path.Combine(managed, ".receipts", "forced.json"),
             };
             Refuse(() => Execute(Json(forced), exe));
@@ -809,8 +835,17 @@ internal static partial class AiInstaller
             receiptPath = null;
         if (args.TryGetProperty("stagingPath", out var stage))
             staging = EditorFiles.ApprovedNewPath(stage.GetString()!, ".xs");
-        if (args.TryGetProperty("backupPath", out var bp))
-            backup = EditorFiles.ApprovedNewPath(bp.GetString()!, ".xs");
+        // Replaced bytes always go to profile <id>\ai_backup (root is <id>\Game\AI); backupPath only names the file.
+        if (update || args.TryGetProperty("backupPath", out _))
+            backup = EditorFiles.BackupPath(
+                args,
+                "backupPath",
+                Path.GetDirectoryName(Path.GetDirectoryName(root))!,
+                EditorFiles.AiBackupFolder,
+                ".xs",
+                Path.GetFileNameWithoutExtension(destination),
+                !Preview(args)
+            );
         if (args.TryGetProperty("receiptPath", out var rp))
         {
             receiptPath = EditorFiles.LocalPath(rp.GetString()!);
@@ -858,9 +893,7 @@ internal static partial class AiInstaller
                 runtimeVerified = false,
             };
         if (staging is null || receiptPath is null || update && backup is null)
-            throw new ArgumentException(
-                "Apply requires stagingPath/receiptPath; update also requires new backupPath."
-            );
+            throw new ArgumentException("Apply requires stagingPath/receiptPath.");
         var phase = "stage";
         var writesStarted = false;
         try

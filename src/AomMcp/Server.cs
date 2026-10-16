@@ -53,6 +53,18 @@ internal sealed partial class Server(
     static readonly string[] RecoveryOperations = ["inspect", "recover"];
     static readonly string[] TriggerEditOperations = ["patch", "clone"];
     static readonly string[] PlayerWorkflowOperations = ["preview", "verify", "apply"];
+
+    /// <summary>Schema text: scenario backups always land in the profile scenario_backup folder.</summary>
+    const string BackupScenarioDescription =
+        "Optional new .mythscn filename inside active-profile <id>\\"
+        + EditorFiles.ScenarioBackupFolder
+        + " (sibling of scenarioProfileDirectory; created on apply). Omit for a generated AomMcp-backup-<timestamp>-<id>.mythscn. Paths elsewhere are refused.";
+
+    /// <summary>Schema text: trigger backups always land in the profile trigger_backup folder.</summary>
+    const string BackupTriggerDescription =
+        "Optional new .trg filename inside active-profile <id>\\"
+        + EditorFiles.TriggerBackupFolder
+        + " (sibling of triggerProfileDirectory; created on apply). Omit for a generated AomMcp-backup-<timestamp>-<id>.trg. Paths elsewhere are refused.";
     static readonly string[] PlayerDirections = ["oneWay", "mutual"];
     static readonly string[] TriggerElementKinds = ["condition", "effect"];
     static readonly string[] TriggerDuplicateRequired = ["kind", "elementIndex"];
@@ -1864,8 +1876,16 @@ internal sealed partial class Server(
                 ["expectedAiPath"] = new { type = "string" },
                 ["desiredAiPath"] = new { type = "string" },
                 ["verificationPath"] = new { type = "string" },
-                ["backupScenarioPath"] = new { type = "string" },
-                ["backupTriggerPath"] = new { type = "string" },
+                ["backupScenarioPath"] = new
+                {
+                    type = "string",
+                    description = BackupScenarioDescription,
+                },
+                ["backupTriggerPath"] = new
+                {
+                    type = "string",
+                    description = BackupTriggerDescription,
+                },
                 ["verificationDirectory"] = new { type = "string" },
                 ["scenarioProfileDirectory"] = new { type = "string" },
                 ["triggerProfileDirectory"] = new { type = "string" },
@@ -1917,8 +1937,16 @@ internal sealed partial class Server(
                     },
                 },
                 ["verificationPath"] = new { type = "string" },
-                ["backupScenarioPath"] = new { type = "string" },
-                ["backupTriggerPath"] = new { type = "string" },
+                ["backupScenarioPath"] = new
+                {
+                    type = "string",
+                    description = BackupScenarioDescription,
+                },
+                ["backupTriggerPath"] = new
+                {
+                    type = "string",
+                    description = BackupTriggerDescription,
+                },
                 ["verificationDirectory"] = new { type = "string" },
                 ["scenarioProfileDirectory"] = new { type = "string" },
                 ["triggerProfileDirectory"] = new { type = "string" },
@@ -2079,7 +2107,7 @@ internal sealed partial class Server(
         );
         yield return Spec(
             "editor_triggers",
-            "Inspect/validate/legacy-patch strict TR v12 single Always/CodeSnippet controllers; editor_trigger_list/edit handles read-only campaign/preview/new-file patch/clone. export verifies game-writer staging; apply replaces whole trigger set only after expectedSha256 for prepared file AND expectedLivePath/expectedLiveSha256 of reviewed game export; fresh game-written backup must match its trigger/camera semantics (export basenames differ). confirmDestructive=true, guarded round-trip of body/cameras (export-basename metadata may differ). No XS effect/persistence proof; no retry/rollback. autoBackup=true takes the backup itself (no expectedLive*); add expectedBasePath/expectedBaseSha256 (editor_trigger_edit basePath/baseSha256) so a live trigger set changed since that export is refused with LIVE_SOURCE_CHANGED listing differing triggers; without them lostUpdateCheck=\"skipped\". Import RESETS the scenario's Triggers->XS Scripts list (.trg carries none): inspect/validate/apply return xsScripts {warning, lastKnown (trigtemp.xs includes + newest profile save), sources, reAdd}; re-add the scripts before playtesting. apply needs scripts=\"restore\"|\"ignore\" whenever lastKnown is non-empty (refused otherwise). restore reads the Script Manager list first, then re-includes every lastKnown name that matched a listed row and verifies by OCR readback (result {apply, scriptRestore {snapshot, restored, unrestorable, list, verified, prefixMatched}}); normal and alternative UI at 2560x1440 only (otherwise refused before the apply, no input; the alternative UI clips list rows, so names match by start and verified stays false), unrestorable rows must be re-added by hand (editor_xs_scripts).",
+            "Inspect/validate/legacy-patch strict TR v12 single Always/CodeSnippet controllers; editor_trigger_list/edit handles read-only campaign/preview/new-file patch/clone. export verifies game-writer staging; apply replaces whole trigger set only after expectedSha256 for prepared file AND expectedLivePath/expectedLiveSha256 of reviewed game export; fresh game-written backup must match its trigger/camera semantics (export basenames differ). The game-written backup is moved to active-profile <id>\\trigger_backup and returned as backupPath. confirmDestructive=true, guarded round-trip of body/cameras (export-basename metadata may differ). No XS effect/persistence proof; no retry/rollback. autoBackup=true takes the backup itself (no expectedLive*); add expectedBasePath/expectedBaseSha256 (editor_trigger_edit basePath/baseSha256) so a live trigger set changed since that export is refused with LIVE_SOURCE_CHANGED listing differing triggers; without them lostUpdateCheck=\"skipped\". Import RESETS the scenario's Triggers->XS Scripts list (.trg carries none): inspect/validate/apply return xsScripts {warning, lastKnown (trigtemp.xs includes + newest profile save), sources, reAdd}; re-add the scripts before playtesting. apply needs scripts=\"restore\"|\"ignore\" whenever lastKnown is non-empty (refused otherwise). restore reads the Script Manager list first, then re-includes every lastKnown name that matched a listed row and verifies by OCR readback (result {apply, scriptRestore {snapshot, restored, unrestorable, list, verified, prefixMatched}}); normal and alternative UI at 2560x1440 only (otherwise refused before the apply, no input; the alternative UI clips list rows, so names match by start and verified stays false), unrestorable rows must be re-added by hand (editor_xs_scripts).",
             new Dictionary<string, object>
             {
                 ["operation"] = new { type = "string", @enum = TriggerOperations },

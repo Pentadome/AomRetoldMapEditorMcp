@@ -175,6 +175,179 @@ internal static class EditorFiles
                 + extension
         );
 
+    /// <summary>Profile sibling folder (&lt;id&gt;\scenario_backup) holding every scenario backup a tool takes (user requirement).</summary>
+    internal const string ScenarioBackupFolder = "scenario_backup";
+
+    /// <summary>Profile sibling folder (&lt;id&gt;\trigger_backup) holding every trigger backup a tool takes (user requirement).</summary>
+    internal const string TriggerBackupFolder = "trigger_backup";
+
+    /// <summary>Profile sibling folder (&lt;id&gt;\ai_backup) holding replaced computer-player .xs files (user requirement).</summary>
+    internal const string AiBackupFolder = "ai_backup";
+
+    /// <summary>Profile sibling folder (&lt;id&gt;\campaign_backup) holding one subfolder per campaign mod update (user requirement).</summary>
+    internal const string CampaignBackupFolder = "campaign_backup";
+
+    /// <summary>Timestamp part of generated backup names; sortable, local time.</summary>
+    const string BackupStampFormat = "yyyyMMdd-HHmmss";
+
+    /// <summary>Profile home &lt;id&gt; of a profile kind directory such as &lt;id&gt;\scenario or &lt;id&gt;\trigger.</summary>
+    /// <param name="profileKindDirectory">Validated profile scenario or trigger directory.</param>
+    /// <returns>Parent profile directory.</returns>
+    internal static string ProfileHomeOf(string profileKindDirectory) =>
+        Path.GetDirectoryName(
+            Path.GetFullPath(profileKindDirectory).TrimEnd(Path.DirectorySeparatorChar)
+        )!;
+
+    /// <summary>Backup folder &lt;id&gt;\&lt;folder&gt;, e.g. &lt;id&gt;\scenario_backup.</summary>
+    /// <param name="home">Profile home &lt;id&gt;.</param>
+    /// <param name="folder">One of the *BackupFolder constants.</param>
+    /// <param name="create">Create the folder when missing (apply); preflight leaves the disk untouched.</param>
+    /// <returns>Full local backup folder path.</returns>
+    internal static string BackupDirectory(string home, string folder, bool create)
+    {
+        var directory = Path.GetDirectoryName(
+            LocalPath(Path.Combine(home, folder, "backup-path-check"))
+        )!;
+        if (create)
+            Directory.CreateDirectory(directory);
+        return directory;
+    }
+
+    /// <summary>Generated backup name AomMcp-&lt;purpose&gt;-&lt;timestamp&gt;-&lt;id&gt;&lt;extension&gt;.</summary>
+    /// <param name="purpose">Short tag.</param>
+    /// <param name="extension">File extension, or empty for a folder.</param>
+    /// <returns>Unique file or folder name.</returns>
+    static string BackupName(string purpose, string extension) =>
+        "AomMcp-"
+        + purpose
+        + "-"
+        + DateTime.Now.ToString(BackupStampFormat, CultureInfo.InvariantCulture)
+        + "-"
+        + Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture)
+        + extension;
+
+    /// <summary>
+    /// Supplied backup name (bare name or full path) resolved inside <paramref name="directory"/>, or a generated one when omitted.
+    /// </summary>
+    /// <param name="args">Tool arguments possibly naming the backup.</param>
+    /// <param name="field">Argument name.</param>
+    /// <param name="directory">Backup folder.</param>
+    /// <param name="generated">Name used when <paramref name="field"/> is omitted.</param>
+    /// <returns>Full path directly inside <paramref name="directory"/>.</returns>
+    static string BackupEntry(JsonElement args, string field, string directory, string generated)
+    {
+        if (
+            !args.TryGetProperty(field, out var supplied)
+            || supplied.ValueKind != JsonValueKind.String
+        )
+            return Path.Combine(directory, generated);
+        var name = supplied
+            .GetString()!
+            .Replace('/', Path.DirectorySeparatorChar)
+            .TrimEnd(Path.DirectorySeparatorChar);
+        var path = LocalPath(
+            name.Contains(Path.DirectorySeparatorChar) ? name : Path.Combine(directory, name)
+        );
+        if (
+            !string.Equals(
+                Path.GetDirectoryName(path),
+                directory,
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+            throw new ArgumentException(
+                field
+                    + " must name an entry directly inside "
+                    + directory
+                    + " (or omit it for a generated name)."
+            );
+        return path;
+    }
+
+    /// <summary>
+    /// New backup file inside &lt;id&gt;\<paramref name="folder"/>. Omitted <paramref name="field"/> generates
+    /// AomMcp-&lt;purpose&gt;-&lt;timestamp&gt;-&lt;id&gt;&lt;extension&gt;; a supplied bare filename or full path must resolve inside that folder.
+    /// </summary>
+    /// <param name="args">Tool arguments possibly naming the backup.</param>
+    /// <param name="field">Argument name, e.g. backupScenarioPath.</param>
+    /// <param name="home">Profile home &lt;id&gt;.</param>
+    /// <param name="folder">One of the *BackupFolder constants.</param>
+    /// <param name="extension">Required extension (.mythscn/.trg/.xs).</param>
+    /// <param name="purpose">Short tag in generated names.</param>
+    /// <param name="create">Create the folder and require a new file (apply) or only validate the spelling (preflight).</param>
+    /// <returns>Full path of the not-yet-existing backup file.</returns>
+    internal static string BackupPath(
+        JsonElement args,
+        string field,
+        string home,
+        string folder,
+        string extension,
+        string purpose,
+        bool create
+    )
+    {
+        var directory = BackupDirectory(home, folder, create);
+        var path = BackupEntry(args, field, directory, BackupName(purpose, extension));
+        if (!create)
+        {
+            if (!path.EndsWith(extension, StringComparison.OrdinalIgnoreCase) || File.Exists(path))
+                throw new ArgumentException(
+                    field + " must be a new " + extension + " file; never silently overwrite."
+                );
+            return path;
+        }
+        return ApprovedNewPath(path, extension);
+    }
+
+    /// <summary>
+    /// New backup subfolder inside &lt;id&gt;\<paramref name="folder"/> (not created here; the writer creates it with its first file).
+    /// Omitted <paramref name="field"/> generates AomMcp-&lt;purpose&gt;-&lt;timestamp&gt;-&lt;id&gt;.
+    /// </summary>
+    /// <param name="args">Tool arguments possibly naming the folder.</param>
+    /// <param name="field">Argument name, e.g. backupDirectory.</param>
+    /// <param name="home">Profile home &lt;id&gt;.</param>
+    /// <param name="folder">One of the *BackupFolder constants.</param>
+    /// <param name="purpose">Short tag in generated names.</param>
+    /// <returns>Full path of the not-yet-existing backup folder.</returns>
+    internal static string BackupFolderPath(
+        JsonElement args,
+        string field,
+        string home,
+        string folder,
+        string purpose
+    )
+    {
+        var path = BackupEntry(
+            args,
+            field,
+            BackupDirectory(home, folder, false),
+            BackupName(purpose, "")
+        );
+        if (Directory.Exists(path) || File.Exists(path))
+            throw new ArgumentException(field + " must be a NEW folder: " + path);
+        return path;
+    }
+
+    /// <summary>Moves a verified game-written trigger backup out of the profile trigger folder into &lt;id&gt;\trigger_backup.</summary>
+    /// <param name="written">Game-written backup in the profile trigger directory.</param>
+    /// <param name="bytes">Verified bytes the game wrote.</param>
+    /// <param name="triggerDirectory">Validated profile trigger directory.</param>
+    /// <returns>New backup path; hash re-verified after the move.</returns>
+    static string RetainTriggerBackup(string written, byte[] bytes, string triggerDirectory)
+    {
+        var target = ApprovedNewPath(
+            Path.Combine(
+                BackupDirectory(ProfileHomeOf(triggerDirectory), TriggerBackupFolder, true),
+                Path.GetFileName(written)
+            ),
+            ".trg"
+        );
+        File.Move(written, target);
+        if (Layout.Hash(target) != Convert.ToHexStringLower(SHA256.HashData(bytes)))
+            throw new IOException("Trigger backup changed while moving to " + target + ".");
+        return target;
+    }
+
     // Verified uiLoadTriggers native formatter at accepted-build RVA4347c48 is "%hs.trg";
     // uiSaveTriggers uses "%ls.trg". Live exports/checkpoints with suffixes produced .trg.trg
     // and .mythscn.mythscn respectively. These profile commands require bare filename stems.
@@ -771,6 +944,7 @@ internal static class EditorFiles
         try
         {
             var original = Export(backup, false, native, Guard);
+            backup = RetainTriggerBackup(backup, original, directory);
             var liveCheck =
                 "autoBackup: game-written export taken immediately before import is the retained original (no separately reviewed live export).";
             var lostUpdateCheck = auto ? "skipped" : "expectedLive";

@@ -19,6 +19,9 @@ internal static partial class CampaignBuilder
 {
     const long MaxScenarioBytes = 512L * 1024 * 1024;
     const string Latest = "latest";
+
+    /// <summary>Host bound for the mod-name tag in generated campaign_backup folder names; not a game limit.</summary>
+    const int MaxBackupTagLength = 32;
     static readonly string[] Keys =
     [
         "modsDirectory",
@@ -745,23 +748,18 @@ internal static partial class CampaignBuilder
                 if (replaces.Length > 0)
                 {
                     EditorFiles.Confirm(args, "confirmDestructive");
-                    var supplied =
-                        Optional(args, "backupDirectory")
-                        ?? throw new ArgumentException(
-                            "backupDirectory (new folder outside the mod) required to replace installed files."
-                        );
-                    backupDirectory = Path.GetDirectoryName(
-                        EditorFiles.LocalPath(supplied.TrimEnd('\\', '/') + "\\x")
-                    )!;
-                    if (
-                        Directory.Exists(backupDirectory)
-                        || File.Exists(backupDirectory)
-                        || !Directory.Exists(Path.GetDirectoryName(backupDirectory))
-                    )
-                        throw new ArgumentException(
-                            "backupDirectory must be a NEW folder in an existing parent: "
-                                + backupDirectory
-                        );
+                    // Replaced originals always go to a new subfolder of profile <id>\campaign_backup; backupDirectory only names it.
+                    backupDirectory = EditorFiles.BackupFolderPath(
+                        args,
+                        "backupDirectory",
+                        profile
+                            ?? ScenarioFiles.ProfileHome()
+                            ?? throw new InvalidDataException(
+                                "Cannot identify the profile <id> for campaign_backup; use modsDirectory <id>\\mods\\local."
+                            ),
+                        EditorFiles.CampaignBackupFolder,
+                        Sanitize(modName, "[^A-Za-z0-9_-]+", MaxBackupTagLength)
+                    );
                     if (
                         (backupDirectory + '\\').StartsWith(
                             modRoot.TrimEnd('\\') + '\\',
@@ -864,7 +862,7 @@ internal static partial class CampaignBuilder
                 ? "Review files/dependencies; then repeat with preview=false, confirmWrite=true and each scenario's sourcePath+expectedSha256 from this preview"
                     + (
                         plan.Operation == "update"
-                            ? ", expectedInstalled for every replace and a new backupDirectory outside the mod."
+                            ? ", expectedInstalled for every replace (originals are copied to a new folder in profile <id>\\campaign_backup; optional backupDirectory names it)."
                             : "."
                     )
                 : "Restart Age of Mythology Retold (mods load at startup).",
