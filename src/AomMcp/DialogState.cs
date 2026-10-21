@@ -1082,7 +1082,7 @@ internal static class DialogState
                 nativeDispatched = false,
             };
         native.RequireNoCursor();
-        var command = native.Commands["gadgetReal"];
+        var command = Catalog.Require(native.Commands, "gadgetReal");
         var expression = Catalog.Build(
             command,
             Json(new Dictionary<string, object?> { [command.Parameters[0].Name] = gadget })
@@ -1150,7 +1150,7 @@ internal static class DialogState
             };
         var ui = before.UiKind ?? before.Set!.UiKind;
         var target = Resolve(catalog.Windows, ui, gadget);
-        var command = native.Commands["gadgetUnreal"];
+        var command = Catalog.Require(native.Commands, "gadgetUnreal");
         var attempts = new List<object>();
         var dispatched = new List<string>();
         Match? after = null;

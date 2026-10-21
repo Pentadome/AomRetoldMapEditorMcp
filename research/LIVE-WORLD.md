@@ -39,6 +39,34 @@ Notation: `ctx = [base + contextRva]`, `world = [ctx + 8]` (same as map `worldOf
 * Water type names: `tm+0xb8` count, `tm+0xc8` pointer array; object `+0x140` → UTF-16 name
   (70 types, e.g. 31 = GreekLake). Live check: painted lake tiles (72..81,40..47) = 31.
 
+## Water surface height per node (`editor_terrain_info.waterSurface`)
+
+* `uiCoverTerrainWithWater` handler `0x682db0` → terrain vtable `+0xa8` (`0x1febd70`, args height, depth, waterType, 1)
+  → per-node setter vtable `+0x78` (`0x1fe0b20`), which writes the float grid at `terrain+0xb8` (same inline layout as
+  heights `terrain+0x78`: `+0` count, `+0x10` data, `+0x2c` stride) and the water tile byte grid `terrain+0x148`.
+  Layout `map.waterSurfaceOffset` = 184, signature at RVA 33426228 (live bytes = image).
+* Live diff: cover 7.25/2 → ground 5.25, surface 7.25, water byte 63 (AtlanteanSea); cover 9.75/3 → ground 6.75, surface 9.75.
+  The host reports the surface only on tiles whose water byte is not `0xff`.
+* **Picking:** elevation bumps, texture-paint clicks (exact tile under 8 units of water) and the camera target all hit the
+  terrain **under** water, not the surface; projecting at the surface caused `BRUSH_NOT_AT_TARGET`. (The plan's
+  surface-pick hypothesis was disproved.) The actual session bug: the 4-pass fixed-point `GroundHit` oscillated next to a
+  10-unit underwater plateau wall; it now ray-marches the cached height grid (0.25 tile steps) and bisects (10 passes).
+* **Not undoable:** two `editor_undo` after a cover changed nothing. Cover also leaves outline nodes of earlier edits at a
+  fixed height (4.15 live, with any cover arguments, also without a map resize); `editor_elevation flatten` clears them.
+  `editor_call editor_uiCoverTerrainWithWater` reports them as `verification.residualNodes`.
+* Water paint (`paintWater`): a GreekSea stroke changed 441 tiles, 33/34 path samples matched. Single dabs from the
+  yaw-45 camera landed ≈(+6,+6) world units from the target with ≈12 bytes changed; unresolved, strokes are unaffected.
+
+## Brush size (`editor_edit_mode.brushSize`)
+
+* `uiChangeBrushSize` handler `0x689820` → editor method `0x536960`: active brush shape `[editor+0x540]` (null in mode
+  None), kind int `+0x14` (jump table: 0/3 no-op, 1 one size, 2/5 two sizes, 4 → `0x5365b0`), size float `+0x80`.
+  Layout `world.brush` {shapeOffset 1344, typeOffset 20, sizeOffset 128} with signatures at `0x536960`/`0x536a10`.
+  (`world.brushOffset` 0x608 is the different paint-selection struct.)
+* Live: elevation 4 → `action_key_editor_3` → 3; Paint 1 → key 7 → 7 → `editor_uiChangeBrushSize(5,0,0,0)` → 5;
+  elevationsample keeps 4, elevation still 3 — each mode has its own size. Right after an edit-mode switch a size change
+  can apply up to ≈1 s late (likely the session's "missed" size keys); re-read `brushSize` to confirm.
+
 ## Editor edit mode
 
 * `int32` at `editor+0x4d0`. Code: `0x537730: cmp dword ptr [rcx+0x4d0],0x22; setne al; ret`
@@ -88,6 +116,10 @@ Notation: `ctx = [base + contextRva]`, `world = [ctx + 8]` (same as map `worldOf
 * Occlusion: a node behind freshly raised terrain (far corner from the camera) cannot be dabbed directly; the
   quantized `GroundHit` back-check accepted such pixels. Touch-ups test the camera ray against node heights and
   aim up to three nodes farther along the camera's horizontal forward (brush disc still covers the node).
+* Relief in front (live 2026-10-21): all four bump clicks for anchor (70,190) landed on an older ridge ≈7 units
+  toward the camera. Before the first click the host now runs the full ground-hit back-check and refuses with the hit
+  point (`TARGET_NOT_CLICKABLE`, nothing sent). Failures after dispatch report `undoSteps` (34 changed nodes restored by
+  18 undos, live).
 * Steep bump slopes (≈1.8 height per world unit) make `set` sampling pixel-limited (~0.1-0.2 height per pixel);
   `SAMPLE_NOT_CONVERGED` then reports the tried t/measured pairs. Larger tolerance or flatten-from-reference works.
 

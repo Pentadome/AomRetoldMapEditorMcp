@@ -12,6 +12,10 @@ internal sealed class WorkflowFailure : Exception
     internal string NextAction { get; }
     internal string[] RetainedPaths { get; }
 
+    /// <summary>Native edit dispatches (clicks/strokes) already applied before the failure, each expected to need one
+    /// editor_undo; null when not counted. Host count, not a read of the native undo stack.</summary>
+    internal int? UndoSteps { get; }
+
     internal WorkflowFailure(
         string code,
         string phase,
@@ -22,7 +26,8 @@ internal sealed class WorkflowFailure : Exception
         string? stagingPath = null,
         string? destinationPath = null,
         Exception? inner = null,
-        string[]? retainedPaths = null
+        string[]? retainedPaths = null,
+        int? undoSteps = null
     )
         : base(message, inner)
     {
@@ -34,6 +39,7 @@ internal sealed class WorkflowFailure : Exception
         DestinationPath = destinationPath;
         NextAction = nextAction;
         RetainedPaths = retainedPaths ?? [];
+        UndoSteps = undoSteps;
     }
 
     internal object Details =>
@@ -49,5 +55,6 @@ internal sealed class WorkflowFailure : Exception
             stagingPath = StagingPath,
             destinationPath = DestinationPath,
             nextAction = NextAction,
+            undoSteps = UndoSteps,
         };
 }

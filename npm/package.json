@@ -20,6 +20,8 @@
     "runtime/AomMcp.runtimeconfig.json",
     "runtime/layouts/*.json",
     "runtime/uilayouts/*.json",
+    "runtime/xs/*.json",
+    "runtime/help/*.md",
     "runtime/fixtures/ocr-*.bgra",
     "runtime/fixtures/playtest-ui-evidence*.json",
     "runtime/trigger-controller-template.trg",

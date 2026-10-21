@@ -176,6 +176,15 @@ internal sealed partial class Server
     /// <param name="game">Validated editor connection.</param>
     static CameraPose SettledPose(Game game) => PoseOf(WaitCamera(game));
 
+    /// <summary>Refuses before any camera input when a camera native is missing from the catalog (Catalog.Require).</summary>
+    void RequireCameraNatives()
+    {
+        foreach (
+            var command in new[] { ZoomCommand, PitchCommand, ZoomResetCommand, PitchResetCommand }
+        )
+            _ = _catalog.Require(command);
+    }
+
     /// <summary>Dispatches one catalog camera command with named arguments.</summary>
     /// <param name="game">Validated editor connection.</param>
     /// <param name="command">Catalog command name.</param>
@@ -183,7 +192,7 @@ internal sealed partial class Server
     void CameraNative(Game game, string command, object args) =>
         _bridge.Execute(
             game,
-            Catalog.Build(_catalog.Commands[command], JsonSerializer.SerializeToElement(args))
+            Catalog.Build(_catalog.Require(command), JsonSerializer.SerializeToElement(args))
         );
 
     /// <summary>Sets native zoom; one corrective dispatch if the readback misses (not observed live; safeguard).</summary>
@@ -232,6 +241,7 @@ internal sealed partial class Server
                 wheel,
                 limitation = CameraLimitation,
             };
+        RequireCameraNatives();
         switch (operation)
         {
             case "zoom":
@@ -333,6 +343,7 @@ internal sealed partial class Server
             maxZ = args.GetProperty("maxZ").GetDouble();
         var margin = Dbl(args, "margin", DefaultMargin);
         var restore = !args.TryGetProperty("restore", out var r) || r.GetBoolean();
+        RequireCameraNatives();
         var start = PoseOf(EditorView.ReadView(game));
         var center = CameraLookAt(
             game,

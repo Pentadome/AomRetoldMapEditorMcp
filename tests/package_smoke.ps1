@@ -15,7 +15,7 @@ try {
         'uilayouts/playtest-normal-en-2560x1440.json', 'fixtures/playtest-ui-evidence-normal-en-2560x1440.json',
         'uilayouts/playtest-alt-en-1920x1080.json', 'fixtures/playtest-ui-evidence-alt-en-1920x1080.json',
         'uilayouts/playtest-normal-en-1920x1080.json', 'fixtures/playtest-ui-evidence-normal-en-1920x1080.json',
-        'uilayouts/dialogs-normal-en-2560x1440.json')) {
+        'uilayouts/dialogs-normal-en-2560x1440.json', 'help/workflows.md', 'help/xs.md')) {
         if (!(Test-Path -LiteralPath (Join-Path $root $name) -PathType Leaf)) { throw "Missing package file: $name" }
     }
     if (!(Get-ChildItem -LiteralPath (Join-Path $root 'layouts') -Filter '*.json')) { throw 'Reviewed layouts missing.' }

@@ -38,6 +38,13 @@ internal sealed partial class Server(
     static readonly int[] HeldInputKeys = [1, 2, 0x10, 0x11, 0x12];
 
     // Host batch schema: step must identify an existing tool; modifiers are Ui.Press's public names.
+    /// <summary>Natives dispatched by checkpoint/trigger workflows (EditorFiles.cs Save/Import); checked before the first dispatch.</summary>
+    static readonly string[] CheckpointNatives =
+    [
+        "saveScenario",
+        "uiSaveTriggers",
+        "uiLoadTriggers",
+    ];
     static readonly string[] StepRequired = ["name"];
     static readonly string[] AreaRequired = ["x", "z", "radius"]; // Host world-XZ circle filter fields.
     static readonly JsonElement Empty = JsonDocument.Parse("{}").RootElement.Clone();
@@ -1094,12 +1101,23 @@ internal sealed partial class Server(
         var game = batchGame ?? ownedGame!;
         if (name == "editor_place_formation")
             return Formations.Place(game, args, a => Place(game, a));
+        // Checkpoint workflows dispatch several natives in sequence; refuse up front so a missing later command cannot
+        // be reported as "nothing dispatched" after an earlier one ran.
+        if (
+            name
+            is "editor_set_diplomacy"
+                or "editor_player_settings"
+                or "editor_save_checkpoint"
+                or "editor_triggers"
+        )
+            foreach (var required in CheckpointNatives)
+                _ = _catalog.Require(required);
         if (name == "editor_set_diplomacy")
             return PlayerWorkflow.Apply(
                 game,
                 args,
                 exe,
-                (command, a) => _bridge.Execute(game, Catalog.Build(_catalog.Commands[command], a))
+                (command, a) => _bridge.Execute(game, Catalog.Build(_catalog.Require(command), a))
             );
         if (name == "editor_player_settings")
             return PlayerSettings.Execute(
@@ -1107,13 +1125,13 @@ internal sealed partial class Server(
                 args,
                 exe,
                 _layout.ExeSha256,
-                (command, a) => _bridge.Execute(game, Catalog.Build(_catalog.Commands[command], a))
+                (command, a) => _bridge.Execute(game, Catalog.Build(_catalog.Require(command), a))
             );
         if (name == "editor_save_checkpoint")
             return EditorFiles.Checkpoint(
                 game,
                 args,
-                (command, a) => _bridge.Execute(game, Catalog.Build(_catalog.Commands[command], a))
+                (command, a) => _bridge.Execute(game, Catalog.Build(_catalog.Require(command), a))
             );
         if (name == "editor_triggers")
         {
@@ -1122,7 +1140,7 @@ internal sealed partial class Server(
                     game,
                     args,
                     (command, a) =>
-                        _bridge.Execute(game, Catalog.Build(_catalog.Commands[command], a))
+                        _bridge.Execute(game, Catalog.Build(_catalog.Require(command), a))
                 );
             return
                 args.TryGetProperty("scripts", out var mode) && mode.GetString() == RestoreScripts
@@ -1206,7 +1224,14 @@ internal sealed partial class Server(
             // Host tool namespaces editor_/action_ both have 7 chars (Catalog.Tools).
             // uiPlaceAtPointer/uiPaint names come from native help/editor.con and require map hover.
             var script = Catalog.Build(command, args);
-            return _bridge.Execute(game, script, command.Name is "uiPlaceAtPointer" or "uiPaint");
+            var result = _bridge.Execute(
+                game,
+                script,
+                command.Name is "uiPlaceAtPointer" or "uiPaint"
+            );
+            return command.Name == CoverWaterCommand
+                ? CoverWaterReport(game, args, result)
+                : result;
         }
         if (
             name.StartsWith("action_", StringComparison.Ordinal)

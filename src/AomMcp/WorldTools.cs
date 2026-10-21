@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 using System.Text.Json;
 using System.Xml.Linq;
@@ -244,6 +245,7 @@ internal sealed partial class Server
         }
         var mode = LiveWorld.EditMode(game);
         var selections = LiveWorld.ReadSelections(game);
+        var brush = LiveWorld.ReadBrush(game);
         var frame = SceneUi.Capture(game);
         var ui = SceneUi.TryLoad(game, frame, out var reason);
         return new
@@ -271,8 +273,10 @@ internal sealed partial class Server
                 forest = selections.ForestName,
                 cliff = selections.CliffName,
             },
+            brushSize = brush?.Size,
+            brushType = brush?.Type,
             modes = LiveWorld.Modes.Select(x => x.Name).ToArray(),
-            limitation = "Edit mode and paint selections are passive memory reads (research/LIVE-WORLD.md); UI kind/panels from pixel gates on one screenshot (focuses game). exit loops editMode(\"None\") until mode 0 (PlaceUnit needs two calls). Mix selection is not readable from memory.",
+            limitation = "Edit mode and paint selections are passive memory reads (research/LIVE-WORLD.md); UI kind/panels from pixel gates on one screenshot (focuses game). exit loops editMode(\"None\") until mode 0 (PlaceUnit needs two calls). Mix selection is not readable from memory. brushSize/brushType: active tool's brush (null with no tool); each edit mode keeps its own size, and uiChangeBrushSize/hotkeys apply on the next frame (re-read to confirm).",
         };
     }
 
@@ -293,6 +297,7 @@ internal sealed partial class Server
     {
         if (!v.InsideMap(x, z))
             return null;
+        // Brushes pick the terrain under water, not the surface (live dab diffs, research/LIVE-WORLD.md).
         var h = atHeight ?? v.Height(x, z).Height;
         var p = v.Project(new Vector3((float)x, h, (float)z));
         if (!p.VisibleInViewport)
@@ -317,6 +322,52 @@ internal sealed partial class Server
         return ((int)Math.Round(p.X), (int)Math.Round(p.Y));
     }
 
+    /// <summary>Why <see cref="PixelFor"/> rejects a world point (same checks, first failing one), for error messages.</summary>
+    static string PixelWhy(
+        EditorView.ViewState v,
+        SceneUi? ui,
+        SceneUi.Area[]? occ,
+        int width,
+        int height,
+        double x,
+        double z,
+        double tolerance,
+        float? atHeight = null
+    )
+    {
+        if (!v.InsideMap(x, z))
+            return string.Create(CultureInfo.InvariantCulture, $"({x:0.#},{z:0.#}) outside map");
+        var h = atHeight ?? v.Height(x, z).Height;
+        var p = v.Project(new Vector3((float)x, h, (float)z));
+        if (!p.VisibleInViewport)
+            return string.Create(
+                CultureInfo.InvariantCulture,
+                $"({x:0.#},{z:0.#}) at y={h:0.##} projects off-screen ({p.X:0},{p.Y:0})"
+            );
+        if (
+            !(
+                ui is null
+                    ? SceneUi.CentralRegion(p.X, p.Y, width, height)
+                    : ui.Clear(occ!, p.X, p.Y, width, height)
+            )
+        )
+            return string.Create(
+                CultureInfo.InvariantCulture,
+                $"({x:0.#},{z:0.#}) pixel ({p.X:0},{p.Y:0}) under a UI panel"
+            );
+        if (atHeight is null && v.GroundHit(v.RayAt(p.X, p.Y)) is var hit)
+            return hit is { } g
+                ? string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"({x:0.#},{z:0.#}) pixel ({p.X:0},{p.Y:0}) ray meets terrain at ({g.X:0.#},{g.Z:0.#}) y={g.Y:0.##}, beyond tolerance {Math.Max(1, tolerance):0.#} (relief in front)"
+                )
+                : string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"({x:0.#},{z:0.#}) pixel ({p.X:0},{p.Y:0}) ray misses terrain"
+                );
+        return string.Create(CultureInfo.InvariantCulture, $"({x:0.#},{z:0.#}) clickable");
+    }
+
     sealed record ScreenPath(
         (int X, int Y)[] Pixels,
         EditorView.ViewState View,
@@ -326,12 +377,19 @@ internal sealed partial class Server
     );
 
     /// <summary>Maps world points to clickable pixels in one view, moving the camera (minimap) to the centroid once if needed.</summary>
+    /// <param name="game">Validated editor connection.</param>
+    /// <param name="points">World X/Z points.</param>
+    /// <param name="moveCamera">Whether the camera may move (minimap look-at; zoom only with <paramref name="zoomOut"/>).</param>
+    /// <param name="tolerance">Ground-hit back-check tolerance (world units).</param>
+    /// <param name="atHeight">Projection height instead of terrain (skips the ground-hit back-check).</param>
+    /// <param name="zoomOut">Zoom out stepwise (up to <see cref="AutoZoomLimit"/>) when the points still do not fit.</param>
     ScreenPath Screen(
         Game game,
         (double X, double Z)[] points,
         bool moveCamera,
         double tolerance,
-        float? atHeight = null
+        float? atHeight = null,
+        bool zoomOut = false
     )
     {
         var (width, height) = Ui.ClientSize(game);
@@ -352,38 +410,270 @@ internal sealed partial class Server
         {
             if (!moveCamera || ui is null)
                 throw new WorkflowFailure(
-                    "TARGET_NOT_CLICKABLE",
+                    NotClickableCode,
                     "preflight",
                     ui is null
                         ? "Points not in trusted central region and UI not detected (no minimap camera)."
-                        : "Some points not visible/clear of UI panels and moveCamera=false.",
+                        : $"Some points not visible/clear of UI panels and moveCamera=false. First: {PixelWhy(view, ui, occ, width, height, points[Array.IndexOf(pixels, null)].X, points[Array.IndexOf(pixels, null)].Z, tolerance, atHeight)}.",
                     false,
                     false,
                     "Move camera (editor_camera_frame) then retry. No input sent."
                 );
             double cx = (points.Min(p => p.X) + points.Max(p => p.X)) / 2,
                 cz = (points.Min(p => p.Z) + points.Max(p => p.Z)) / 2;
-            camera = CameraLookAt(game, cx, cz, 2, 4);
-            view = EditorView.ReadView(game);
-            frame = SceneUi.Capture(game);
-            occ = ui.Occluders(frame);
-            pixels = Map(view, occ);
-            var missing = pixels
-                .Select((p, i) => (p, i))
-                .Where(t => t.p is null)
-                .Select(t => t.i)
-                .ToArray();
+            int[] Missing() =>
+                pixels.Select((p, i) => (p, i)).Where(t => t.p is null).Select(t => t.i).ToArray();
+            void Aim()
+            {
+                // Normal UI bottom panels cover the near-camera band; aim at the largest UI-free rectangle, not the viewport centre.
+                var (ax, az) = ClearAim(view, ui, occ, width, height, cx, cz);
+                camera = CameraLookAt(game, ax, az, 2, 4);
+                view = EditorView.ReadView(game);
+                frame = SceneUi.Capture(game);
+                occ = ui.Occluders(frame);
+                pixels = Map(view, occ);
+            }
+            Aim();
+            var missing = Missing();
+            var zooms = new List<double>();
+            while (
+                zoomOut && missing.Length > 0 && (PoseOf(view).Zoom ?? DefaultZoom) < AutoZoomLimit
+            )
+            {
+                var (pose, _, _) = SetZoom(
+                    game,
+                    Math.Min(AutoZoomLimit, (PoseOf(view).Zoom ?? DefaultZoom) * AutoZoomFactor)
+                );
+                zooms.Add(pose.Zoom ?? DefaultZoom);
+                view = EditorView.ReadView(game);
+                Aim();
+                missing = Missing();
+            }
+            if (zooms.Count > 0)
+                camera = new { lookAt = camera, zoomedOutTo = zooms };
             if (missing.Length > 0)
                 throw new WorkflowFailure(
-                    "TARGET_NOT_CLICKABLE",
+                    NotClickableCode,
                     "camera",
-                    $"Points {string.Join(",", missing.Take(10))} not clickable after centering camera (too spread for one view, hidden behind UI panels or map edge).",
+                    $"Points {string.Join(",", missing.Take(10))} not clickable after centering camera (too spread for one view, hidden behind UI panels, relief or map edge). First: {PixelWhy(view, ui, occ, width, height, points[missing[0]].X, points[missing[0]].Z, tolerance, atHeight)}.",
                     false,
                     false,
-                    "Camera moved only; scene unchanged. Split the stroke/area into smaller parts."
+                    "Camera moved only; scene unchanged. Split the stroke/area into smaller parts (editor_paint_world splits strokes itself)."
                 );
         }
         return new(pixels.Select(p => p!.Value).ToArray(), view, ui, occ, camera);
+    }
+
+    /// <summary>Largest auto zoom (native cameraMaxZoomSet distance) for areas that do not fit; 130 painted/sampled
+    /// correctly in the 2026-10-20 Wake Island session (1600×900). Native accepts up to MaxZoom.</summary>
+    const double AutoZoomLimit = 130;
+
+    /// <summary>Auto zoom-out step factor; host choice (85 → 106 → 130).</summary>
+    const double AutoZoomFactor = 1.25;
+
+    /// <summary>Native whole-map water cover command (catalog name, exe help: "flattens terrain and paints water over the
+    /// entire map").</summary>
+    const string CoverWaterCommand = "uiCoverTerrainWithWater";
+
+    /// <summary>Node-height tolerance for the cover-water floor check (host choice, matches editor_elevation default).</summary>
+    const float CoverTolerance = 0.05f;
+
+    /// <summary>Listed residual nodes / dry tiles in the cover-water report (host output bound).</summary>
+    const int CoverListLimit = 20;
+
+    /// <summary>Settle before the passive read (host choice; live: grid updated within one 1 s poll after the call).</summary>
+    const int CoverSettleMs = 300;
+
+    /// <summary>Passive full-grid check after uiCoverTerrainWithWater: nodes left above the floor (waterHeight - depth),
+    /// nodes above the water surface and tiles without water. Live (Wake Island session and 2026-10-21 replay without a
+    /// resize): outline nodes of earlier edits stayed at 4.15 above the floor, unchanged by repeated covers.</summary>
+    /// <param name="game">Validated editor connection.</param>
+    /// <param name="args">Native arguments waterHeight, depth, name.</param>
+    /// <param name="native">Native dispatcher result, returned unchanged.</param>
+    static object CoverWaterReport(Game game, JsonElement args, object native)
+    {
+        Thread.Sleep(CoverSettleMs);
+        var surface = (float)args.GetProperty("waterHeight").GetDouble();
+        var floor = surface - (float)args.GetProperty("depth").GetDouble();
+        var view = EditorView.ReadView(game);
+        int nodes = 0,
+            residual = 0,
+            above = 0;
+        int rx0 = int.MaxValue,
+            rz0 = int.MaxValue,
+            rx1 = -1,
+            rz1 = -1;
+        var listed = new List<object>();
+        for (var ix = 0; ix < view.Vertices[0]; ix++)
+        {
+            var row = view.HeightRow(ix, 0, view.Vertices[1]);
+            for (var iz = 0; iz < row.Length; iz++)
+            {
+                nodes++;
+                if (row[iz] > surface)
+                    above++;
+                if (row[iz] <= floor + CoverTolerance)
+                    continue;
+                residual++;
+                (rx0, rz0, rx1, rz1) = (
+                    Math.Min(rx0, ix),
+                    Math.Min(rz0, iz),
+                    Math.Max(rx1, ix),
+                    Math.Max(rz1, iz)
+                );
+                if (listed.Count < CoverListLimit)
+                    listed.Add(
+                        new
+                        {
+                            x = ix * view.Scale,
+                            z = iz * view.Scale,
+                            height = row[iz],
+                        }
+                    );
+            }
+        }
+        var tiles = new LiveWorld.Tiles(game, view);
+        var dry = new List<object>();
+        var dryCount = 0;
+        for (var tx = 0; tx < tiles.TilesX; tx++)
+        for (var tz = 0; tz < tiles.TilesZ; tz++)
+            if (tiles.WaterName(tiles.At(tx, tz)) is null)
+            {
+                dryCount++;
+                if (dry.Count < CoverListLimit)
+                    dry.Add(new { x = tx * view.Scale, z = tz * view.Scale });
+            }
+        return new
+        {
+            native,
+            verification = new
+            {
+                floor,
+                surface,
+                tolerance = CoverTolerance,
+                nodes,
+                residualNodes = new
+                {
+                    count = residual,
+                    bbox = residual == 0
+                        ? null
+                        : new
+                        {
+                            minX = rx0 * view.Scale,
+                            minZ = rz0 * view.Scale,
+                            maxX = rx1 * view.Scale,
+                            maxZ = rz1 * view.Scale,
+                        },
+                    first = listed,
+                },
+                aboveSurface = above,
+                tilesWithoutWater = new { count = dryCount, first = dry },
+                success = residual == 0 && dryCount == 0,
+            },
+            limitation = "Passive read of node heights and the per-tile water grid after the native call (research/LIVE-WORLD.md). residualNodes = nodes above waterHeight - depth + tolerance. Live: outlines of earlier land/water-paint edits stayed at a fixed height (4.15) through repeated covers with any arguments; editor_elevation flatten over residualNodes.bbox (reference at a floor node) cleared them. Undo with editor_undo. Not saved.",
+        };
+    }
+
+    /// <summary>Error code for world points that cannot be mapped to a clickable, UI-free pixel.</summary>
+    const string NotClickableCode = "TARGET_NOT_CLICKABLE";
+
+    /// <summary>Touch-up aim offsets in nodes along the camera's horizontal forward, tried in order. Positive: nodes hidden
+    /// behind raised terrain (brush disc ~2.5 nodes still covers them). Negative: low nodes behind a plateau wall, aimed on
+    /// the plateau edge in front (live: 10-unit plateau over a deep water floor left far-corner nodes unpainted).</summary>
+    static readonly int[] TouchUpAimOffsets = [0, 1, 2, 3, -1, -2];
+
+    /// <summary>Error code for a non-workflow exception after elevation edits were dispatched (host-defined).</summary>
+    const string ElevationIncompleteCode = "ELEVATION_INCOMPLETE";
+
+    /// <summary>Grid cell (client pixels) for the UI-free rectangle search; host choice, finer than any occluder edge needs.</summary>
+    const int ClearCellPixels = 10;
+
+    /// <summary>Camera look-at target that puts world (x,z) at the centre of the largest UI-free rectangle.</summary>
+    /// <param name="v">Current view; pan offsets are reused because minimap look-at keeps zoom/orientation.</param>
+    /// <param name="ui">Detected scene UI.</param>
+    /// <param name="occ">Occluders for the current frame.</param>
+    /// <param name="width">Client width.</param>
+    /// <param name="height">Client height.</param>
+    /// <param name="x">World X to frame.</param>
+    /// <param name="z">World Z to frame.</param>
+    /// <returns>Look-at target clamped to the map; (x,z) when no offset can be computed.</returns>
+    static (double X, double Z) ClearAim(
+        EditorView.ViewState v,
+        SceneUi ui,
+        SceneUi.Area[]? occ,
+        int width,
+        int height,
+        double x,
+        double z
+    )
+    {
+        if (occ is null || LargestClear(ui, occ, width, height) is not { } r)
+            return (x, z);
+        var plane = v.Target()?.Y ?? 0;
+        Vector3? OnPlane(Vector3 d) =>
+            d.Y < 0 ? v.Pose.Position + d * ((plane - v.Pose.Position.Y) / d.Y) : null;
+        if (
+            OnPlane(v.Pose.Forward) is not { } centre
+            || OnPlane(v.RayAt((float)(r.X + r.W / 2), (float)(r.Y + r.H / 2))) is not { } aim
+        )
+            return (x, z);
+        return (
+            Math.Clamp(x - (aim.X - centre.X), 0, v.WorldWidth),
+            Math.Clamp(z - (aim.Z - centre.Z), 0, v.WorldDepth)
+        );
+    }
+
+    /// <summary>Largest axis-aligned client rectangle whose grid cells are all clear of UI (maximal-rectangle histogram).</summary>
+    /// <param name="ui">Detected scene UI.</param>
+    /// <param name="occ">Occluders for the current frame.</param>
+    /// <param name="width">Client width.</param>
+    /// <param name="height">Client height.</param>
+    /// <returns>Rectangle in client pixels, or null when no cell is clear.</returns>
+    static (double X, double Y, double W, double H)? LargestClear(
+        SceneUi ui,
+        SceneUi.Area[] occ,
+        int width,
+        int height
+    )
+    {
+        int cols = width / ClearCellPixels,
+            rows = height / ClearCellPixels;
+        var run = new int[cols];
+        (int Area, int X, int Y, int W, int H) best = default;
+        for (var row = 0; row < rows; row++)
+        {
+            for (var col = 0; col < cols; col++)
+                run[col] = ui.Clear(
+                    occ,
+                    (col + 0.5) * ClearCellPixels,
+                    (row + 0.5) * ClearCellPixels,
+                    width,
+                    height
+                )
+                    ? run[col] + 1
+                    : 0;
+            var stack = new Stack<int>();
+            for (var col = 0; col <= cols; col++)
+            {
+                var h = col < cols ? run[col] : 0;
+                while (stack.Count > 0 && run[stack.Peek()] >= h)
+                {
+                    var top = run[stack.Pop()];
+                    var left = stack.Count > 0 ? stack.Peek() + 1 : 0;
+                    if (top * (col - left) > best.Area)
+                        best = (top * (col - left), left, row - top + 1, col - left, top);
+                }
+                stack.Push(col);
+            }
+        }
+        return best.Area == 0
+            ? null
+            : (
+                best.X * ClearCellPixels,
+                best.Y * ClearCellPixels,
+                best.W * ClearCellPixels,
+                best.H * ClearCellPixels
+            );
     }
 
     static void RequireNoHeldInput()
@@ -534,6 +824,7 @@ internal sealed partial class Server
         EnterMode(game, PaintMode(kind));
         steps.Add(new { editMode = PaintMode(kind) });
         string? selectionNote = null;
+        var strokes = 0;
         try
         {
             switch (kind)
@@ -581,17 +872,32 @@ internal sealed partial class Server
                     );
             }
             steps.Add(new { selected = type, selectionNote });
-            var path = Screen(game, points, moveCamera, 2);
-            RequireNoHeldInput();
-            Ui.DragPath(game, path.Pixels, duration);
-            steps.Add(
-                new
-                {
-                    stroke = path.Pixels.Select(p => new[] { p.X, p.Y }).ToArray(),
-                    durationMs = duration,
-                    camera = path.Camera,
-                }
-            );
+            try
+            {
+                PaintChunks(
+                    game,
+                    points,
+                    moveCamera,
+                    duration,
+                    PathLength(points),
+                    0,
+                    steps,
+                    ref strokes
+                );
+            }
+            catch (WorkflowFailure f) when (strokes > 0)
+            {
+                throw new WorkflowFailure(
+                    f.Code,
+                    f.Phase,
+                    $"{f.Message} {strokes} earlier stroke chunk(s) were already painted.",
+                    true,
+                    false,
+                    $"Scene changed: run editor_undo {strokes} time(s) to revert the painted chunks, or paint the rest separately.",
+                    inner: f,
+                    undoSteps: strokes
+                );
+            }
             Thread.Sleep(300); // Host settle for terrain/object updates before verification reads.
         }
         finally
@@ -674,6 +980,7 @@ internal sealed partial class Server
             kind,
             type,
             points = points.Length,
+            strokes,
             steps,
             verification = new
             {
@@ -699,9 +1006,107 @@ internal sealed partial class Server
                     .ToArray(),
             },
             editModeAfter = LiveWorld.ModeName(LiveWorld.EditMode(game)),
-            limitation = "Drags the left mouse along projected stroke pixels in the native paint tool with the CURRENT brush size/shape. Verification diffs live tile textures/water grid/heights in the stroke bounds (+8 tiles) and live objects; mixes cannot be read back except through tile changes. Forest painting may remove objects under the brush (panel 'Remove Nature/Non-Nature' options). Undo with editor_undo (one per stroke). Scenario not saved.",
+            limitation = "Drags the left mouse along projected stroke pixels in the native paint tool with the CURRENT brush size/shape. Verification diffs live tile textures/water grid/heights in the stroke bounds (+8 tiles) and live objects; mixes cannot be read back except through tile changes. Forest painting may remove objects under the brush (panel 'Remove Nature/Non-Nature' options). Strokes that do not fit one view (UI panels, spread) are halved recursively (shared endpoints, camera re-aimed per chunk); `strokes` = painted chunks. Undo with editor_undo (one per stroke chunk). Scenario not saved.",
         };
     }
+
+    /// <summary>Host bound on recursive stroke halving (2^6 = 64 chunks at most).</summary>
+    const int MaxStrokeSplitDepth = 6;
+
+    /// <summary>Shortest chunk duration; host choice, above the 100 ms DragPath floor so each chunk still registers.</summary>
+    const int MinChunkDurationMs = 300;
+
+    /// <summary>World length of a polyline.</summary>
+    /// <param name="points">World X/Z vertices.</param>
+    static double PathLength((double X, double Z)[] points) =>
+        points
+            .Zip(points.Skip(1))
+            .Sum(s =>
+                Math.Sqrt(Math.Pow(s.Second.X - s.First.X, 2) + Math.Pow(s.Second.Z - s.First.Z, 2))
+            );
+
+    /// <summary>Paints a polyline as one stroke, or halves it (shared endpoint) when it does not fit one camera view.</summary>
+    /// <param name="game">Validated editor connection.</param>
+    /// <param name="points">World X/Z vertices of this chunk.</param>
+    /// <param name="moveCamera">Whether the camera may move.</param>
+    /// <param name="duration">Duration for the whole requested stroke; chunks get their length share.</param>
+    /// <param name="total">World length of the whole requested stroke.</param>
+    /// <param name="depth">Current split depth.</param>
+    /// <param name="steps">Step log (one entry per painted chunk).</param>
+    /// <param name="strokes">Painted chunk count (one editor_undo each).</param>
+    void PaintChunks(
+        Game game,
+        (double X, double Z)[] points,
+        bool moveCamera,
+        int duration,
+        double total,
+        int depth,
+        List<object> steps,
+        ref int strokes
+    )
+    {
+        ScreenPath path;
+        try
+        {
+            path = Screen(game, points, moveCamera, 2);
+        }
+        catch (WorkflowFailure f)
+            when (f.Code == NotClickableCode
+                && moveCamera
+                && points.Length > 1
+                && depth < MaxStrokeSplitDepth
+            )
+        {
+            var halves =
+                points.Length > 2
+                    ? (points[..(points.Length / 2 + 1)], points[(points.Length / 2)..])
+                    : (
+                        new[] { points[0], Mid(points[0], points[1]) },
+                        new[] { Mid(points[0], points[1]), points[1] }
+                    );
+            PaintChunks(
+                game,
+                halves.Item1,
+                moveCamera,
+                duration,
+                total,
+                depth + 1,
+                steps,
+                ref strokes
+            );
+            PaintChunks(
+                game,
+                halves.Item2,
+                moveCamera,
+                duration,
+                total,
+                depth + 1,
+                steps,
+                ref strokes
+            );
+            return;
+        }
+        var share =
+            total > 0
+                ? Math.Max(MinChunkDurationMs, (int)(duration * PathLength(points) / total))
+                : duration;
+        RequireNoHeldInput();
+        Ui.DragPath(game, path.Pixels, Math.Min(share, duration));
+        strokes++;
+        steps.Add(
+            new
+            {
+                stroke = path.Pixels.Select(p => new[] { p.X, p.Y }).ToArray(),
+                world = depth > 0 ? points.Select(p => new[] { p.X, p.Z }).ToArray() : null,
+                durationMs = Math.Min(share, duration),
+                camera = path.Camera,
+            }
+        );
+    }
+
+    /// <summary>Midpoint of two world X/Z points.</summary>
+    static (double X, double Z) Mid((double X, double Z) a, (double X, double Z) b) =>
+        ((a.X + b.X) / 2, (a.Z + b.Z) / 2);
 
     /// <summary>Texture selection: already selected → sample a visible tile with that texture → normal-UI palette OCR search.</summary>
     string SelectTexture(Game game, string type, LiveWorld.Catalogs names)
@@ -978,6 +1383,10 @@ internal sealed partial class Server
         );
     }
 
+    /// <summary>Elevation edit dispatches (bump/dab clicks, strokes) in the running editor_elevation call; reported as
+    /// undoSteps when a later phase fails. Tools run one at a time per server.</summary>
+    int _elevationEdits;
+
     object Elevation(Game game, JsonElement args)
     {
         var op = String(args, "operation");
@@ -1008,12 +1417,20 @@ internal sealed partial class Server
         var steps = new List<object> { new { exitedMode = LiveWorld.ModeName(exited.Before) } };
         double? target = op == "set" ? args.GetProperty("height").GetDouble() : null;
         double? sampled = null;
+        _elevationEdits = 0;
         try
         {
             // Ensure the whole stroke is visible first (camera may move once).
             // Visibility pre-check (may move camera): at the target height for set; otherwise loose ray tolerance because
             // steep existing edges make quantized back-projection noisy.
-            var screen = Screen(game, path, moveCamera, 4, target is { } th ? (float)th : null);
+            var screen = Screen(
+                game,
+                path,
+                moveCamera,
+                4,
+                target is { } th ? (float)th : null,
+                zoomOut: true
+            );
             if (screen.Camera is not null)
                 steps.Add(new { camera = screen.Camera });
             if (op == "smooth")
@@ -1026,6 +1443,7 @@ internal sealed partial class Server
                     screen.Pixels,
                     Int(args, "durationMs", Math.Clamp(200 * path.Length, 400, 5000))
                 );
+                _elevationEdits++;
                 steps.Add(new { smoothStroke = path.Length });
             }
             else
@@ -1080,9 +1498,10 @@ internal sealed partial class Server
                     screen = Screen(
                         game,
                         pass == 0 ? path : path.Reverse().ToArray(),
-                        false,
+                        moveCamera, // SetSample may have moved the camera; re-aim instead of failing (live).
                         2,
-                        goalHeight
+                        goalHeight,
+                        zoomOut: moveCamera
                     );
                     RequireNoHeldInput();
                     Ui.DragPath(
@@ -1090,12 +1509,13 @@ internal sealed partial class Server
                         screen.Pixels,
                         Int(args, "durationMs", Math.Clamp(120 * path.Length, 300, 5000))
                     );
+                    _elevationEdits++;
                     Thread.Sleep(150);
                 }
                 steps.Add(new { paintStroke = path.Length, passes = 2 });
                 // Touch-up: dab remaining off-target nodes (stroke ends/disc corners), host bound 40 dabs.
                 var touched = 0;
-                var aims = new List<int>();
+                var aims = new List<int?>();
                 for (var round = 0; round < 2; round++)
                 {
                     var v2 = EditorView.ReadView(game);
@@ -1113,7 +1533,14 @@ internal sealed partial class Server
                     }
                     if (misses.Count == 0 || touched + misses.Count > 40)
                         break;
-                    var dabs = Screen(game, misses.ToArray(), false, 4, goalHeight);
+                    var dabs = Screen(
+                        game,
+                        misses.ToArray(),
+                        moveCamera,
+                        4,
+                        goalHeight,
+                        zoomOut: moveCamera
+                    );
                     // The brush lands where the pointer ray meets CURRENT terrain. A node still far from the goal (e.g. the
                     // corner farthest from the camera next to a raised plateau) projected at goal height lands ~2 nodes beyond
                     // it, so prefer the current-terrain pixel when its ground-hit back-check lands on the node's tile.
@@ -1124,7 +1551,7 @@ internal sealed partial class Server
                     fwd = fwd.LengthSquared() > 1e-6f ? Vector2.Normalize(fwd) : Vector2.Zero;
                     (int X, int Y)? Aim((double X, double Z) p)
                     {
-                        for (var k = 0; k <= 3; k++)
+                        foreach (var k in TouchUpAimOffsets)
                             if (
                                 RayClear(
                                     dabs.View,
@@ -1147,7 +1574,7 @@ internal sealed partial class Server
                                 aims.Add(k);
                                 return hit;
                             }
-                        aims.Add(-1); // Fallback: goal-height projection (may hit raised terrain in front of the node).
+                        aims.Add(null); // Fallback: goal-height projection (may hit raised terrain in front of the node).
                         return null;
                     }
                     var pixels = misses.Select((p, i) => Aim(p) ?? dabs.Pixels[i]).ToArray();
@@ -1155,14 +1582,31 @@ internal sealed partial class Server
                     {
                         RequireNoHeldInput();
                         Ui.SettledClick(game, d.X, d.Y, "left");
+                        _elevationEdits++;
                         touched++; // Brush must leave the previous stroke/dab spot.
                     }
                     Thread.Sleep(200);
                 }
                 if (touched > 0)
-                    steps.Add(new { touchUpDabs = touched, touchUpAimOffsetsNodes = aims }); // -1 = goal-height fallback.
+                    steps.Add(new { touchUpDabs = touched, touchUpAimOffsetsNodes = aims }); // null = goal-height fallback.
             }
             Thread.Sleep(300);
+        }
+        catch (Exception e)
+            when (_elevationEdits > 0 && e is not WorkflowFailure { UndoSteps: not null })
+        {
+            // No automatic undo: a wrong count would revert user work (plans/wake-island-session-bugs.md B3).
+            var f = e as WorkflowFailure;
+            throw new WorkflowFailure(
+                f?.Code ?? ElevationIncompleteCode,
+                f?.Phase ?? op,
+                $"{e.Message} {_elevationEdits} elevation edit(s) were already applied.",
+                true,
+                false,
+                $"Scene changed: run editor_undo {_elevationEdits} time(s) to revert (check with editor_terrain_grid), then retry.",
+                inner: e,
+                undoSteps: _elevationEdits
+            );
         }
         finally
         {
@@ -1272,10 +1716,24 @@ internal sealed partial class Server
                     false,
                     "Inspect terrain with editor_terrain_grid around the area AND the previous pointer position; editor_undo reverts strokes. Move the mouse over the map, then retry."
                 );
+            // Before the first click the terrain is unmodified, so the full ground-hit back-check is exact. Live: without it
+            // all bump clicks landed on an older ridge 7 units in front of the anchor (atHeight skips the back-check).
+            if (
+                clicks == 0
+                && PixelFor(v, ui, occ, width, height, ax + s / 2, az + s / 2, 2) is null
+            )
+                throw new WorkflowFailure(
+                    NotClickableCode,
+                    "elevation",
+                    $"Bump anchor not clickable: {PixelWhy(v, ui, occ, width, height, ax + s / 2, az + s / 2, 2)}.",
+                    false,
+                    false,
+                    "No bump sent. Move/rotate the camera so no higher terrain lies between it and the area centre, or pick another area."
+                );
             var px =
                 PixelFor(v, ui, occ, width, height, ax + s / 2, az + s / 2, 2, now) // Tile middle → brush centers on node (ax,az).
                 ?? throw new WorkflowFailure(
-                    "TARGET_NOT_CLICKABLE",
+                    NotClickableCode,
                     "elevation",
                     "Anchor not clickable.",
                     clicks > 0,
@@ -1287,6 +1745,7 @@ internal sealed partial class Server
                 Ui.SettledClick(game, px.X, px.Y, raise ? "left" : "right"); // Brush must leave the old pointer spot.
             else
                 Ui.Click(game, px.X, px.Y, raise ? "left" : "right");
+            _elevationEdits++;
             Thread.Sleep(60);
         }
         v = EditorView.ReadView(game);
@@ -1372,7 +1831,7 @@ internal sealed partial class Server
                 ?? throw new WorkflowFailure(
                     "TARGET_NOT_CLICKABLE",
                     "sample",
-                    "Test node not clickable.",
+                    $"Test node not clickable: {PixelWhy(v, ui, occ, width, height, tx + s / 2, tz + s / 2, 2)}.",
                     true,
                     false,
                     "Undo bump and retry with camera closer."
@@ -1381,6 +1840,7 @@ internal sealed partial class Server
             Ui.SettledClick(game, sp.X, sp.Y, "right"); // Unsettled presses sampled/painted at the previous pointer spot (live).
             Thread.Sleep(80);
             Ui.SettledClick(game, tp.X, tp.Y, "left");
+            _elevationEdits++;
             Thread.Sleep(200);
             measured = EditorView.ReadView(game).Height(tx, tz).Height;
             tested.Add((t, measured));

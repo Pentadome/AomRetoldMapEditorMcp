@@ -46,6 +46,12 @@
       Link="xs/%(Filename)%(Extension)"
       CopyToOutputDirectory="PreserveNewest"
     />
+    <!-- editor_help topic guides; shipped as help/ (packages exclude research/, tests/package_smoke.ps1). -->
+    <None
+      Include="../../research/help/*.md"
+      Link="help/%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+    />
     <None
       Include="../../uilayouts/*.json"
       Link="uilayouts/%(Filename)%(Extension)"

@@ -48,6 +48,20 @@ public sealed record WorldReadLayout(
     int LightingCountOffset,
     int LightingDataOffset,
     int LightingNameOffset,
+    UnitReadSignature[] Signatures,
+    BrushReadLayout? Brush = null
+);
+
+/// <summary>Reviewed active brush-shape fields (read-only); see research/LIVE-WORLD.md "Brush size".</summary>
+/// <param name="ShapeOffset">Editor's active brush-shape pointer member (uiChangeBrushSize handler 0x536960 reads [editor+0x540]).</param>
+/// <param name="TypeOffset">Brush-shape kind int (handler jump table on [shape+0x14], kinds 0..5).</param>
+/// <param name="SizeOffset">Brush-shape size float (uiScrollBrushSize path 0x536a7c reads [shape+0x80]); live: equals the
+/// uiChangeBrushSize/hotkey value one frame later.</param>
+/// <param name="Signatures">Reviewed handler code fragments.</param>
+public sealed record BrushReadLayout(
+    int ShapeOffset,
+    int TypeOffset,
+    int SizeOffset,
     UnitReadSignature[] Signatures
 );
 
@@ -404,6 +418,29 @@ internal static class LiveWorld
         string? CliffName
     );
 
+    /// <summary>Active brush kind and size of the current edit mode.</summary>
+    /// <param name="Type">Native brush-shape kind (jump-table index 0..5).</param>
+    /// <param name="Size">Native brush size (hotkeys 1..0 set 1..10).</param>
+    internal sealed record Brush(int Type, float Size);
+
+    /// <summary>Reads the active brush shape, or null when the layout lacks reviewed brush fields or no tool is active.</summary>
+    internal static Brush? ReadBrush(Game game)
+    {
+        if (game.Layout.World?.Brush is not { } b)
+            return null;
+        CheckSignatures(b.Signatures);
+        if (new[] { b.ShapeOffset, b.TypeOffset, b.SizeOffset }.Any(o => o is < 0 or > MaxOffset))
+            throw new InvalidDataException("Invalid live brush layout.");
+        LiveUnits.ValidateRuntime(game, b.Signatures);
+        var shape = Ptr(game, game.Editor() + b.ShapeOffset);
+        if (shape == 0)
+            return null; // No edit tool active (mode None).
+        var size = BitConverter.ToSingle(game.Read(shape + b.SizeOffset, IntSize));
+        if (!float.IsFinite(size))
+            throw new InvalidDataException("Invalid live brush size.");
+        return new(Int(game, shape + b.TypeOffset), size);
+    }
+
     internal static Selections ReadSelections(Game game)
     {
         var l = World(game);
@@ -560,6 +597,7 @@ internal static class LiveWorld
                 type = t.Type,
                 subtype = t.Subtype,
                 water = tiles.WaterName(t),
+                waterSurface = view.WaterSurface(x, z),
                 passability = tiles.Passability(t),
             };
         }
@@ -674,7 +712,7 @@ internal static class LiveWorld
             tileWorldSize = view.Scale,
             points,
             area,
-            limitation = "Passive reads of live tile texture records, per-tile water grid and quantized node heights (research/LIVE-WORLD.md). passability is a coarse class from the terrain group plus water grid, not pathing/obstruction or unit-footprint proof; units, cliffs objects and forests are not included. Atomic frame not claimed.",
+            limitation = "Passive reads of live tile texture records, per-tile water grid, per-node water-surface height (null on dry tiles) and quantized node heights (research/LIVE-WORLD.md). Editor brushes pick the terrain under water, not the surface. passability is a coarse class from the terrain group plus water grid, not pathing/obstruction or unit-footprint proof; units, cliffs objects and forests are not included. Atomic frame not claimed.",
         };
     }
 

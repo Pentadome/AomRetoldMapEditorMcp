@@ -49,7 +49,56 @@ internal sealed partial class Catalog
         "renderWater",
         "renderTerrain",
         "renderUnits",
+        // Camera natives from installed executable help (generated/catalog.json). Only cameraMaxZoomSet is referenced by
+        // decoded editor UI (ui_pitch_editor.xml), so without UI XML they were dropped and editor_camera failed.
+        "cameraMaxZoomSet",
+        "cameraPitchAngle",
+        "cameraZoomReset",
+        "cameraPitchReset",
     };
+
+    /// <summary>Native commands the host itself dispatches by name; the catalog self-test refuses a catalog missing any.</summary>
+    // Call sites: CameraTools (camera*), DialogState (gadgetReal/gadgetUnreal), EditorFiles (saveScenario,
+    // uiSaveTriggers, uiLoadTriggers), placement (uiSetProtoCursor, uiPlaceAtPointer).
+    public static readonly string[] HostRequired =
+    [
+        "cameraMaxZoomSet",
+        "cameraPitchAngle",
+        "cameraZoomReset",
+        "cameraPitchReset",
+        "gadgetReal",
+        "gadgetUnreal",
+        "saveScenario",
+        "uiSaveTriggers",
+        "uiLoadTriggers",
+        "uiSetProtoCursor",
+        "uiPlaceAtPointer",
+    ];
+
+    /// <summary>Error code for a host-required native missing from the loaded catalog.</summary>
+    internal const string CommandUnavailableCode = "NATIVE_COMMAND_UNAVAILABLE";
+
+    /// <summary>Looks up a native the host dispatches by name; refuses before any dispatch when it is missing.</summary>
+    /// <param name="commands">Loaded command table.</param>
+    /// <param name="name">Exact native command name.</param>
+    /// <returns>The catalog command.</returns>
+    /// <exception cref="WorkflowFailure">The command is not in the catalog; nothing was dispatched.</exception>
+    internal static Command Require(IReadOnlyDictionary<string, Command> commands, string name) =>
+        commands.TryGetValue(name, out var command)
+            ? command
+            : throw new WorkflowFailure(
+                CommandUnavailableCode,
+                "preflight",
+                $"Native command '{name}' is not in the loaded catalog ({commands.Count} commands).",
+                false,
+                false,
+                "No native command was dispatched. Run editor_generate_catalog and restart the MCP server; report the build if it persists."
+            );
+
+    /// <summary>Instance form of <see cref="Require(IReadOnlyDictionary{string, Command}, string)"/>.</summary>
+    /// <param name="name">Exact native command name.</param>
+    /// <returns>The catalog command.</returns>
+    internal Command Require(string name) => Require(Commands, name);
 
     /// <summary>Scans executable help, editor hotkeys, and optional decoded editor XML.</summary>
     /// <param name="exe">Installed game executable path.</param>

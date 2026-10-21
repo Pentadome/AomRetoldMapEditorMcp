@@ -45,6 +45,9 @@ public sealed record SelectionReadLayout(
 /// <param name="ViewportOffsets">Render-state client viewport X/Y/width/height.</param>
 /// <param name="ProjectionOffset">Render-state untransposed Direct3D projection matrix.</param>
 /// <param name="Signatures">Reviewed map/camera/height/projection code fragments.</param>
+/// <param name="WaterSurfaceOffset">Terrain per-node water-surface float grid (same inline count/data/stride structure as
+/// <paramref name="GridOffset"/>); null when not reviewed for the build. Source: terrain vtable+0x78 (cover-water per-node
+/// setter) reads it at terrain+0xb8; live diff matched uiCoverTerrainWithWater waterHeight (research/LIVE-WORLD.md).</param>
 public sealed record MapReadLayout(
     int WorldOffset,
     int TerrainOffset,
@@ -62,7 +65,8 @@ public sealed record MapReadLayout(
     uint RendererGlobalRva,
     int[] ViewportOffsets,
     int ProjectionOffset,
-    UnitReadSignature[] Signatures
+    UnitReadSignature[] Signatures,
+    int? WaterSurfaceOffset = null
 );
 
 /// <summary>Actual selection/map state; native commands are never executed to obtain getter values.</summary>
@@ -77,6 +81,12 @@ internal static class EditorView
     // Numerical policy for degenerate rays, matrices and approximately normalized camera bases.
     const float Epsilon = 0.00001f,
         BasisTolerance = 0.01f;
+
+    /// <summary>Ray-march step in tiles (host choice: quarter tile cannot skip a quantized tile column).</summary>
+    const float MarchStepTiles = 0.25f;
+
+    /// <summary>Bisection passes after a march crossing (host choice: quarter tile / 2^10 ≈ 0.0005 tiles).</summary>
+    const int BisectPasses = 10;
 
     internal sealed record Selection(int Kind, int Id);
 
@@ -232,6 +242,12 @@ internal static class EditorView
         internal float WorldDepth => Tiles[1] * Scale;
         (int Count, int Stride, nint Data)? _grid;
 
+        /// <summary>Cached water-surface grid (stride, data) plus water-tile grid (stride, data, none value); null = unavailable.</summary>
+        (int Stride, nint Data, int TileStride, nint Tiles, int None)? _surface;
+
+        /// <summary>Whether <see cref="_surface"/> was resolved (it may legitimately resolve to null).</summary>
+        bool _surfaceRead;
+
         int Int(nint a) => BitConverter.ToInt32(Game.Read(a, FloatSize));
 
         float Float(nint a) => BitConverter.ToSingle(Game.Read(a, FloatSize));
@@ -269,6 +285,55 @@ internal static class EditorView
             return (height, ix, iz);
         }
 
+        /// <summary>Resolves the water-surface and water-tile grids once; null when either layout is absent.</summary>
+        (int Stride, nint Data, int TileStride, nint Tiles, int None)? Surface()
+        {
+            if (_surfaceRead)
+                return _surface;
+            _surfaceRead = true;
+            if (L.WaterSurfaceOffset is not { } offset || Game.Layout.World is not { } w)
+                return null;
+            CheckOffsets([
+                offset,
+                w.WaterGridOffset,
+                w.WaterGridCountOffset,
+                w.WaterGridDataOffset,
+                w.WaterGridStrideOffset,
+            ]);
+            var grid = Terrain + offset;
+            var count = Int(grid + L.GridCountOffset);
+            var stride = Int(grid + L.GridStrideOffset);
+            var data = Game.Pointer(grid + L.GridDataOffset);
+            if (stride != Vertices[1] || count != (long)Vertices[0] * Vertices[1] || data == 0)
+                throw new InvalidDataException("Water-surface grid bounds mismatch.");
+            var tiles = Terrain + w.WaterGridOffset;
+            var tileCount = Int(tiles + w.WaterGridCountOffset);
+            var tileStride = Int(tiles + w.WaterGridStrideOffset);
+            var tileData = Game.Pointer(tiles + w.WaterGridDataOffset);
+            if (tileStride < Tiles[1] || tileCount < (long)Tiles[0] * tileStride || tileData == 0)
+                throw new InvalidDataException("Water tile grid bounds mismatch.");
+            _surface = (stride, data, tileStride, tileData, w.WaterNone);
+            return _surface;
+        }
+
+        /// <summary>Water surface height over the tile containing (x, z), or null when the tile has no water or the
+        /// water layout is unavailable. Node (tile lower-left corner) value, like <see cref="Height"/>.</summary>
+        internal float? WaterSurface(double x, double z)
+        {
+            if (!InsideMap(x, z) || Surface() is not { } s)
+                return null;
+            var ix = (int)(x * InverseScale);
+            var iz = (int)(z * InverseScale);
+            var tx = Math.Min(ix, Tiles[0] - 1);
+            var tz = Math.Min(iz, Tiles[1] - 1);
+            if (Game.Read(s.Tiles + checked(tx * s.TileStride + tz), 1)[0] == s.None)
+                return null;
+            var surface = Float(s.Data + checked((ix * s.Stride + iz) * FloatSize));
+            if (!float.IsFinite(surface))
+                throw new InvalidDataException("Invalid water-surface height.");
+            return surface;
+        }
+
         /// <summary>Reads contiguous Z-fast node heights for one X node row.</summary>
         internal float[] HeightRow(int ix, int iz0, int count)
         {
@@ -293,25 +358,86 @@ internal static class EditorView
 
         internal Vector3 RayAt(float x, float y) => Ray(x, y, Pose, Projection, Viewport);
 
-        /// <summary>Ray hit on quantized terrain node heights by fixed-point refinement; not collision/occlusion.</summary>
-        internal Vector3? GroundHit(Vector3 direction)
+        /// <summary>First hit of a camera ray on the terrain surface (bilinear node heights; ray march over the cached grid,
+        /// then bisection); not collision/occlusion by objects.</summary>
+        /// <remarks>Terrain only, also under water: editor brushes and the native camera target pick the terrain, not the
+        /// water surface (live dab diffs and camera read, research/LIVE-WORLD.md). Live: the former 4-pass fixed-point
+        /// refinement oscillated next to a 10-unit plateau wall or converged on the floor behind it, so elevation set
+        /// rejected its test node; the march returns the first (nearest) crossing.</remarks>
+        internal Vector3? GroundHit(Vector3 direction) =>
+            direction.Y > -Epsilon ? null : MarchHit(direction);
+
+        /// <summary>Whole height grid (one read, cached per snapshot) for ray marching.</summary>
+        float[]? _heights;
+
+        /// <summary>Terrain surface height from the cached whole grid, bilinear between the tile's four corner nodes
+        /// (approximates the rendered two-triangle tile the pointer picks; <see cref="Height"/> is the native node lookup).</summary>
+        float CachedHeight(float x, float z)
         {
-            if (direction.Y > -Epsilon)
-                return null;
-            float plane = 0;
-            Vector3 hit = default;
-            for (var i = 0; i < 4; i++) // Host refinement passes; converges on gentle quantized terrain.
+            if (_heights is null)
             {
-                var distance = (plane - Pose.Position.Y) / direction.Y;
-                if (distance < 0)
-                    return null;
-                hit = Pose.Position + direction * distance;
-                plane = Height(
-                    Math.Clamp(hit.X, 0, WorldWidth),
-                    Math.Clamp(hit.Z, 0, WorldDepth)
-                ).Height;
+                var (count, _, data) = Grid();
+                var bytes = Game.Read(data, checked(count * FloatSize));
+                _heights = Enumerable
+                    .Range(0, count)
+                    .Select(i => BitConverter.ToSingle(bytes, i * FloatSize))
+                    .ToArray();
+                if (_heights.Any(h => !float.IsFinite(h)))
+                    throw new InvalidDataException("Invalid terrain height.");
             }
-            return hit;
+            var fx = Math.Clamp(x, 0, WorldWidth) * InverseScale;
+            var fz = Math.Clamp(z, 0, WorldDepth) * InverseScale;
+            var ix = Math.Min((int)fx, Vertices[0] - 2);
+            var iz = Math.Min((int)fz, Vertices[1] - 2);
+            float tx = Math.Clamp(fx - ix, 0, 1),
+                tz = Math.Clamp(fz - iz, 0, 1);
+            var n = Vertices[1];
+            float h00 = _heights[ix * n + iz],
+                h01 = _heights[ix * n + iz + 1],
+                h10 = _heights[(ix + 1) * n + iz],
+                h11 = _heights[(ix + 1) * n + iz + 1];
+            return (h00 * (1 - tz) + h01 * tz) * (1 - tx) + (h10 * (1 - tz) + h11 * tz) * tx;
+        }
+
+        /// <summary>First crossing of the ray below the quantized terrain, marched in sub-tile steps between the grid's max
+        /// and min heights, then bisected; null when the ray never meets the terrain.</summary>
+        Vector3? MarchHit(Vector3 direction)
+        {
+            CachedHeight(0, 0); // Fills the cache.
+            float top = _heights!.Max(),
+                bottom = _heights!.Min();
+            var start = Math.Max(0, (top - Pose.Position.Y) / direction.Y);
+            var end = (bottom - Pose.Position.Y) / direction.Y;
+            if (end < 0)
+                return null;
+            var step = Scale * MarchStepTiles;
+            bool Below(float t)
+            {
+                var p = Pose.Position + direction * t;
+                return p.Y <= CachedHeight(p.X, p.Z);
+            }
+            float previous = start;
+            for (var t = start; t <= end + step; t += step)
+            {
+                if (!Below(t))
+                {
+                    previous = t;
+                    continue;
+                }
+                float lo = previous,
+                    hi = t;
+                for (var i = 0; i < BisectPasses; i++)
+                {
+                    var mid = (lo + hi) / 2;
+                    if (Below(mid))
+                        hi = mid;
+                    else
+                        lo = mid;
+                }
+                var q = Pose.Position + direction * hi;
+                return q with { Y = CachedHeight(q.X, q.Z) };
+            }
+            return null;
         }
 
         /// <summary>Camera forward-ray ground hit: world point at viewport center.</summary>

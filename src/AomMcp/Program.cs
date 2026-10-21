@@ -131,14 +131,13 @@ if (selfTest)
         return;
     }
     var catalog = new Catalog(exe, ui);
-    // Required native placement names from installed help/editor.con. 300 is a host regression floor,
+    // Natives the host dispatches by name (Catalog.HostRequired). 300 is a host regression floor,
     // below measured 434 exposed commands after unsafe loadScenario removal, not a game API count guarantee.
-    if (
-        !catalog.Commands.ContainsKey("uiSetProtoCursor")
-        || !catalog.Commands.ContainsKey("uiPlaceAtPointer")
-        || catalog.Commands.Count < 300
-    )
-        throw new InvalidOperationException("Catalog coverage self-test failed.");
+    var missing = Catalog.HostRequired.Where(c => !catalog.Commands.ContainsKey(c)).ToArray();
+    if (missing.Length > 0 || catalog.Commands.Count < 300)
+        throw new InvalidOperationException(
+            $"Catalog coverage self-test failed; missing host-required natives: [{string.Join(", ", missing)}], {catalog.Commands.Count} commands."
+        );
     Console.WriteLine(
         $"Self-tests passed; {catalog.Commands.Count} command tools, {catalog.Actions.Count} UI actions. No game calls performed."
     );

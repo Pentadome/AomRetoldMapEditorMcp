@@ -30,6 +30,11 @@ try {
     assert(existsSync(join(runtime, 'uilayouts', profile)), `Reviewed Play/Quit profile required: ${profile}.`);
     assert(existsSync(join(runtime, 'fixtures', evidence)), `Pinned sanitized Play/Quit evidence required: ${evidence}.`);
   }
+  // editor_help topics (HelpTools) and XS API data (XsApi) are located next to the executable.
+  for (const topic of ['workflows.md', 'xs.md', 'placement.md']) {
+    assert(existsSync(join(runtime, 'help', topic)), `Missing help topic runtime/help/${topic}.`);
+  }
+  assert(existsSync(join(runtime, 'xs', 'xs_api.json')), 'XS API data runtime/xs/xs_api.json required.');
   for (const name of ['ocr-control.bgra', 'ocr-pop.bgra', 'ocr-food.bgra', 'ocr-age.bgra']) {
     assert(existsSync(join(runtime, 'fixtures', name)), `Missing OCR fixture ${name}.`);
   }

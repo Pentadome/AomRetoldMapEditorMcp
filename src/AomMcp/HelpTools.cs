@@ -10,15 +10,26 @@ internal static class HelpTools
     const int MaxTopicBytes = 64 * 1024,
         MaxTriggerNames = 40;
 
+    /// <summary>Help directory copied next to the executable (AomMcp.csproj Link; packages exclude research/).</summary>
+    const string ShippedHelpDirectory = "help";
+
+    /// <summary>Repository source of the topic guides.</summary>
+    static readonly string RepositoryHelpDirectory = Path.Combine("research", "help");
+
+    /// <summary>Finds the topic directory: shipped help/ next to the executable first, else research/help upward (repo runs).</summary>
+    /// <returns>Directory path, or null when neither exists.</returns>
     static string? HelpDirectory()
     {
+        var shipped = Path.Combine(AppContext.BaseDirectory, ShippedHelpDirectory);
+        if (Directory.Exists(shipped))
+            return shipped;
         for (
             var dir = new DirectoryInfo(AppContext.BaseDirectory);
             dir is not null;
             dir = dir.Parent
         )
         {
-            var candidate = Path.Combine(dir.FullName, "research", "help");
+            var candidate = Path.Combine(dir.FullName, RepositoryHelpDirectory);
             if (Directory.Exists(candidate))
                 return candidate;
         }
@@ -52,7 +63,7 @@ internal static class HelpTools
         var directory =
             HelpDirectory()
             ?? throw new FileNotFoundException(
-                "research/help not found beside the server install; topic guides ship with the repository."
+                "Topic guides not found (help/ beside the server executable or research/help in the repository); reinstall or rebuild the server."
             );
         var topics = Topics(directory);
         if (!args.TryGetProperty("topic", out var t))
