@@ -192,3 +192,41 @@ smooth; House move (error 0.02) + rotate to 270 (quantized from 186.65) and plac
   saved 2560×1440 PNG; restore returned zoom 75 and the center within the 3-unit minimap tolerance (~1.8 drift).
   Alternative UI: not live-tested for these two tools; they only use the minimap path of `editor_camera_look_at`,
   which is verified on both UIs, plus native commands.
+
+## Map-building tools (live 2026-10-21, build 100.19.17020.0, normal UI 1600×900 derived layout; alternative UI untested)
+
+Seven core helpers (`src/AomMcp/ShapeTools.cs`, `src/AomMcp/MapDialogTools.cs`); natives, UI input and memory reads
+only (no memory writes).
+
+| Tool | Behaviour / live result |
+|---|---|
+| `editor_project` | world points → pixel, terrain height, water surface, `blockedBy` panel, `clickable`/`why` (same `PixelFor` check as brush tools); pixels → ground hit (terrain under water), `insideMap`, `blockedBy`. Live: (60,60) clickable at (616,280); pixel (800,880) → `blockedBy: objectPalette`; largest UI-free rect [10,70,1570,520]. |
+| `editor_brush` | `uiChangeBrushSize(n,0,0,0)` / `uiChangeBrushType(name)` + readback poll ([editor+0x540] +0x80 size, +0x14 type). Live: elevation 3 → 7 and Paint 5 → 3 applied and read back; each edit mode keeps its own size. |
+| `editor_stroke` | raise/lower (elevation left/right drag), smooth, roughen, flatten (elevationsample right-click sample, left drag). Live: raise + point mirror (75 nodes up, 2 strokes), lower 2 passes over the fresh ridge (61 down), smooth (25 up/35 down), roughen (17/17); 6 undos restored the map exactly (all nodes back to 4). |
+| `editor_terrain_shape` | polygon/circle/ellipse/capsule; 7×7-node sample square (flat square preferred), scanline elevation-sample strokes over the brush-eroded mask, touch-ups, optional water. Live: 56×38 rectangle back to 3 (532/532 nodes exact, 0/318 ring nodes changed, 4 undo steps); circle r16 at 8 + point mirror (197/197 nodes each at 8.23 with tolerance 0.3, 164 land tiles each); concave L polygon at 8 (369/369 nodes, 320 land tiles). |
+| `editor_land_analysis` | land = passability class land; 8-connected without diagonal corner cutting; Dijkstra path length, widest-path bottleneck, path-distance Voronoi. Live acropolis seed 11 (135×135 tiles): one land component, TownCenters connected, path 232.3 vs straight 222.4, bottleneck 24.6 at (165,173), territory 8726/8720 tiles (balance 0.999). |
+| `editor_map_size` | World > Map Size dialog (`gadgetReal("AMapSizeDialog")`), all four fields retyped (END + backspaces + digits, OCR-verified), Add/Take, live tile dims polled. Live: add right 20 → 138×128, take right 20 → 128×128, add left 10 → 133×128 (island centroid x 61.9 → 71.9, so left grows −X and shifts content), take left 10 → back. |
+| `editor_new_scenario` | File > New Scenario (`gadgetReal("NewScenarioGadget")`): type by OCR list scan (scrolls to the top until rows stop changing), players by row position (see below), seed typed, size radio, Generate. Live: Blank Normal 2 → 128×128; acropolis seed 11 Normal 2 → 135×135; yellow_river seed 5 Large 3 → 191×191 (27 list scrolls); Blank players 4/10/2 → live player count 5/11/3. |
+
+Facts found while building them:
+
+* Drags shorter than ~400 ms painted nothing; `PaintChunks` now uses ≥ 800 ms per chunk (`MinChunkDurationMs`).
+* Ray back-check misses: after a raise pass the stroke targets sit behind a ridge or in a trench; the ray hit
+  missed by 4–6 world units. `editor_stroke` now projects each instance on its pre-stroke mean height (as flatten
+  uses the sample height); `PixelFor` refines the pixel up to 4 times by the screen offset between target and hit.
+* Auto zoom-out: the engine clamped zoom (camera height stayed ~95) and `Screen` looped forever; it now stops when a
+  zoom step does not increase the zoom and after 4 steps.
+* A shape's 7×7 sample square on relief (older bumps) broke the bump anchor pick; the host prefers a flat square.
+* Sampling a steep bump for height 8 did not converge within 0.05 (8.10–8.36); tolerance 0.3 converged.
+* Undo applies a frame or more later: a terrain read right after six quick undos still showed a 10.02 peak; the
+  same area read flat a moment later. Re-read after undo before judging it.
+* New Scenario: random maps leave editor mode (black loading screen; `Game.Editor` refuses, stale pointers fail
+  ReadProcessMemory) for ~10–20 s. Blank → Blank at the same size reuses the terrain object, stays in editor mode and
+  kept the camera; only the live player count (players + Gaia) proved it. The dialog resets players to 2 after
+  Generate but keeps the last type.
+* New Scenario OCR: the dropdown arrow is read as a trailing "t" ("Blank" → "blankt"), so the field text is read
+  without the arrow strip. Single digits in the open players list are misread (6→"9", 7→"", 9→"6") while the closed
+  field reads reliably, so players are picked by row position (24.8 px pitch at 900 px height, the field rect includes
+  the label; the list starts ~30% in) and read back. A single-digit seed ("5") OCRs as "n": seeds are refused only
+  when the field reads a different number, otherwise reported `seedVerified:false`.
+* The catalog size radio-set rect (469..517 at 900 px) covers only Normal and half of Large; rows are at y 490/519/548.

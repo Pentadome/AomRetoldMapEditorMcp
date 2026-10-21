@@ -23,6 +23,13 @@ internal sealed partial class Server
         "editor_resource_balance",
         "editor_mirror_units",
         "editor_scatter",
+        "editor_project",
+        "editor_brush",
+        "editor_stroke",
+        "editor_terrain_shape",
+        "editor_land_analysis",
+        "editor_map_size",
+        "editor_new_scenario",
     };
 
     // Host vocabularies (tool API), mapped to native editMode names below.
@@ -73,6 +80,8 @@ internal sealed partial class Server
 
     void PreflightWorld(string name, JsonElement args)
     {
+        PreflightShape(name, args);
+        PreflightMapDialog(name, args);
         switch (name)
         {
             case "editor_paint_world":
@@ -151,6 +160,13 @@ internal sealed partial class Server
             "editor_resource_balance" => ResourceBalance(game, args),
             "editor_mirror_units" => MirrorUnits(game, args),
             "editor_scatter" => Scatter(game, args),
+            "editor_project" => Project(game, args),
+            "editor_brush" => BrushTool(game, args),
+            "editor_stroke" => Stroke(game, args),
+            "editor_terrain_shape" => TerrainShape(game, args),
+            "editor_land_analysis" => LandAnalysis(game, args),
+            "editor_map_size" => MapSize(game, args),
+            "editor_new_scenario" => NewScenario(game, args),
             _ => throw new ArgumentException("Unknown world tool."),
         };
     }
@@ -297,9 +313,7 @@ internal sealed partial class Server
     {
         if (!v.InsideMap(x, z))
             return null;
-        // Brushes pick the terrain under water, not the surface (live dab diffs, research/LIVE-WORLD.md).
-        var h = atHeight ?? v.Height(x, z).Height;
-        var p = v.Project(new Vector3((float)x, h, (float)z));
+        var (p, h, hit) = Pick(v, x, z, tolerance, atHeight);
         if (!p.VisibleInViewport)
             return null;
         if (
@@ -310,16 +324,70 @@ internal sealed partial class Server
             )
         )
             return null;
-        if (atHeight is null)
-        {
-            var hit = v.GroundHit(v.RayAt(p.X, p.Y));
-            if (
+        if (
+            atHeight is null
+            && (
                 hit is not { } g
                 || Math.Sqrt(Math.Pow(g.X - x, 2) + Math.Pow(g.Z - z, 2)) > Math.Max(1, tolerance)
             )
-                return null;
-        }
+        )
+            return null;
         return ((int)Math.Round(p.X), (int)Math.Round(p.Y));
+    }
+
+    /// <summary>Most pixel refinement steps when the ray back-check misses (host choice; relief rarely needs more).</summary>
+    const int PickRefineSteps = 4;
+
+    /// <summary>Projected pixel for a world X/Z and its ray ground hit. When the hit misses by more than the tolerance
+    /// (relief in front of or below the line of sight), the pixel moves by the screen offset between target and hit,
+    /// up to <see cref="PickRefineSteps"/> times, keeping the closest hit.</summary>
+    /// <param name="v">View state.</param>
+    /// <param name="x">World X.</param>
+    /// <param name="z">World Z.</param>
+    /// <param name="tolerance">Accepted hit distance.</param>
+    /// <param name="atHeight">Plane height (no ray check), or null for terrain.</param>
+    static (EditorView.Projected P, float H, Vector3? Hit) Pick(
+        EditorView.ViewState v,
+        double x,
+        double z,
+        double tolerance,
+        float? atHeight
+    )
+    {
+        // Brushes pick the terrain under water, not the surface (live dab diffs, research/LIVE-WORLD.md).
+        var h = atHeight ?? v.Height(x, z).Height;
+        var target = v.Project(new Vector3((float)x, h, (float)z));
+        if (atHeight is not null || !target.VisibleInViewport)
+            return (target, h, null);
+        double Miss(Vector3? g) =>
+            g is { } q ? Math.Sqrt(Math.Pow(q.X - x, 2) + Math.Pow(q.Z - z, 2)) : double.MaxValue;
+        var best = target;
+        var bestHit = v.GroundHit(v.RayAt(target.X, target.Y));
+        var p = target;
+        var hit = bestHit;
+        for (var step = 0; step < PickRefineSteps && Miss(bestHit) > Math.Max(1, tolerance); step++)
+        {
+            if (hit is not { } g)
+                break;
+            var seen = v.Project(g);
+            p = p with { X = p.X + target.X - seen.X, Y = p.Y + target.Y - seen.Y };
+            hit = v.GroundHit(v.RayAt(p.X, p.Y));
+            if (Miss(hit) < Miss(bestHit))
+                (best, bestHit) = (p, hit);
+        }
+        return (
+            best with
+            {
+                VisibleInViewport =
+                    best.InFront
+                    && best.X >= v.Viewport.X
+                    && best.Y >= v.Viewport.Y
+                    && best.X <= v.Viewport.X + v.Viewport.Width
+                    && best.Y <= v.Viewport.Y + v.Viewport.Height,
+            },
+            h,
+            bestHit
+        );
     }
 
     /// <summary>Why <see cref="PixelFor"/> rejects a world point (same checks, first failing one), for error messages.</summary>
@@ -337,8 +405,7 @@ internal sealed partial class Server
     {
         if (!v.InsideMap(x, z))
             return string.Create(CultureInfo.InvariantCulture, $"({x:0.#},{z:0.#}) outside map");
-        var h = atHeight ?? v.Height(x, z).Height;
-        var p = v.Project(new Vector3((float)x, h, (float)z));
+        var (p, h, hit) = Pick(v, x, z, tolerance, atHeight);
         if (!p.VisibleInViewport)
             return string.Create(
                 CultureInfo.InvariantCulture,
@@ -355,7 +422,7 @@ internal sealed partial class Server
                 CultureInfo.InvariantCulture,
                 $"({x:0.#},{z:0.#}) pixel ({p.X:0},{p.Y:0}) under a UI panel"
             );
-        if (atHeight is null && v.GroundHit(v.RayAt(p.X, p.Y)) is var hit)
+        if (atHeight is null)
             return hit is { } g
                 ? string.Create(
                     CultureInfo.InvariantCulture,
@@ -437,14 +504,19 @@ internal sealed partial class Server
             var missing = Missing();
             var zooms = new List<double>();
             while (
-                zoomOut && missing.Length > 0 && (PoseOf(view).Zoom ?? DefaultZoom) < AutoZoomLimit
+                zoomOut
+                && missing.Length > 0
+                && zooms.Count < MaxAutoZoomSteps
+                && (PoseOf(view).Zoom ?? DefaultZoom) < AutoZoomLimit
             )
             {
-                var (pose, _, _) = SetZoom(
-                    game,
-                    Math.Min(AutoZoomLimit, (PoseOf(view).Zoom ?? DefaultZoom) * AutoZoomFactor)
-                );
+                var before = PoseOf(view).Zoom ?? DefaultZoom;
+                var (pose, _, _) = SetZoom(game, Math.Min(AutoZoomLimit, before * AutoZoomFactor));
                 zooms.Add(pose.Zoom ?? DefaultZoom);
+                // The engine clamps zoom (live 2026-10-21: camera stayed at ~95 height, the loop never ended): stop when
+                // a step does not zoom out further.
+                if ((pose.Zoom ?? DefaultZoom) <= before)
+                    break;
                 view = EditorView.ReadView(game);
                 Aim();
                 missing = Missing();
@@ -470,6 +542,9 @@ internal sealed partial class Server
 
     /// <summary>Auto zoom-out step factor; host choice (85 → 106 → 130).</summary>
     const double AutoZoomFactor = 1.25;
+
+    /// <summary>Most auto zoom-out steps (host bound; 85 → 130 takes two at <see cref="AutoZoomFactor"/>).</summary>
+    const int MaxAutoZoomSteps = 4;
 
     /// <summary>Native whole-map water cover command (catalog name, exe help: "flattens terrain and paints water over the
     /// entire map").</summary>
@@ -1013,8 +1088,15 @@ internal sealed partial class Server
     /// <summary>Host bound on recursive stroke halving (2^6 = 64 chunks at most).</summary>
     const int MaxStrokeSplitDepth = 6;
 
-    /// <summary>Shortest chunk duration; host choice, above the 100 ms DragPath floor so each chunk still registers.</summary>
-    const int MinChunkDurationMs = 300;
+    /// <summary>Shortest chunk duration: the 2026-10-20 Wake Island session (1600×900 normal UI) saw drags under ~400 ms
+    /// paint nothing and 800 ms drags paint reliably (plans/map-building-tools.md).</summary>
+    const int MinChunkDurationMs = 800;
+
+    /// <summary>Largest polyline Ui.DragPath accepts (host input bound, Ui.DragPath).</summary>
+    const int MaxStrokeVertices = 256;
+
+    /// <summary>Default pick back-check tolerance in world units (the value every brush tool used before).</summary>
+    const double DefaultPickTolerance = 2;
 
     /// <summary>World length of a polyline.</summary>
     /// <param name="points">World X/Z vertices.</param>
@@ -1034,6 +1116,9 @@ internal sealed partial class Server
     /// <param name="depth">Current split depth.</param>
     /// <param name="steps">Step log (one entry per painted chunk).</param>
     /// <param name="strokes">Painted chunk count (one editor_undo each).</param>
+    /// <param name="atHeight">Projection height instead of terrain (elevation-sample painting at the goal height).</param>
+    /// <param name="button">Held mouse button (elevation tool: right lowers).</param>
+    /// <param name="pickTolerance">World distance the ray-back-check hit may miss a vertex by (relief in front).</param>
     void PaintChunks(
         Game game,
         (double X, double Z)[] points,
@@ -1042,13 +1127,42 @@ internal sealed partial class Server
         double total,
         int depth,
         List<object> steps,
-        ref int strokes
+        ref int strokes,
+        float? atHeight = null,
+        string button = "left",
+        double pickTolerance = DefaultPickTolerance
     )
     {
+        if (points.Length > MaxStrokeVertices)
+        {
+            // Ui.DragPath takes at most 256 vertices: paint consecutive pieces sharing their endpoint.
+            for (var start = 0; start < points.Length - 1; start += MaxStrokeVertices - 1)
+                PaintChunks(
+                    game,
+                    points[start..Math.Min(points.Length, start + MaxStrokeVertices)],
+                    moveCamera,
+                    duration,
+                    total,
+                    depth,
+                    steps,
+                    ref strokes,
+                    atHeight,
+                    button,
+                    pickTolerance
+                );
+            return;
+        }
         ScreenPath path;
         try
         {
-            path = Screen(game, points, moveCamera, 2);
+            path = Screen(
+                game,
+                points,
+                moveCamera,
+                pickTolerance,
+                atHeight,
+                zoomOut: atHeight is not null && moveCamera
+            );
         }
         catch (WorkflowFailure f)
             when (f.Code == NotClickableCode
@@ -1072,7 +1186,10 @@ internal sealed partial class Server
                 total,
                 depth + 1,
                 steps,
-                ref strokes
+                ref strokes,
+                atHeight,
+                button,
+                pickTolerance
             );
             PaintChunks(
                 game,
@@ -1082,7 +1199,10 @@ internal sealed partial class Server
                 total,
                 depth + 1,
                 steps,
-                ref strokes
+                ref strokes,
+                atHeight,
+                button,
+                pickTolerance
             );
             return;
         }
@@ -1091,7 +1211,7 @@ internal sealed partial class Server
                 ? Math.Max(MinChunkDurationMs, (int)(duration * PathLength(points) / total))
                 : duration;
         RequireNoHeldInput();
-        Ui.DragPath(game, path.Pixels, Math.Min(share, duration));
+        Ui.DragPath(game, path.Pixels, Math.Min(share, duration), button);
         strokes++;
         steps.Add(
             new
@@ -1514,81 +1634,18 @@ internal sealed partial class Server
                 }
                 steps.Add(new { paintStroke = path.Length, passes = 2 });
                 // Touch-up: dab remaining off-target nodes (stroke ends/disc corners), host bound 40 dabs.
-                var touched = 0;
-                var aims = new List<int?>();
-                for (var round = 0; round < 2; round++)
-                {
-                    var v2 = EditorView.ReadView(game);
-                    var misses = new List<(double X, double Z)>();
-                    int jx0 = (int)Math.Ceiling(minX * v2.InverseScale),
-                        jx1 = Math.Min(v2.Vertices[0] - 1, (int)Math.Floor(maxX * v2.InverseScale));
-                    int jz0 = (int)Math.Ceiling(minZ * v2.InverseScale),
-                        jz1 = Math.Min(v2.Vertices[1] - 1, (int)Math.Floor(maxZ * v2.InverseScale));
-                    for (var ix = jx0; ix <= jx1; ix++)
-                    {
-                        var row = v2.HeightRow(ix, jz0, jz1 - jz0 + 1);
-                        for (var j = 0; j < row.Length; j++)
-                            if (Math.Abs(row[j] - goalHeight) > tolerance)
-                                misses.Add((ix * v2.Scale + half, (jz0 + j) * v2.Scale + half));
-                    }
-                    if (misses.Count == 0 || touched + misses.Count > 40)
-                        break;
-                    var dabs = Screen(
-                        game,
-                        misses.ToArray(),
-                        moveCamera,
-                        4,
-                        goalHeight,
-                        zoomOut: moveCamera
-                    );
-                    // The brush lands where the pointer ray meets CURRENT terrain. A node still far from the goal (e.g. the
-                    // corner farthest from the camera next to a raised plateau) projected at goal height lands ~2 nodes beyond
-                    // it, so prefer the current-terrain pixel when its ground-hit back-check lands on the node's tile.
-                    var (cw, ch) = Ui.ClientSize(game);
-                    // Nodes hidden behind already-raised terrain (far corner from the camera) cannot be hit directly; aim up to
-                    // two nodes farther along the camera's horizontal forward so the brush disc (~2.5 nodes) still covers them.
-                    var fwd = new Vector2(dabs.View.Pose.Forward.X, dabs.View.Pose.Forward.Z);
-                    fwd = fwd.LengthSquared() > 1e-6f ? Vector2.Normalize(fwd) : Vector2.Zero;
-                    (int X, int Y)? Aim((double X, double Z) p)
-                    {
-                        foreach (var k in TouchUpAimOffsets)
-                            if (
-                                RayClear(
-                                    dabs.View,
-                                    p.X + fwd.X * k * v2.Scale,
-                                    p.Z + fwd.Y * k * v2.Scale
-                                )
-                                && PixelFor(
-                                    dabs.View,
-                                    dabs.Ui,
-                                    dabs.Occluders,
-                                    cw,
-                                    ch,
-                                    p.X + fwd.X * k * v2.Scale,
-                                    p.Z + fwd.Y * k * v2.Scale,
-                                    half
-                                )
-                                    is { } hit
-                            )
-                            {
-                                aims.Add(k);
-                                return hit;
-                            }
-                        aims.Add(null); // Fallback: goal-height projection (may hit raised terrain in front of the node).
-                        return null;
-                    }
-                    var pixels = misses.Select((p, i) => Aim(p) ?? dabs.Pixels[i]).ToArray();
-                    foreach (var d in pixels)
-                    {
-                        RequireNoHeldInput();
-                        Ui.SettledClick(game, d.X, d.Y, "left");
-                        _elevationEdits++;
-                        touched++; // Brush must leave the previous stroke/dab spot.
-                    }
-                    Thread.Sleep(200);
-                }
-                if (touched > 0)
-                    steps.Add(new { touchUpDabs = touched, touchUpAimOffsetsNodes = aims }); // null = goal-height fallback.
+                TouchUpNodes(
+                    game,
+                    (_, _) => true,
+                    (int)Math.Ceiling(minX * view.InverseScale),
+                    (int)Math.Ceiling(minZ * view.InverseScale),
+                    (int)Math.Floor(maxX * view.InverseScale),
+                    (int)Math.Floor(maxZ * view.InverseScale),
+                    goalHeight,
+                    tolerance,
+                    moveCamera,
+                    steps
+                );
             }
             Thread.Sleep(300);
         }
@@ -1659,6 +1716,111 @@ internal sealed partial class Server
                 : ring.Within - stats.Within,
             limitation = "Uses native elevation tools with the CURRENT brush: set = raise/lower a bump inside the area, right-click sample at a bisected slope point, verify on a test dab, then paint the area with the elevation-sample tool; flatten = sample at reference point then paint; smooth = smooth tool stroke. Brush edges can alter nodes up to ~2 nodes outside the area (reported). Heights are native quantized node heights. Undo with editor_undo (several strokes). Not saved.",
         };
+    }
+
+    /// <summary>Host bound on touch-up dabs per call (editor_elevation, editor_terrain_shape).</summary>
+    const int MaxTouchUpDabs = 40;
+
+    /// <summary>Elevation-sample touch-up: dabs nodes in the node box that <paramref name="inside"/> accepts and that are
+    /// still off <paramref name="goalHeight"/> (two rounds, at most <see cref="MaxTouchUpDabs"/> dabs). The
+    /// elevationsample tool must be active with the goal height sampled.</summary>
+    /// <param name="game">Validated editor connection.</param>
+    /// <param name="inside">Node filter (ix, iz).</param>
+    /// <param name="ix0">First X node.</param>
+    /// <param name="iz0">First Z node.</param>
+    /// <param name="ix1">Last X node (inclusive).</param>
+    /// <param name="iz1">Last Z node (inclusive).</param>
+    /// <param name="goalHeight">Sampled goal height.</param>
+    /// <param name="tolerance">Node height tolerance.</param>
+    /// <param name="moveCamera">Whether the camera may move.</param>
+    /// <param name="steps">Step log.</param>
+    /// <returns>Dabs sent (one editor_undo each, counted in _elevationEdits).</returns>
+    int TouchUpNodes(
+        Game game,
+        Func<int, int, bool> inside,
+        int ix0,
+        int iz0,
+        int ix1,
+        int iz1,
+        float goalHeight,
+        double tolerance,
+        bool moveCamera,
+        List<object> steps
+    )
+    {
+        var half = EditorView.ReadView(game).Scale / 2;
+        var touched = 0;
+        var aims = new List<int?>();
+        for (var round = 0; round < 2; round++)
+        {
+            var v2 = EditorView.ReadView(game);
+            var misses = new List<(double X, double Z)>();
+            int jx0 = Math.Max(0, ix0),
+                jx1 = Math.Min(v2.Vertices[0] - 1, ix1);
+            int jz0 = Math.Max(0, iz0),
+                jz1 = Math.Min(v2.Vertices[1] - 1, iz1);
+            for (var ix = jx0; ix <= jx1; ix++)
+            {
+                var row = v2.HeightRow(ix, jz0, jz1 - jz0 + 1);
+                for (var j = 0; j < row.Length; j++)
+                    if (inside(ix, jz0 + j) && Math.Abs(row[j] - goalHeight) > tolerance)
+                        misses.Add((ix * v2.Scale + half, (jz0 + j) * v2.Scale + half));
+            }
+            if (misses.Count == 0 || touched + misses.Count > MaxTouchUpDabs)
+                break;
+            var dabs = Screen(
+                game,
+                misses.ToArray(),
+                moveCamera,
+                4,
+                goalHeight,
+                zoomOut: moveCamera
+            );
+            // The brush lands where the pointer ray meets CURRENT terrain. A node still far from the goal (e.g. the
+            // corner farthest from the camera next to a raised plateau) projected at goal height lands ~2 nodes beyond
+            // it, so prefer the current-terrain pixel when its ground-hit back-check lands on the node's tile.
+            var (cw, ch) = Ui.ClientSize(game);
+            // Nodes hidden behind already-raised terrain (far corner from the camera) cannot be hit directly; aim up to
+            // two nodes farther along the camera's horizontal forward so the brush disc (~2.5 nodes) still covers them.
+            var fwd = new Vector2(dabs.View.Pose.Forward.X, dabs.View.Pose.Forward.Z);
+            fwd = fwd.LengthSquared() > 1e-6f ? Vector2.Normalize(fwd) : Vector2.Zero;
+            (int X, int Y)? Aim((double X, double Z) p)
+            {
+                foreach (var k in TouchUpAimOffsets)
+                    if (
+                        RayClear(dabs.View, p.X + fwd.X * k * v2.Scale, p.Z + fwd.Y * k * v2.Scale)
+                        && PixelFor(
+                            dabs.View,
+                            dabs.Ui,
+                            dabs.Occluders,
+                            cw,
+                            ch,
+                            p.X + fwd.X * k * v2.Scale,
+                            p.Z + fwd.Y * k * v2.Scale,
+                            half
+                        )
+                            is { } hit
+                    )
+                    {
+                        aims.Add(k);
+                        return hit;
+                    }
+                aims.Add(null); // Fallback: goal-height projection (may hit raised terrain in front of the node).
+                return null;
+            }
+            var pixels = misses.Select((p, i) => Aim(p) ?? dabs.Pixels[i]).ToArray();
+            foreach (var d in pixels)
+            {
+                RequireNoHeldInput();
+                Ui.SettledClick(game, d.X, d.Y, "left");
+                _elevationEdits++;
+                touched++; // Brush must leave the previous stroke/dab spot.
+            }
+            Thread.Sleep(200);
+        }
+        if (touched > 0)
+            steps.Add(new { touchUpDabs = touched, touchUpAimOffsetsNodes = aims }); // null = goal-height fallback.
+        return touched;
     }
 
     /// <summary>Closed loop for an exact sample height: bump at area center, slope bisection sampling, test dab verification.</summary>
@@ -3254,5 +3416,7 @@ internal sealed partial class Server
             },
             ScatterRequired
         );
+        foreach (var spec in ShapeExtras(coord, point, area))
+            yield return spec;
     }
 }

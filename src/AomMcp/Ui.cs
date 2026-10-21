@@ -76,14 +76,7 @@ internal static class Ui
     {
         game.Move(x, y);
         Thread.Sleep(80); // Host-chosen pointer settle time; frame-polled input observed in live tests.
-        // Windows SDK MOUSEEVENTF_* pairs: LEFTDOWN/UP=2/4, RIGHT=8/16, MIDDLE=32/64.
-        (var down, var up) = button switch
-        {
-            "left" => (2u, 4u),
-            "right" => (8u, 16u),
-            "middle" => (32u, 64u),
-            _ => throw new ArgumentException("button: left/right/middle"),
-        };
+        var (down, up) = ButtonFlags(button);
         Send(Mouse(down));
         try
         {
@@ -95,6 +88,18 @@ internal static class Ui
         }
     }
 
+    /// <summary>Windows SDK MOUSEEVENTF_* down/up flag pair for a host button name.</summary>
+    /// <param name="button">Mouse button: left, right, or middle.</param>
+    /// <returns>LEFTDOWN/UP=2/4, RIGHTDOWN/UP=8/16, MIDDLEDOWN/UP=32/64 (winuser.h).</returns>
+    static (uint Down, uint Up) ButtonFlags(string button) =>
+        button switch
+        {
+            "left" => (2u, 4u),
+            "right" => (8u, 16u),
+            "middle" => (32u, 64u),
+            _ => throw new ArgumentException("button: left/right/middle"),
+        };
+
     /// <summary>Drags the left button along a client-pixel path and releases it in finally.</summary>
     /// <param name="game">Validated editor connection.</param>
     /// <param name="x1">Starting horizontal coordinate.</param>
@@ -105,12 +110,19 @@ internal static class Ui
     public static void Drag(Game game, int x1, int y1, int x2, int y2, int duration) =>
         DragPath(game, [(x1, y1), (x2, y2)], duration);
 
-    /// <summary>Holds the left button along a client-pixel polyline; one point is a stationary press.</summary>
+    /// <summary>Holds a mouse button along a client-pixel polyline; one point is a stationary press.</summary>
     /// <param name="game">Validated editor connection.</param>
     /// <param name="points">1..256 client-pixel vertices.</param>
     /// <param name="duration">Total stroke duration in milliseconds, from 100 to 5000.</param>
-    public static void DragPath(Game game, IReadOnlyList<(int X, int Y)> points, int duration)
+    /// <param name="button">Held button: left (default), right or middle (elevation tool: right lowers).</param>
+    public static void DragPath(
+        Game game,
+        IReadOnlyList<(int X, int Y)> points,
+        int duration,
+        string button = "left"
+    )
     {
+        var (down, up) = ButtonFlags(button);
         // Host policy: bound stroke to 0.1..5 s and 256 vertices; ~20 px interpolation spacing,
         // at least 20 total pointer updates. Not engine constants.
         if (duration is < 100 or > 5000)
@@ -142,7 +154,7 @@ internal static class Ui
         // Without a settle the press could land at the stale previous pointer position (observed: first drag
         // segment started away from x1,y1; 80 ms was not always enough for brush tools). Empirical, not engine.
         Settle(game, points[0].X, points[0].Y);
-        Send(Mouse(2)); // winuser.h MOUSEEVENTF_LEFTDOWN.
+        Send(Mouse(down));
         try
         {
             Thread.Sleep(60); // Let the press register at the start point before motion (frame polling).
@@ -155,7 +167,7 @@ internal static class Ui
         }
         finally
         {
-            Send(Mouse(4)); // winuser.h MOUSEEVENTF_LEFTUP.
+            Send(Mouse(up));
         }
     }
 

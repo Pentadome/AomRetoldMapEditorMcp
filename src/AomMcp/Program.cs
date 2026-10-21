@@ -89,6 +89,7 @@ if (selfTest)
     DialogState.SelfTest();
     Ui.SelfTest();
     Server.OverviewSelfTest();
+    Server.ShapeSelfTest();
     ScreenProbe.SelfTest();
     UiLayouts.SelfTest();
     UiRead.SelfTest();

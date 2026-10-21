@@ -926,6 +926,7 @@ try:
     help_text = ''.join(tool('editor_help', {'topic': t['name']})['structuredContent']['text'] for t in topics)
     assert all(n in help_text for n in workflow_names), [n for n in workflow_names if n not in help_text]
     assert 'campaign' in {t['name'] for t in topics}, topics
+    assert 'editor_terrain_shape' in tool('editor_help', {'topic': 'map-building'})['structuredContent']['text']
     assert tool('editor_help', {'topic': '../AGENTS'})['isError'] and tool('editor_help', {'topic': 'nope'})['isError']
     digest_cp = root / 'research/BaseDefense.mythscn'
     digest_tr = root / 'research/defense-code-sample.trg'
@@ -1213,7 +1214,7 @@ try:
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
     expected_core = (helper_names - (workflow_names - core_workflow)) | core_native
-    assert len(expected_core) == 87 and len(names) == 937
+    assert len(expected_core) == 94 and len(names) == 944
     assert {'editor_dialog_state', 'editor_dialog_act', 'editor_xs_scripts'} <= expected_core
     # XS Scripts list preflight refuses before any game connection.
     preflight_refusal_xs = [
@@ -1229,7 +1230,9 @@ try:
     assert tool('editor_triggers', {'operation': 'apply', 'path': 'C:/x.trg', 'scripts': 'bogus'})['isError']
     world_tools = {'editor_terrain_info', 'editor_live_players', 'editor_edit_mode', 'editor_paint_world', 'editor_elevation',
                    'editor_transform_unit', 'editor_terrain_catalog', 'editor_camera_frame', 'editor_overview',
-                   'editor_resource_balance', 'editor_mirror_units', 'editor_scatter', 'editor_camera', 'editor_capture'}
+                   'editor_resource_balance', 'editor_mirror_units', 'editor_scatter', 'editor_camera', 'editor_capture',
+                   'editor_project', 'editor_brush', 'editor_stroke', 'editor_terrain_shape', 'editor_land_analysis',
+                   'editor_map_size', 'editor_new_scenario'}
     assert world_tools <= expected_core, world_tools - expected_core
     # Camera/capture preflight refuses before any game connection.
     for args in ({'operation': 'zoom'}, {'operation': 'pitch'}, {'operation': 'zoom', 'distance': 5}):
@@ -1237,6 +1240,23 @@ try:
     assert tool('editor_capture', {'minX': 10, 'minZ': 10, 'maxX': 5, 'maxZ': 20})['isError']
     assert tool('editor_capture', {'minX': 1, 'minZ': 1, 'maxX': 5, 'maxZ': 5, 'saveTo': 'relative.png'})['isError']
     assert tool('editor_screenshot', {'saveTo': 'C:/missing-dir-aommcp/x.png'})['isError']
+    # Map-building preflight refuses before any game connection.
+    for name, args in [
+            ('editor_project', {}),
+            ('editor_stroke', {'tool': 'raise', 'points': [[10, 10]]}),
+            ('editor_stroke', {'tool': 'raise', 'points': [[10, 10]], 'durationMs': 400, 'confirmDestructive': True}),
+            ('editor_stroke', {'tool': 'raise', 'points': [[10, 10]], 'referenceX': 1, 'referenceZ': 1,
+                               'confirmDestructive': True}),
+            ('editor_terrain_shape', {'shape': 'circle', 'x': 50, 'z': 50, 'radius': 20, 'height': 5}),
+            ('editor_terrain_shape', {'shape': 'polygon', 'points': [[0, 0], [10, 0]], 'height': 5,
+                                      'confirmDestructive': True}),
+            ('editor_terrain_shape', {'shape': 'circle', 'x': 50, 'height': 5, 'confirmDestructive': True}),
+            ('editor_land_analysis', {'minX': 10, 'minZ': 10, 'maxX': 5, 'maxZ': 20}),
+            ('editor_map_size', {'operation': 'add', 'right': 20}),
+            ('editor_map_size', {'operation': 'add', 'confirmDestructive': True}),
+            ('editor_new_scenario', {'type': 'Blank'}),
+            ('editor_brush', {'size': 4, 'keepMode': True})]:
+        assert tool(name, args)['isError'], (name, args)
     scene_tools = {'editor_camera_look_at', 'editor_view_info', 'editor_ui_state', 'editor_place_at_world',
                    'editor_units_snapshot', 'editor_units_diff', 'editor_scene_summary', 'editor_delete_units',
                    'editor_check_footprints', 'editor_terrain_grid', 'editor_apply_layout'}
