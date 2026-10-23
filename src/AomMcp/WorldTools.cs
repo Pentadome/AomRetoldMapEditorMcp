@@ -1016,11 +1016,6 @@ internal sealed partial class Server
         };
     }
 
-    /// <summary>Exact catalog name for a paint request (case/space-insensitive), else UNKNOWN_PAINT_TYPE with suggestions.</summary>
-    /// <param name="kind">texture, mix, water, forest or cliff.</param>
-    /// <param name="requested">Requested type name.</param>
-    /// <param name="names">Live type catalogs.</param>
-    /// <param name="mixes">Generated mix titles (loaded on demand).</param>
     /// <summary>Names listed when fuzzy suggestions find nothing (host output bound).</summary>
     const int PaintSuggestionFallback = 8;
 
