@@ -4,6 +4,10 @@ using AomMcp;
 if (!OperatingSystem.IsWindows() || !Environment.Is64BitProcess)
     throw new PlatformNotSupportedException("Windows x64 required.");
 
+// Tool messages and native command scripts format numbers; a German locale printed "1,41" (live 2026-10-22).
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+
 // Default from inspected local Steam installation; --exe overrides different library locations.
 var exe = @"C:\Program Files (x86)\Steam\steamapps\common\Age of Mythology Retold\AoMRT_s.exe";
 
@@ -90,6 +94,7 @@ if (selfTest)
     Ui.SelfTest();
     Server.OverviewSelfTest();
     Server.ShapeSelfTest();
+    Server.PaintAreaSelfTest();
     ScreenProbe.SelfTest();
     UiLayouts.SelfTest();
     UiRead.SelfTest();

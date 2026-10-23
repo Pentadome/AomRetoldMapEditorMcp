@@ -3,6 +3,11 @@
   "ui": "normal",
   "width": 2560,
   "height": 1440,
+  "anchors": {
+    "editorScene.minimap": { "x": "right", "y": "bottom" },
+    "editorScene.occluders.minimap": { "x": "right", "y": "bottom" },
+    "note": "Elements scaled uniformly by min(width/2560, height/1440) and pinned to this client edge when the aspect differs from 16:9 (live 1440x900/1920x1200, research/UI-SCALING.md). Everything else stretches per axis."
+  },
   "notes": "Measured on English normal (non-alternative) editor UI, 2560x1440, 256x256 map. Rects are full-res client px [x,y,w,h]; gates are 1280x720 half-res screenshot samples (ScreenProbe frame), stable across 5 captures (no panel, elevation panel, paint panel, object palette, palette after editMode None). Bottom tool panel (left, 'Paint Terrain'/'Elevation'/'Place Object') opens for most edit modes; the list panel (right, terrain/object list with filter dropdown) opens for paint/forest/object placement modes. Minimap frame outer diamond 2092..2540 x 971..1421; inner map diamond center (2316,1196) half-diagonal ~201. Minimap frame is identical to the alternative UI (same gate pixels match); the UI kind is told apart by the normal-UI top menu-bar detect gate (alternative UI has no menu bar).",
   "ocrNotes": "Measured 2026-10-07 on English normal UI 2560x1440: Scenario > Player Data dialog with 12 players, its Age Settings popup (fixed position for every row) and the AI 'Set' Load Menu file browser. Player rows: field boxes y=293..331 (row 1) to 768..805 (row 12); rects relative to row center, x from box edges at row 1. 'pop' = Starting Pop column. No 'color' preset: normal UI shows only a swatch. Gates are 1280x720 half-res samples stable across captures; agePopup gate points differ from the closed-popup dialog.",
   "rowCenterFirst": 312,

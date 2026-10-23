@@ -98,6 +98,39 @@ Notation: `ctx = [base + contextRva]`, `world = [ctx + 8]` (same as map `worldOf
   array; `uiApplyLightingSet(n)` applies element `n`. Lightset object `+0x108` → UTF-16 name
   (662 sets on this build: `04open_bluelight`, …, `aotgotg_autumn`, …, `yas\yas12`).
 
+## Pointer and placement cursor (layout `cursor`, 2026-10-22)
+
+* The on-disk exe is encrypted; code was read from live memory (ReadProcessMemory + Capstone).
+* `uiPlaceAtPointer` `0x689010`: hover byte `[ptr+0xdf0]` (ptr = `[pointerGlobalRva]`) must be set, then `0x443800`
+  resolves the pointer into a stack vector that goes to the place routine `0x5377d0`.
+* `0x443800`: copies the cursor-object transform `[[ptr+0xd38]]` (translation +0xc/+0x1c/+0x2c). Only when
+  `[ptr+0xd20] < 0` does it ray-cast the terrain (`0x3d4a60`, direction `game+0x100`, camera `game+0xd8`) and write the
+  hit and the hover byte. `[ptr+0xd20]` is the **placement-cursor prototype ID** (live: 526 with a BerryBush cursor,
+  -1 without), not a hovered unit.
+* So with a placement cursor, `uiPlaceAtPointer` places at the cursor object's position, which the engine updates
+  per frame. Live trace (blank map, 1920×1080, high FPS): after `SetCursorPos` the translation followed in ≈100 ms
+  (grid-snapped, e.g. BerryBush 131,131 for target 130,130). The previous `Server.Place` waited a fixed 150 ms, so at
+  low frame rates (large maps) the object landed at the previous cursor spot. That spot is often the previous object,
+  which blocks the placement (`PLACEMENT_NOT_OBSERVED`, `overlapsExisting`), and otherwise produces a ≈previous-target
+  offset (Wake Island session: Mahi #29 at #28's position, TownCenter 11 units off). The host now polls the
+  translation until it is near the expected ground hit (`Ui.HoverMap`).
+* Pick ray `game+0x100` (normalized world direction; `+0x110` is the previous value) follows `SetCursorPos` within
+  3–54 ms, also right after a minimap click. `uiSampleTerrainAtPointer` `0x683bf0` ray-casts it directly and does not
+  check the hover byte.
+* Hover byte: never written in edit mode None (pointer swept over map/minimap, stayed 0). The bridge's map-hover
+  guard (refusal 10) therefore reflects the last cursor/brush frame or placement, not the current pointer. This is
+  why `paint_world kind=texture` sampling (mode None) failed with refusal 10 after camera moves. The sample now runs
+  without that guard after the host confirms the pick ray matches the target pixel.
+* Batch check (1.3, live 2026-10-22, 1920×1080 normal, blank 256² map): two `editor_batch` runs of camera_look_at +
+  4 `place_at_world` steps ×2 (Gazelle, BerryBush, Pig, MineGoldMedium, TreePine; 2–5 units apart, delayMs 600). All
+  16 landed ≤1.41 from target (grid snap; mines snap to odd coordinates). Each placement reported a confirmed ray and
+  cursor after ≈190–200 ms. A rerun onto the same points created nothing; every step returned `PLACEMENT_NOT_OBSERVED`
+  with "object IDs unchanged", `retrySafe:true` and the overlapped object. The original stale case needs a low frame
+  rate and was not reproduced at this frame rate. The fix rests on the traced one-frame cursor lag above.
+* After a minimap click, `editor_camera_look_at` parks the pointer at the viewport center (`pointerParked`). Texture
+  sampling right after a camera move selected `Default` and `Aztec Aztlan Grass 1` from visible tiles without a manual
+  `mouse_move` (formerly refusal 10).
+
 ## Elevation tools (behaviour, not memory)
 
 * `editMode("elevation")`: left click raises (≈+1.06 at the brush center for an 80+60 ms click at the
@@ -134,6 +167,24 @@ Notation: `ctx = [base + contextRva]`, `world = [ctx + 8]` (same as map `worldOf
   **sign** of `amount` only, and rotates only the first selected unit. Magnitude is ignored.
 * Reads refuse when the block is not orthonormal (host tolerance 0.01). Heading is a host derivation,
   not a native getter (`trUnitGetHeading` uses an obfuscated pointer; not used).
+
+## Paint brush footprint and `editor_paint_area` (live 2026-10-22, build 100.19.17020.0, alternative UI 1440×900 derived layout)
+
+Single 800 ms dabs on flat ground (tile = 2 world units):
+
+| Tool | Brush size → tiles changed | Model |
+|---|---|---|
+| Texture (`Paint`) | 1/3/6/10/20 → 1/5/30/78/257 | disc, radius ≈0.45·size tiles |
+| Forest (`paintforest`) | same footprint as texture | one object per changed tile |
+| Water (`paintWater`) | ≈81–100 tiles per dab at any size | stroke band ≈14 wu (7 tiles) wide at sizes 1 and 10: brush size ignored; ~3×2 water cells inside a shore texture ring per dab |
+
+`editor_paint_area` findings:
+
+- Even brush sizes paint offset by half a tile: a size-2 fill leaked a full tile row on the −X/−Z edges only. Planner uses odd sizes only; requested even sizes are lowered with a warning.
+- Disc model alone leaked one tile at size 5 (14 tiles round a 144-tile circle); erosion uses radius + 1 tile for brushes wider than one tile. Water needs no margin (band edges exact), and a 1-tile margin with the fixed 3.5-tile band left 30 % unreachable.
+- Touch-up targets on a freshly lowered lake bed ray-hit the shore 2.5 wu away (`TARGET_NOT_CLICKABLE` at pick tolerance 2); water strokes use tolerance 4.
+- Palette labels at 1440×900 alternative are clipped on both sides ("ireek Grass Rocks" for "Greek Grass Rocks 1"): `SelectFromPalette` falls back to clicking the computed row once the scroll is calibrated from an exact label, textures only (memory readback rejects a wrong pick).
+- Results: texture ring (r 14, hole 4) 100 %; texture polygon 188 tiles 99.5 %, 0 leak; ring r 30/hole 8 (664 tiles, size 5) 99.8 %, 1 tile leaked, 32 strokes; water ellipse 244 tiles 99.2 %, 11 tiles leaked, 141 shore-ring tiles changed outside; forest circle 112 tiles 100 %, 0 leak, 112 objects.
 
 ## Players
 

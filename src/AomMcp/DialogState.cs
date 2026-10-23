@@ -171,15 +171,33 @@ internal static class DialogState
         );
     }
 
+    /// <summary>Scores one signature: points authored in the 1280×720 reference frame are mapped per axis into the frame;
+    /// off the calibrated client size each point may match within <see cref="UiLayouts.DerivedGateRadius"/> (best effort).</summary>
     internal static Match Score(ScreenProbe.Frame frame, Signature signature, SignatureSet set)
     {
-        var matched = signature.Points.Count(p =>
+        var radius =
+            frame.ClientWidth == set.Width && frame.ClientHeight == set.Height
+                ? 0
+                : UiLayouts.DerivedGateRadius;
+        bool Near(int x, int y, int[] p)
         {
-            var c = frame.At(p[0], p[1]);
+            if (!frame.Contains(x, y))
+                return false;
+            var c = frame.At(x, y);
             return Math.Max(
                     Math.Abs(c.R - p[2]),
                     Math.Max(Math.Abs(c.G - p[3]), Math.Abs(c.B - p[4]))
                 ) <= set.Tolerance;
+        }
+        var matched = signature.Points.Count(p =>
+        {
+            int x = frame.MapX(p[0]),
+                y = frame.MapY(p[1]);
+            for (var dy = -radius; dy <= radius; dy++)
+            for (var dx = -radius; dx <= radius; dx++)
+                if (Near(x + dx, y + dy, p))
+                    return true;
+            return false;
         });
         var score = (double)matched / signature.Points.Length;
         return new(
@@ -205,12 +223,23 @@ internal static class DialogState
         internal bool Exact { get; init; }
         internal Match[] Matches { get; init; } = [];
         internal List<string> Warnings { get; } = [];
-        internal double Scale => Width / 2560.0;
 
+        /// <summary>Client pixels per 2560-reference pixel along x.</summary>
+        internal double Scale => UiLayouts.Scale(Width);
+
+        /// <summary>Client pixels per 2560-reference pixel along y (differs from <see cref="Scale"/> off 16:9).</summary>
+        internal double ScaleY => UiLayouts.ScaleY(Height);
+
+        /// <summary>True when signatures are reused on a derivable (unreviewed) client size: pixel actions are best effort.</summary>
+        internal bool BestEffort => !Exact && UiLayouts.IsDerivable(Width, Height);
+
+        /// <summary>Score of one gadget's signature.</summary>
         internal Match? Find(string gadget) =>
             Matches.FirstOrDefault(m => m.Signature.Gadget == gadget);
 
-        internal int[] Bounds(Signature s) => [.. s.Bounds.Select(v => (int)Math.Round(v * Scale))];
+        /// <summary>Signature bounds (2560 reference) to client pixels per axis.</summary>
+        internal int[] Bounds(Signature s) =>
+            [.. s.Bounds.Select((v, i) => (int)Math.Round(v * (i % 2 == 0 ? Scale : ScaleY)))];
     }
 
     /// <summary>One screenshot: UI kind by SceneUi gates, then scoring of all hash/UI-matching signatures.</summary>
@@ -219,11 +248,7 @@ internal static class DialogState
         _ = game.Editor();
         var (width, height) = Ui.ClientSize(game);
         var frame = SceneUi.Capture(game);
-        if (
-            !UiLayouts.IsSupported(width, height)
-            || !frame.Contains(1279, 719)
-            || frame.Contains(1280, 0)
-        )
+        if (!UiLayouts.IsSupported(width, height))
         {
             var unsupported = new Observation
             {
@@ -232,7 +257,7 @@ internal static class DialogState
                 Height = height,
             };
             unsupported.Warnings.Add(
-                $"Dialog signatures need a 16:9 client {UiLayouts.SupportedText}; client is {width}x{height}. No dialog detection."
+                $"Dialog signatures need a client {UiLayouts.SupportedText}; client is {width}x{height}. No dialog detection."
             );
             return unsupported;
         }
@@ -265,7 +290,12 @@ internal static class DialogState
         var exact = set is not null && set.Width == width && set.Height == height;
         if (set is not null && !exact)
             warnings.Add(
-                $"Signatures calibrated at {set.Width}x{set.Height}; reused on {width}x{height} (signatureReviewed=false). Pixel clicks/typing refused."
+                $"Signatures calibrated at {set.Width}x{set.Height}; reused on {width}x{height} (signatureReviewed=false, points mapped per axis). "
+                    + (
+                        UiLayouts.IsDerivable(width, height)
+                            ? "Pixel clicks/typing are best effort (layoutReviewed=false)."
+                            : "Pixel clicks/typing refused."
+                    )
             );
         var observation = new Observation
         {
@@ -768,7 +798,9 @@ internal static class DialogState
             .OrderByDescending(m => m.Score)
             .ToArray();
         (int Width, int Height, byte[] Bgra)? capture =
-            read && selected.Any(m => m.State != "closed") ? Ui.CapturePixels(game, 2560) : null;
+            read && selected.Any(m => m.State != "closed")
+                ? Ui.CapturePixels(game, Ui.FullResolutionWidth)
+                : null;
         var tiles = MaxTiles;
         var reads = 0;
         var dialogs = selected
@@ -1333,19 +1365,36 @@ internal static class DialogState
                     "Use action=click (pixel click on an open nominal dialog, OCR-label verified); no input sent."
                 ),
             "select" => Select(game, hash, sets, native, o, resolved, args, timeout),
-            "toggle" => Toggle(game, hash, sets, native, o, resolved, args, timeout),
-            "click" => Click(game, hash, sets, native, o, resolved, args),
-            "setText" => SetText(
-                game,
-                hash,
-                sets,
-                native,
-                o,
-                resolved,
-                args.GetProperty("text").GetString()!
+            "toggle" => MarkBestEffort(
+                Toggle(game, hash, sets, native, o, resolved, args, timeout),
+                o
+            ),
+            "click" => MarkBestEffort(Click(game, hash, sets, native, o, resolved, args), o),
+            "setText" => MarkBestEffort(
+                SetText(
+                    game,
+                    hash,
+                    sets,
+                    native,
+                    o,
+                    resolved,
+                    args.GetProperty("text").GetString()!
+                ),
+                o
             ),
             _ => throw new ArgumentException("Unknown action."),
         };
+    }
+
+    /// <summary>Adds <c>layoutReviewed:false</c> and the best-effort note to a pixel-action result on a derived client size.</summary>
+    static object MarkBestEffort(object result, Observation o)
+    {
+        if (!o.BestEffort)
+            return result;
+        var node = JsonSerializer.SerializeToNode(result)!.AsObject();
+        node["layoutReviewed"] = false;
+        node["bestEffort"] = ScreenProbe.BestEffortNote;
+        return node;
     }
 
     static object RunScripts(
@@ -1556,11 +1605,11 @@ internal static class DialogState
                 false,
                 "Inspect with editor_dialog_state; no input sent."
             );
-        if (o.Set is null || !o.Exact)
+        if (o.Set is null || !(o.Exact || o.BestEffort))
             throw new WorkflowFailure(
                 "DIALOG_UNCALIBRATED",
                 "preflight",
-                $"Pixel actions need signatures calibrated at this exact client size ({o.Width}x{o.Height}). {string.Join(" ", o.Warnings)}",
+                $"Pixel actions need signatures calibrated at this client size or a derivable one ({o.Width}x{o.Height}; {UiLayouts.SupportedText}). {string.Join(" ", o.Warnings)}",
                 false,
                 false,
                 "Use script actions (press/select) or a reviewed size; no input sent."
@@ -1605,7 +1654,7 @@ internal static class DialogState
                 "No input sent."
             );
         var bounds = o.Bounds(signature);
-        var capture = Ui.CapturePixels(game, 2560);
+        var capture = Ui.CapturePixels(game, Ui.FullResolutionWidth);
         var tiles = MaxTiles;
         var lines = Read(capture, bounds, ref tiles);
         var nominal = Place(r.Target, o, 0, 0);
@@ -1745,7 +1794,7 @@ internal static class DialogState
         native.RequireNoCursor();
         Ui.SettledClick(game, x, y, "left");
         Thread.Sleep(SettleMs);
-        var after = Ui.CapturePixels(game, 2560);
+        var after = Ui.CapturePixels(game, Ui.FullResolutionWidth);
         var dialog = Observe(game, hash, sets).Find(r.Target.Gadget);
         return new
         {
@@ -1788,7 +1837,7 @@ internal static class DialogState
         native.RequireNoCursor();
         Ui.SettledClick(game, x, y, "left");
         Thread.Sleep(SettleMs);
-        var capture = Ui.CapturePixels(game, 2560);
+        var capture = Ui.CapturePixels(game, Ui.FullResolutionWidth);
         var after = TickFraction(capture, live.Control.Rect, live.Bounds);
         bool? was = Checked(before),
             now = Checked(after);
@@ -1853,7 +1902,7 @@ internal static class DialogState
         {
             if (frames > 0)
                 Thread.Sleep(VerifyFrameMs);
-            var capture = Ui.CapturePixels(game, 2560);
+            var capture = Ui.CapturePixels(game, Ui.FullResolutionWidth);
             var reads = FieldZooms
                 .Select(zoom => Value(live.Control, ReadControl(capture, live.Control, zoom)))
                 .ToArray();

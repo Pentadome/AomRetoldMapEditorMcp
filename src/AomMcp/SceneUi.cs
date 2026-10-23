@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace AomMcp;
 
@@ -28,7 +29,7 @@ internal sealed class SceneUi
     internal int Tolerance { get; private set; }
     internal int SafeMargin { get; private set; }
 
-    /// <summary>False for a layout derived from the 2560×1440 reference at an unreviewed 16:9 client size.</summary>
+    /// <summary>False for a layout derived from the 2560×1440 reference at an unreviewed client size (best effort).</summary>
     internal bool Reviewed { get; private set; } = true;
     int Radius { get; set; }
     internal string Describe =>
@@ -127,8 +128,54 @@ internal sealed class SceneUi
                 return ui;
             }
         reason =
-            "No reviewed UI detected (normal-UI menu bar+minimap gate and alternative-UI minimap gate both failed: dialog/menu open, minimap hidden, other language/UI scale).";
+            "No reviewed UI detected (normal-UI menu bar+minimap gate and alternative-UI minimap gate both failed: dialog/menu open, minimap hidden, other language/UI scale). Gates (frame px, 1280-wide screenshot): "
+            + string.Join(
+                " | ",
+                candidates.Select(ui =>
+                    ui.Kind
+                    + ": "
+                    + string.Join(
+                        ", ",
+                        ui.Diagnose(frame)
+                            .Where(g => g.Key != KindKey && g.Key != FileKey)
+                            .Select(g => UiLayouts.GateSummary(g.Key, g.Value!.AsObject()))
+                    )
+                )
+            );
         return null;
+    }
+
+    /// <summary>JSON key naming the UI kind in <see cref="Diagnose"/> output.</summary>
+    const string KindKey = "kind";
+
+    /// <summary>JSON key naming the layout file in <see cref="Diagnose"/> output.</summary>
+    const string FileKey = "file";
+
+    /// <summary>Gate reports for UI detection (detect gate if any, minimap gate) on one frame.</summary>
+    internal JsonObject Diagnose(ScreenProbe.Frame frame)
+    {
+        var result = new JsonObject { [KindKey] = Kind, [FileKey] = File };
+        if (_root.TryGetProperty("detect", out var detect))
+            result["detect"] = UiLayouts.GateReport(frame, detect, Tolerance, Radius);
+        result["minimap"] = UiLayouts.GateReport(
+            frame,
+            _root.GetProperty("minimap"),
+            Tolerance,
+            Radius
+        );
+        return result;
+    }
+
+    /// <summary>Detection gate reports for every loadable UI kind (normal, alternative) on one frame.</summary>
+    internal static JsonArray Diagnostics(Game game, ScreenProbe.Frame frame)
+    {
+        var all = new JsonArray();
+        foreach (var kind in Kinds)
+            if (Load(game, kind, out var why) is { } ui)
+                all.Add(ui.Diagnose(frame));
+            else
+                all.Add(new JsonObject { [KindKey] = kind, ["unavailable"] = why });
+        return all;
     }
 
     /// <summary>Captures one half-resolution frame (focuses game) for pixel gates.</summary>

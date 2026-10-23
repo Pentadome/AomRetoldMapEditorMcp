@@ -81,6 +81,13 @@ internal static class PlayerSettings
     internal static void SelfTest()
     {
         if (
+            !NearTitle("Plavers Settings", "Players Settings")
+            || !NearTitle("x Plaver Data |", "Player Data")
+            || NearTitle("Diplomacy", "Players Settings")
+            || NearTitle("Load Menu", "Player Data")
+        )
+            throw new InvalidDataException("Derived title OCR tolerance changed.");
+        if (
             !MatchesRequestedAi(@"aom_mcp\fixture", @"aom_mcp\fixture.xs")
             || !MatchesRequestedAi(@"aom_mcp\fixture.xs", @"aom_mcp\fixture.xs")
             || MatchesRequestedAi(@"other\fixture", @"aom_mcp\fixture.xs")
@@ -129,7 +136,7 @@ internal static class PlayerSettings
             || Normal.For(1920, 1080) is not { File: "normal-en-1920x1080.json" } small
             || small.Row(1) != 234
             || small.Row(12) != 590
-            || small.P(Normal.AgeArrowY("mythicGod")) != 497
+            || small.Y(Normal.AgeArrowY("mythicGod")) != 497
             || Alternative.For(1920, 1080).Row(12) != 966
         )
             throw new InvalidOperationException("Player settings UI geometry fixture failed.");
@@ -158,25 +165,54 @@ internal static class PlayerSettings
         int ListScrolls
     )
     {
-        internal double S { get; init; } = 1;
-        internal int W { get; init; } = 2560;
-        internal int H { get; init; } = 1440;
-        internal string File => UiLayouts.File(Kind, W, H);
+        /// <summary>Client pixels per reference pixel along x.</summary>
+        internal double Sx { get; init; } = 1;
 
-        internal int P(double reference) => UiLayouts.ToClient(reference, S);
+        /// <summary>Client pixels per reference pixel along y (differs from <see cref="Sx"/> off 16:9; dialogs stretch per axis).</summary>
+        internal double Sy { get; init; } = 1;
 
-        internal int[] P(int[] rect) => UiLayouts.ToClient(rect, S);
+        /// <summary>Client width.</summary>
+        internal int W { get; init; } = UiLayouts.ReferenceWidth;
 
+        /// <summary>Client height.</summary>
+        internal int H { get; init; } = UiLayouts.ReferenceHeight;
+
+        /// <summary>True when the client size has a live-reviewed layout.</summary>
+        internal bool Reviewed => UiLayouts.IsReviewed(W, H);
+
+        /// <summary>Layout file for this UI kind and client size; "derived:" in-memory name off reviewed sizes (<see cref="UiRead"/> resolves both).</summary>
+        internal string File =>
+            Reviewed
+                ? UiLayouts.File(Kind, W, H)
+                : UiRead.DerivedPrefix + UiLayouts.File(Kind, W, H);
+
+        /// <summary>Reference x position or width to client pixels.</summary>
+        internal int X(double reference) => UiLayouts.ToClient(reference, Sx);
+
+        /// <summary>Reference y position or height to client pixels.</summary>
+        internal int Y(double reference) => UiLayouts.ToClient(reference, Sy);
+
+        /// <summary>Reference rect [x,y,w,h] to client pixels per axis.</summary>
+        internal int[] P(int[] rect) => UiLayouts.ToClient(rect, Sx, Sy);
+
+        /// <summary>Client coordinate to the index in a capture of the given width (captures cap at 2560 px).</summary>
+        internal int Capture(int client, int captureWidth) =>
+            captureWidth == W ? client : (int)(client * (double)captureWidth / W);
+
+        /// <summary>Geometry for a client size.</summary>
         internal Geometry For(int width, int height) =>
             this with
             {
-                S = UiLayouts.Scale(width),
+                Sx = UiLayouts.Scale(width),
+                Sy = UiLayouts.ScaleY(height),
                 W = width,
                 H = height,
             };
 
-        internal int Row(int player) => P(RowFirst + (player - 1) * RowStep);
+        /// <summary>Client y of a player row centre.</summary>
+        internal int Row(int player) => Y(RowFirst + (player - 1) * RowStep);
 
+        /// <summary>Reference y of the Age popup arrow for a field.</summary>
         internal int AgeArrowY(string field) => AgeArrowYs[Array.IndexOf(AgeFields, field)];
     }
 
@@ -243,7 +279,13 @@ internal static class PlayerSettings
         6
     );
 
-    static readonly int[] Panel = [0, 22, 420, 74];
+    /// <summary>Alternative Players Settings title (2560 reference). Title glyphs end near x=421 and scale with height off 16:9,
+    /// so the box extends over the empty bar to x=600 (R2 1440×900 capture clipped "Settings" at 420).</summary>
+    static readonly int[] Panel = [0, 22, 600, 74];
+
+    /// <summary>Maximum letter edit distance accepted for dialog-title gates on unreviewed (derived) sizes, where small
+    /// glyph OCR confuses e.g. 'y' with 'v' (R2 1440×900: "Plavers Settings").</summary>
+    const int DerivedTitleEdits = 2;
     static readonly int[] NormalTitle = [1100, 128, 360, 40];
     static readonly int[] BrowserTitle = [1080, 240, 420, 100];
     static readonly int[] BrowserRows = [360, 415, 430, 485];
@@ -252,7 +294,7 @@ internal static class PlayerSettings
     {
         if (ui.Kind == "alternative")
         {
-            Gate(game, ui.P(Panel), "Players Settings");
+            Gate(game, ui.P(Panel), ["Players Settings"], !ui.Reviewed);
             return;
         }
         if (!UiRead.NormalGate(ScreenProbe.Capture(game), "playerData", out var detail))
@@ -264,12 +306,15 @@ internal static class PlayerSettings
                 false,
                 "Stop; inspect UI manually. No automatic retry."
             );
-        Gate(game, ui.P(NormalTitle), "Player Data");
+        Gate(game, ui.P(NormalTitle), ["Player Data"], !ui.Reviewed);
     }
 
+    /// <summary>OCR gate expecting one exact (case-insensitive substring) text.</summary>
     static void Gate(Game game, int[] rect, string expected) => Gate(game, rect, [expected]);
 
-    static void Gate(Game game, int[] rect, string[] expected)
+    /// <summary>OCR gate: refuses unless the region text contains one of <paramref name="expected"/>;
+    /// <paramref name="fuzzyTitle"/> also accepts letter-only edit distance ≤ <see cref="DerivedTitleEdits"/>.</summary>
+    static void Gate(Game game, int[] rect, string[] expected, bool fuzzyTitle = false)
     {
         // Normal-UI text fields keep a blinking caret after TAB ("300|" read as "30d", "Bob|" as "Bot"):
         // re-read (read-only) across blink phases before refusing.
@@ -279,7 +324,7 @@ internal static class PlayerSettings
             if (attempt != 0)
                 Thread.Sleep(300);
             text = UiRead.Text(game, rect);
-            if (expected.Any(e => GateText(text, e)))
+            if (expected.Any(e => GateText(text, e) || (fuzzyTitle && NearTitle(text, e))))
                 return;
         }
         throw new WorkflowFailure(
@@ -292,6 +337,48 @@ internal static class PlayerSettings
         );
     }
 
+    /// <summary>True when the letters of <paramref name="text"/> contain a window within <see cref="DerivedTitleEdits"/> edits of <paramref name="expected"/>'s letters.</summary>
+    static bool NearTitle(string text, string expected)
+    {
+        static string Letters(string v) =>
+            new([.. v.Where(char.IsLetter).Select(char.ToLowerInvariant)]);
+        string t = Letters(text),
+            e = Letters(expected);
+        if (e.Length == 0)
+            return false;
+        for (var start = 0; start <= Math.Max(0, t.Length - e.Length + DerivedTitleEdits); start++)
+        for (var len = e.Length - DerivedTitleEdits; len <= e.Length + DerivedTitleEdits; len++)
+            if (
+                len > 0
+                && start + len <= t.Length
+                && Distance(t.Substring(start, len), e) <= DerivedTitleEdits
+            )
+                return true;
+        return false;
+    }
+
+    /// <summary>Levenshtein distance.</summary>
+    static int Distance(string a, string b)
+    {
+        var row = Enumerable.Range(0, b.Length + 1).ToArray();
+        for (var i = 1; i <= a.Length; i++)
+        {
+            var diagonal = row[0];
+            row[0] = i;
+            for (var j = 1; j <= b.Length; j++)
+            {
+                var above = row[j];
+                row[j] = Math.Min(
+                    Math.Min(row[j] + 1, row[j - 1] + 1),
+                    diagonal + (a[i - 1] == b[j - 1] ? 0 : 1)
+                );
+                diagonal = above;
+            }
+        }
+        return row[b.Length];
+    }
+
+    /// <summary>Exact gate comparison with the known '9'→'6' digit confusion.</summary>
     static bool GateText(string text, string expected)
     {
         // ChineseV6Tiny consistently recognizes this game's small glyph '9' as '6' (verified against
@@ -604,14 +691,14 @@ internal static class PlayerSettings
     static void Age(Game game, Geometry ui, Change change, string hash)
     {
         PanelGate(game, ui);
-        Click(game, ui.P(ui.AgeButtonX), ui.Row(change.Player));
+        Click(game, ui.X(ui.AgeButtonX), ui.Row(change.Player));
         Gate(
             game,
             UiRead.Resolve("agePopup.title", ui.W, ui.H, hash, ui.File),
             "Age Settings for Player " + change.Player
         );
         var rect = AgeRect(ui, change, hash);
-        var y = ui.P(ui.AgeArrowY(change.Field));
+        var y = ui.Y(ui.AgeArrowY(change.Field));
         // Menu extends down; bounded OCR list distinguishes selected field from options.
         // Normal UI shows saved startAge 0 as "Default" (alternative UI: "Archaic Age").
         string[] before =
@@ -621,18 +708,18 @@ internal static class PlayerSettings
         Select(
             game,
             rect,
-            ui.P(ui.AgeArrowX),
+            ui.X(ui.AgeArrowX),
             y,
             [
-                ui.P(ui.AgeList[0]),
-                y + ui.P(ui.AgeList[1]),
-                ui.P(ui.AgeList[2]),
-                ui.P(ui.AgeList[3]),
+                ui.X(ui.AgeList[0]),
+                y + ui.Y(ui.AgeList[1]),
+                ui.X(ui.AgeList[2]),
+                ui.Y(ui.AgeList[3]),
             ],
             before,
             DesiredLabel(change)
         );
-        Click(game, ui.P(ui.AgeCloseX), ui.P(ui.AgeCloseY));
+        Click(game, ui.X(ui.AgeCloseX), ui.Y(ui.AgeCloseY));
         PanelGate(game, ui);
     }
 
@@ -670,14 +757,14 @@ internal static class PlayerSettings
         Thread.Sleep(300);
         // Open Directory selects a directory as the result; Open navigates highlighted folders.
         Gate(game, ui.P([1810, 1090, 270, 85]), "Open");
-        Click(game, ui.P(1956), ui.P(1140));
+        Click(game, ui.X(1956), ui.Y(1140));
         Thread.Sleep(300);
     }
 
     static void Ai(Game game, Geometry ui, Change change, string hash)
     {
         PanelGate(game, ui);
-        Click(game, ui.P(ui.AiSetX), ui.Row(change.Player));
+        Click(game, ui.X(ui.AiSetX), ui.Row(change.Player));
         // Load Menu file browser geometry is identical in both reviewed UIs (measured).
         Gate(game, ui.P(BrowserTitle), "Load Menu");
         // Profile-only listing shows profile Game\\AI (custom personalities), not INSTALLPATH game\\ai.
@@ -689,7 +776,7 @@ internal static class PlayerSettings
             && !root.Contains("campaign", StringComparison.OrdinalIgnoreCase)
         )
         {
-            Click(game, ui.P(1792), ui.P(1044));
+            Click(game, ui.X(1792), ui.Y(1044));
             Gate(game, ui.P(BrowserRows), "campaign");
         }
         foreach (var folder in parts[..^1])
@@ -702,7 +789,7 @@ internal static class PlayerSettings
         )
         {
             Gate(game, ui.P(BrowserTitle), "Load Menu");
-            Click(game, ui.P(1000), ui.P(1044));
+            Click(game, ui.X(1000), ui.Y(1044));
             Ui.Text(game, parts[^1].Replace(".xs", "", StringComparison.OrdinalIgnoreCase));
             Thread.Sleep(400);
             var query = parts[^1].Replace(".xs", "", StringComparison.OrdinalIgnoreCase);
@@ -756,9 +843,9 @@ internal static class PlayerSettings
             Select(
                 game,
                 rect,
-                ui.P(d.Arrow),
+                ui.X(d.Arrow),
                 row,
-                [ui.P(d.ListX), row + ui.P(d.ListDy), ui.P(d.ListW), ui.P(d.ListH)],
+                [ui.X(d.ListX), row + ui.Y(d.ListDy), ui.X(d.ListW), ui.Y(d.ListH)],
                 [UiLabel(c)],
                 DesiredLabel(c),
                 c.Field == "civ" ? ui.ListScrolls : 0
@@ -768,32 +855,36 @@ internal static class PlayerSettings
         if (c.Field == "color")
         {
             // No numeric color labels: require exact RGB in bounded visible palette and final checkpoint ID.
-            Click(game, ui.P(ui.ColorButtonX), row);
-            var screen = Ui.CapturePixels(game, 2560);
+            Click(game, ui.X(ui.ColorButtonX), row);
+            var screen = Ui.CapturePixels(game, Ui.FullResolutionWidth);
             var rgb = Convert.FromHexString(c.SwatchRgb![1..]);
             var matches = new List<(int X, int Y)>();
             for (var n = 0; n <= c.Scroll; n++)
             {
                 if (n != 0)
                 {
-                    game.Move(ui.P(ui.PaletteWheelX), row + ui.P(ui.PaletteWheelDy));
+                    game.Move(ui.X(ui.PaletteWheelX), row + ui.Y(ui.PaletteWheelDy));
                     Ui.Wheel(game, -1);
                     Thread.Sleep(150);
-                    screen = Ui.CapturePixels(game, 2560);
+                    screen = Ui.CapturePixels(game, Ui.FullResolutionWidth);
                 }
                 // Swatch centers every 47 reference px below the row; flat swatch interiors keep exact RGB at any reviewed scale.
                 for (var offset = ui.SwatchFirst; offset < ui.SwatchEnd; offset += 47)
                 {
-                    var y = row + ui.P(offset);
-                    if (y >= ui.P(1360))
+                    var y = row + ui.Y(offset);
+                    if (y >= ui.Y(1360))
                         break;
-                    var pos = (y * screen.Width + ui.P(ui.SwatchX)) * 4;
+                    var pos =
+                        (
+                            ui.Capture(y, screen.Width) * screen.Width
+                            + ui.Capture(ui.X(ui.SwatchX), screen.Width)
+                        ) * 4;
                     if (
                         screen.Bgra[pos] == rgb[2]
                         && screen.Bgra[pos + 1] == rgb[1]
                         && screen.Bgra[pos + 2] == rgb[0]
                     )
-                        matches.Add((ui.P(ui.SwatchX), y));
+                        matches.Add((ui.X(ui.SwatchX), y));
                 }
                 if (matches.Count != 0)
                     break;
@@ -1060,6 +1151,8 @@ internal static class PlayerSettings
             {
                 verified = true,
                 uiKind = ui.Kind,
+                layoutReviewed = ui.Reviewed,
+                bestEffort = ui.Reviewed ? null : ScreenProbe.BestEffortNote,
                 backupScenarioPath = backup,
                 backupTriggerPath = trigger,
                 finalCheckpointPath = latest,

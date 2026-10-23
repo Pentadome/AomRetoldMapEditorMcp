@@ -34,6 +34,9 @@ internal sealed partial class Server
     static readonly string[] DeleteRequired = ["unitId", "proto", "player"];
     static readonly string[] TerrainRequired = ["minX", "minZ", "maxX", "maxZ"];
 
+    /// <summary>World placement tool name (MCP tool registry); per-item failures of layout/mirror tools are classified as it.</summary>
+    const string PlaceAtWorldTool = "editor_place_at_world";
+
     /// <summary>Simple tools whose bridge refusal means nothing affecting the scene was dispatched.</summary>
     bool SingleCommandTool(string name) =>
         name is "editor_place_unit" or "editor_place_at_world"
@@ -42,11 +45,15 @@ internal sealed partial class Server
             && _catalog.Commands.ContainsKey(name[7..])
         );
 
-    static object RefusalDetails(BridgeRefusal refusal, string name) =>
+    /// <summary>Retry-safe failure for a bridge refusal when nothing else of the tool reached the game.</summary>
+    /// <param name="refusal">Bridge refusal (code and command).</param>
+    /// <param name="name">Tool name (placement tools get cursor-cleanup advice).</param>
+    /// <param name="phase">"dispatch" for single-command tools, "before-input" for multi-step tools with zero effects.</param>
+    static object RefusalDetails(BridgeRefusal refusal, string name, string phase) =>
         new
         {
             code = "BRIDGE_REFUSED",
-            phase = "dispatch",
+            phase,
             message = refusal.Message,
             refusalCode = refusal.Code,
             refusedCommand = refusal.Command,
@@ -55,7 +62,7 @@ internal sealed partial class Server
             retrySafe = true,
             stagingPath = (string?)null,
             destinationPath = (string?)null,
-            nextAction = refusal.Code == 10
+            nextAction = refusal.Code == PointerOffMapRefusal
                 ? "Pointer was not over the map (off-map, map edge or UI panel). Refused command did not run; scene unchanged. Choose an on-map point (editor_view_info / editor_place_at_world) and retry."
             : name is "editor_place_unit" or "editor_place_at_world"
                 ? "Bridge refused before the placement command; preparatory cursor commands ran and were cleaned up, scene unchanged. Fix the reported precondition, then retry."
@@ -188,7 +195,10 @@ internal sealed partial class Server
                 game,
                 !args.TryGetProperty("probeUi", out var probe) || probe.GetBoolean()
             ),
-            "editor_ui_state" => UiState(game),
+            "editor_ui_state" => UiState(
+                game,
+                args.TryGetProperty("diagnose", out var diagnose) && diagnose.GetBoolean()
+            ),
             "editor_place_at_world" => PlaceAtWorld(
                 game,
                 String(args, "proto"),
@@ -360,6 +370,7 @@ internal sealed partial class Server
             py = pixel.Y + dy;
         }
         var residual = Error(current);
+        var parked = ParkPointer(game);
         return new
         {
             requested = new { x, z },
@@ -368,6 +379,7 @@ internal sealed partial class Server
             residual,
             withinTolerance = residual <= tolerance,
             clicks,
+            pointerParked = parked,
             cameraOnly = true,
             note = residual <= tolerance
                 ? "Camera center (forward ray on quantized terrain) verified by live camera read."
@@ -375,6 +387,24 @@ internal sealed partial class Server
             limitation = ui.Reviewed
                 ? "Left clicks on the reviewed minimap (normal or alternative UI); no scene mutation intended. Camera center measured from live pose, not occlusion proof."
                 : "Left clicks on a derived (scaled, not live-reviewed at this size) minimap; no scene mutation intended. Camera center measured from live pose, not occlusion proof.",
+        };
+    }
+
+    /// <summary>Moves the pointer (no click) from the minimap to the viewport center and waits for the engine to follow,
+    /// so following pointer-dependent tools do not act on a pointer still registered on the minimap.</summary>
+    /// <param name="game">Connected editor.</param>
+    /// <returns>Parked client pixel and the hover report.</returns>
+    static object ParkPointer(Game game)
+    {
+        var (width, height) = Ui.ClientSize(game);
+        int px = width / 2,
+            py = height / 2;
+        var hover = PointerState.HoverMap(game, px, py);
+        return new
+        {
+            x = px,
+            y = py,
+            hover = hover.Report(),
         };
     }
 
@@ -483,7 +513,8 @@ internal sealed partial class Server
         };
     }
 
-    object UiState(Game game)
+    /// <summary>Editor UI state from memory plus pixel gates; <paramref name="diagnose"/> (or a failed detection) adds per-gate hit reports.</summary>
+    object UiState(Game game, bool diagnose)
     {
         var editor = game.Editor();
         Win.Check(Win.GetClientRect(game.Window, out var rect), "GetClientRect");
@@ -523,7 +554,8 @@ internal sealed partial class Server
             panels,
             uiGeometry = ui is null ? "unreviewed: " + reason : ui.Describe,
             layoutReviewed = ui?.Reviewed,
-            limitation = "Placement cursor/selection read from memory; panel flags from pixel gates on a fresh screenshot (focuses game). Gate failure means not detected, not proof of absence. Dialogs/menus outside reviewed gates are not enumerated.",
+            gateDiagnostics = diagnose || ui is null ? SceneUi.Diagnostics(game, frame) : null,
+            limitation = "Placement cursor/selection read from memory; panel flags from pixel gates on a fresh screenshot (focuses game). Gate failure means not detected, not proof of absence. Dialogs/menus outside reviewed gates are not enumerated. gateDiagnostics (diagnose=true or no UI detected): hits/need per gate and worst points, expected vs observed RGB in 1280-wide frame pixels.",
         };
     }
 
@@ -534,7 +566,9 @@ internal sealed partial class Server
         (int X, int Y) Pixel,
         double Error,
         bool CameraMoved,
-        object? Camera
+        object? Camera,
+        JsonElement? Pointer = null,
+        object? Correction = null
     );
 
     WorldPlacement PlaceWorld(
@@ -614,18 +648,22 @@ internal sealed partial class Server
         }
         var pixel = ((int)Math.Round(projected.X), (int)Math.Round(projected.Y));
         var before = LiveUnits.Read(game);
-        Place(
-            game,
-            JsonSerializer.SerializeToElement(
-                new
-                {
-                    proto,
-                    player,
-                    x = pixel.Item1,
-                    y = pixel.Item2,
-                }
-            )
+        var request = JsonSerializer.SerializeToElement(
+            Place(
+                game,
+                JsonSerializer.SerializeToElement(
+                    new
+                    {
+                        proto,
+                        player,
+                        x = pixel.Item1,
+                        y = pixel.Item2,
+                    }
+                )
+            ),
+            Json
         );
+        JsonElement? pointer = request.TryGetProperty("pointer", out var pe) ? pe : null;
         LiveUnits.Unit? unit = null;
         Exception? last = null;
         for (var i = 0; i < 10 && unit is null; i++) // Host 1 s observation window for queued creation.
@@ -641,18 +679,108 @@ internal sealed partial class Server
             }
         }
         if (unit is null)
+        {
+            // Rescan: when the ID set equals the pre-placement set, the engine created nothing (scene unchanged).
+            Thread.Sleep(PlacementRescanMs);
+            var unchanged = UnitIdsUnchanged(game, before);
             throw new WorkflowFailure(
                 "PLACEMENT_NOT_OBSERVED",
                 "observe",
-                "Placement command returned but exactly one new matching object was not observed: "
-                    + last?.Message
-                    + PlacementDiagnostics(game, proto, x, z),
+                (
+                    unchanged
+                        ? "Placement command returned but no new object was created (rescan: object IDs unchanged)."
+                        : "Placement command returned but exactly one new matching object was not observed: "
+                            + last?.Message
+                ) + PlacementDiagnostics(game, proto, x, z),
                 true,
-                true,
-                "Do not retry. Inspect editor_units_diff/editor_units around target; obstruction or invalid terrain may have blocked placement."
+                !unchanged,
+                unchanged
+                    ? "Scene unchanged (verified). Obstruction or invalid terrain likely blocked placement: move the target per the diagnostics, then retry."
+                    : "Do not retry. Inspect editor_units_diff/editor_units around target; obstruction or invalid terrain may have blocked placement.",
+                retrySafe: unchanged
             );
+        }
         var error = Math.Sqrt(Math.Pow(unit.Position.X - x, 2) + Math.Pow(unit.Position.Z - z, 2));
-        return new(unit, pixel, error, moved, camera);
+        object? correction = null;
+        if (error > tolerance && _layout.Selection is not null && _layout.World is not null)
+        {
+            // Item 1.1: an object off target is moved there with the moveunit tool (one more undo step).
+            var offset = error;
+            LiveUnits.Unit after;
+            object step;
+            try
+            {
+                (after, step) = MoveUnitTo(
+                    game,
+                    unit,
+                    x,
+                    z,
+                    tolerance,
+                    moveCamera,
+                    DefaultMoveDurationMs
+                );
+            }
+            catch (Exception e) when (e is not WorkflowFailure { Code: "UNIT_NOT_FOUND" })
+            {
+                throw new WorkflowFailure(
+                    "PLACEMENT_OFFSET",
+                    "correct",
+                    $"{unit.Proto} #{unit.UnitId} landed {offset:0.##} units from target; auto-move failed: {e.Message}",
+                    true,
+                    false,
+                    $"Object #{unit.UnitId} exists at ({unit.Position.X:0.##},{unit.Position.Z:0.##}). Move it with editor_transform_unit or remove it with editor_undo; do not place again.",
+                    inner: e,
+                    retrySafe: false
+                );
+            }
+            var corrected = Math.Sqrt(
+                Math.Pow(after.Position.X - x, 2) + Math.Pow(after.Position.Z - z, 2)
+            );
+            if (corrected > tolerance)
+                throw new WorkflowFailure(
+                    "PLACEMENT_OFFSET",
+                    "correct",
+                    $"{unit.Proto} #{unit.UnitId} landed {offset:0.##} units from target; after the auto-move it is {corrected:0.##} away (tolerance {tolerance}).",
+                    true,
+                    false,
+                    $"Object #{unit.UnitId} exists at ({after.Position.X:0.##},{after.Position.Z:0.##}); obstruction or grid snap may prevent the exact spot. Accept it, raise tolerance, or editor_undo (placement + move); do not place again.",
+                    retrySafe: false
+                );
+            correction = new
+            {
+                corrected = true,
+                offsetBeforeCorrection = offset,
+                positionBefore = new { x = unit.Position.X, z = unit.Position.Z },
+                move = step,
+                undoSteps = 2,
+            };
+            unit = after;
+            error = corrected;
+        }
+        return new(unit, pixel, error, moved, camera, pointer, correction);
+    }
+
+    /// <summary>Extra wait before the no-new-object rescan (host choice: past the 1 s observation window, covers one more
+    /// slow frame batch).</summary>
+    const int PlacementRescanMs = 500;
+
+    /// <summary>True when a fresh read has exactly the pre-placement object IDs (nothing created, nothing removed).</summary>
+    /// <param name="game">Connected editor.</param>
+    /// <param name="before">Pre-placement snapshot.</param>
+    static bool UnitIdsUnchanged(Game game, LiveUnits.Unit[] before)
+    {
+        try
+        {
+            return LiveUnits
+                .Read(game)
+                .Select(u => u.UnitId)
+                .ToHashSet()
+                .SetEquals(before.Select(u => u.UnitId));
+        }
+        catch (InvalidDataException)
+        {
+            return false;
+        }
     }
 
     /// <summary>Best-effort read-only hints after a failed placement: footprint overlaps/slope and terrain class.</summary>
@@ -757,6 +885,8 @@ internal sealed partial class Server
             withinTolerance = placed.Error <= tolerance,
             snapped = placed.Error > 0.05, // Host threshold: >0.05 units = engine grid snap/obstruction shift.
             cameraMoved = placed.CameraMoved,
+            pointer = placed.Pointer,
+            correction = placed.Correction,
             camera = placed.Camera,
             rotation,
             note = placed.Error <= tolerance
@@ -1439,8 +1569,11 @@ internal sealed partial class Server
             );
         var placed = new List<object>();
         string? error = null;
+        object? failure = null;
+        var failedIndex = -1;
         foreach (var (it, i) in items.Select((it, i) => (it, i)))
         {
+            var effects = Game.Effects;
             try
             {
                 var r = PlaceWorld(game, it.Proto, it.Player, it.X, it.Z, true, tolerance);
@@ -1452,12 +1585,15 @@ internal sealed partial class Server
                         positionError = r.Error,
                         withinTolerance = r.Error <= tolerance,
                         cameraMoved = r.CameraMoved,
+                        correction = r.Correction,
                     }
                 );
             }
             catch (Exception e)
             {
                 error = e is WorkflowFailure w ? $"{w.Code}: {w.Message}" : e.Message;
+                failure = FailureDetails(e, PlaceAtWorldTool, Empty, true, Game.Effects - effects);
+                failedIndex = i;
                 break;
             }
         }
@@ -1468,6 +1604,23 @@ internal sealed partial class Server
             placedCount = placed.Count,
             stoppedOnError = error is not null,
             error,
+            failure,
+            remaining = failedIndex < 0
+                ? null
+                : items
+                    .Skip(failedIndex)
+                    .Select(
+                        (it, k) =>
+                            new
+                            {
+                                index = failedIndex + k,
+                                proto = it.Proto,
+                                player = it.Player,
+                                x = it.X,
+                                z = it.Z,
+                            }
+                    )
+                    .ToArray(),
             placed,
             plan,
             atomic = false,
@@ -1493,7 +1646,7 @@ internal sealed partial class Server
         };
         yield return Spec(
             "editor_camera_look_at",
-            "Center editor camera on world X/Z by clicking the minimap (normal or alternative UI, auto-detected; reviewed 2560×1440/1920×1080 or derived for other 16:9 clients 1280..2560 wide, pinned build) in a closed loop: each click is verified from the live camera pose and corrected (maxClicks 1..6, default 4; tolerance world units default 3). Refuses if placement cursor active, minimap pixel gate fails, or first click has no effect. Camera only; no scene mutation. Edge targets may stay offset because of camera bounds.",
+            "Center editor camera on world X/Z by clicking the minimap (normal or alternative UI, auto-detected; reviewed 2560×1440/1920×1080 or derived best effort for other clients 1024..3840 wide with aspect 1.25..2.4, pinned build) in a closed loop: each click is verified from the live camera pose and corrected (maxClicks 1..6, default 4; tolerance world units default 3). Refuses if placement cursor active, minimap pixel gate fails, or first click has no effect. Camera only; no scene mutation. Edge targets may stay offset because of camera bounds.",
             new Dictionary<string, object>
             {
                 ["x"] = coord,
@@ -1522,8 +1675,8 @@ internal sealed partial class Server
         );
         yield return Spec(
             "editor_ui_state",
-            "Read editor UI state: placement cursor active/proto/player, selection count, current edit mode (memory), detected UI kind (normal/alternative via pixel gates, plus profile hint), foreground, client size, camera target, and pixel-gated panels (minimap visible; normal UI: toolPanel/objectPalette bottom panels; alternative UI: object palette/tool bar). Captures one screenshot (focuses game). Read-only.",
-            [],
+            "Read editor UI state: placement cursor active/proto/player, selection count, current edit mode (memory), detected UI kind (normal/alternative via pixel gates, plus profile hint), foreground, client size, camera target, and pixel-gated panels (minimap visible; normal UI: toolPanel/objectPalette bottom panels; alternative UI: object palette/tool bar). diagnose=true (automatic when uiKind is unknown) adds gateDiagnostics: per UI kind and detection gate hits/need and the 3 worst points (expected vs observed RGB). Captures one screenshot (focuses game). Read-only.",
+            new Dictionary<string, object> { ["diagnose"] = new { type = "boolean" } },
             [],
             true
         );

@@ -339,13 +339,27 @@ internal sealed partial class Catalog
                 throw new ArgumentException(UnknownArgument(p.Name, names));
     }
 
-    /// <summary>"Unknown argument X." plus the closest valid name and the valid list (capped at 40 names).</summary>
+    /// <summary>Top-level argument names of the tool schema validated last on this thread (set by the server before
+    /// tool preflights), so mode-specific checks can tell "known but not accepted here" from "unknown".</summary>
+    [ThreadStatic]
+    internal static HashSet<string>? SchemaKeys;
+
+    /// <summary>"Unknown argument X." plus the closest valid name and the valid list (capped at 40 names). Keys the tool
+    /// schema knows (<see cref="SchemaKeys"/>) get "not accepted with these arguments" and no synonym guess (session 2:
+    /// trigger_edit preview rejected outputPath with "Did you mean path?", and the agent overwrote path).</summary>
+    /// <param name="name">Rejected argument name.</param>
+    /// <param name="allowed">Names accepted in this context.</param>
+    /// <param name="prefix">Nested object path prefix ("" at top level).</param>
     internal static string UnknownArgument(
         string name,
         IReadOnlyCollection<string> allowed,
         string prefix = ""
     )
     {
+        if (prefix.Length == 0 && SchemaKeys?.Contains(name) == true && !allowed.Contains(name))
+            return $"Argument {name} is not accepted with these arguments (mode-specific, e.g. preview or operation). Accepted here: "
+                + string.Join(", ", allowed.Order(StringComparer.Ordinal))
+                + ".";
         // Host synonym hints for names agents tried in sessions (outputPath on tools whose file argument is path).
         string[] synonyms = name.ToLowerInvariant() switch
         {
@@ -717,6 +731,20 @@ internal sealed partial class Catalog
     /// <summary>Checks escaping and confirmation classification without calling the game.</summary>
     public static void SelfTest()
     {
+        // Schema-known but mode-rejected keys get no synonym guess.
+        SchemaKeys = ["path", "outputPath"];
+        var modal = UnknownArgument("outputPath", ["path"]);
+        SchemaKeys = null;
+        if (
+            !modal.StartsWith("Argument outputPath is not accepted", StringComparison.Ordinal)
+            || modal.Contains("Did you mean")
+        )
+            throw new InvalidOperationException("Mode-specific argument message test failed.");
+        if (
+            !UnknownArgument("outputPath", ["path"])
+                .Contains("Did you mean path?", StringComparison.Ordinal)
+        )
+            throw new InvalidOperationException("Argument synonym test failed.");
         // Deliberate test literals contain quote/backslash, NUL/newline, and safe/guarded native names.
         if (Quote("a\"b\\c") != "\"a\\\"b\\\\c\"")
             throw new InvalidOperationException("Escape test failed.");

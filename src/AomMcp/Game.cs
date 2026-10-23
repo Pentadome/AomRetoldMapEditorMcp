@@ -21,6 +21,31 @@ internal sealed class Game : IDisposable
     /// <summary>Gets the thread ID that owns the game window.</summary>
     public uint Thread { get; }
 
+    /// <summary>Cross-process per-game lock name prefix (Win32 Local\ = this session); one MCP server drives a game at a time.</summary>
+    const string LockPrefix = @"Local\AomEditorMcp-Game-";
+
+    /// <summary>Wait for another server's call on the same game before refusing (host choice: longer than typical batches).</summary>
+    const int LockTimeoutMs = 30_000;
+
+    /// <summary>Held cross-process lock (recursive for nested connections on the same thread); null after dispose.</summary>
+    Mutex? _lock;
+
+    /// <summary>Managed thread that acquired <see cref="_lock"/> (mutexes are thread-affine).</summary>
+    int _lockThread;
+
+    /// <summary>Process-wide count of game-affecting actions (dispatched native commands, clicks, key presses, wheel,
+    /// drags; not pointer moves). Calls are serialized, so a zero delta over a failed call proves nothing reached the game.</summary>
+    static long _effects;
+
+    /// <summary>Current effect count (see <see cref="CountEffect"/>).</summary>
+    internal static long Effects => Interlocked.Read(ref _effects);
+
+    /// <summary>Records one game-affecting action before or as it is sent.</summary>
+    internal static void CountEffect() => Interlocked.Increment(ref _effects);
+
+    /// <summary>True when the lock was taken over from a server that exited while holding it.</summary>
+    public bool LockAbandoned { get; private set; }
+
     /// <summary>Gets the connected process ID.</summary>
     public uint Pid => checked((uint)Process.Id);
 
@@ -133,6 +158,35 @@ internal sealed class Game : IDisposable
             Process.Dispose();
             throw;
         }
+        AcquireLock();
+    }
+
+    /// <summary>Takes the per-game cross-process lock so two MCP servers (sub-agents, second clients) never send input or
+    /// native commands to one game at once; calls inside one server were already serialized.</summary>
+    /// <exception cref="GameConnectionException">GAME_BUSY after <see cref="LockTimeoutMs"/>; nothing was sent.</exception>
+    void AcquireLock()
+    {
+        var mutex = new Mutex(false, LockPrefix + Pid);
+        try
+        {
+            if (!mutex.WaitOne(LockTimeoutMs))
+            {
+                mutex.Dispose();
+                Handle.Dispose();
+                Process.Dispose();
+                throw new GameConnectionException(
+                    "GAME_BUSY",
+                    $"Another MCP server has been using this game for over {LockTimeoutMs / 1000} s; no operation executed.",
+                    "Wait for the other agent/client to finish (or stop it), then retry."
+                );
+            }
+        }
+        catch (AbandonedMutexException)
+        {
+            LockAbandoned = true; // Previous holder exited mid-call: acquired, but its last call may be incomplete.
+        }
+        _lock = mutex;
+        _lockThread = Environment.CurrentManagedThreadId;
     }
 
     static Process FindProcess()
@@ -185,13 +239,14 @@ internal sealed class Game : IDisposable
 
     /// <summary>Requires scenario-editor mode and resolves the live editor context.</summary>
     /// <returns>Non-null editor context pointer.</returns>
-    /// <exception cref="InvalidOperationException">Editor mode or context is unavailable.</exception>
+    /// <exception cref="NotInEditorException">The game is not in scenario-editor mode.</exception>
+    /// <exception cref="InvalidOperationException">Editor context is unavailable.</exception>
     public nint Editor()
     {
         var game = Pointer(Base + checked((int)Layout.EditorGlobalRva));
         // Recovered one-byte mode flag: 1 means editor; see accepted layout and LIVE-FINDINGS.md.
         if (game == 0 || Read(game + checked((int)Layout.EditorFlagOffset), 1)[0] != 1)
-            throw new InvalidOperationException("Not in scenario editor. No operation executed.");
+            throw new NotInEditorException();
         var editor = Pointer(game + checked((int)Layout.EditorPointerOffset));
         if (editor == 0)
             throw new InvalidOperationException("Editor context unavailable.");
@@ -488,6 +543,14 @@ internal sealed class Game : IDisposable
     /// <summary>Releases the process handle and process wrapper without closing the game.</summary>
     public void Dispose()
     {
+        if (_lock is { } held)
+        {
+            _lock = null;
+            // A release from another thread is impossible (thread-affine); the OS then frees it when that thread ends.
+            if (_lockThread == Environment.CurrentManagedThreadId)
+                held.ReleaseMutex();
+            held.Dispose();
+        }
         ReleaseLease();
         Handle.Dispose();
         Process.Dispose();
@@ -527,3 +590,7 @@ public sealed class FocusRefusedException(int attempts = 1, string? foregroundPr
     /// <summary>Name of the process that held the foreground when focus was refused, if known.</summary>
     public string? ForegroundProcess { get; } = foregroundProcess;
 }
+
+/// <summary>The game is not in scenario-editor mode (memory flag read); thrown before any editor command or input.</summary>
+public sealed class NotInEditorException()
+    : InvalidOperationException("Not in scenario editor. No operation executed.");

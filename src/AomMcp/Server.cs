@@ -37,6 +37,9 @@ internal sealed partial class Server(
     // Windows SDK VK_LBUTTON=1, VK_RBUTTON=2, VK_SHIFT/CONTROL/MENU=0x10/11/12.
     static readonly int[] HeldInputKeys = [1, 2, 0x10, 0x11, 0x12];
 
+    /// <summary>Bridge refusal code for "pointer not over the map" (native/EditorBridge.cpp map-hover guard).</summary>
+    internal const uint PointerOffMapRefusal = 10;
+
     // Host batch schema: step must identify an existing tool; modifiers are Ui.Press's public names.
     /// <summary>Natives dispatched by checkpoint/trigger workflows (EditorFiles.cs Save/Import); checked before the first dispatch.</summary>
     static readonly string[] CheckpointNatives =
@@ -355,6 +358,7 @@ internal sealed partial class Server(
     )
     {
         var passedPreflight = false;
+        var effectsAtStart = Game.Effects;
         try
         {
             if (args.ValueKind == JsonValueKind.Null)
@@ -401,73 +405,13 @@ internal sealed partial class Server(
         }
         catch (Exception e)
         {
-            var noInput = e is FocusRefusedException;
-            // Read-only annotated helpers never dispatch native commands or write files, so their failures are inspections.
-            var readOnly = FullIndex.GetValueOrDefault(name)?.Annotations?.ReadOnlyHint == true;
-            var safeInspection =
-                passedPreflight
-                && (
-                    noInput
-                    || readOnly
-                    || WorkflowSafeInspection(name, args)
-                    || name
-                        is "editor_search_tools"
-                            or "editor_trigger_list"
-                            or "editor_players"
-                            or "editor_player_dependency_audit"
-                    || (name is "editor_set_diplomacy" or "editor_player_settings")
-                        && args.GetProperty("operation").GetString() != "apply"
-                    || (name is "editor_trigger_edit" or "editor_stage_ai")
-                        && (
-                            !args.TryGetProperty("preview", out var preview) || preview.GetBoolean()
-                        )
-                );
-            var unknown = passedPreflight && !safeInspection;
-            var failure =
-                e is WorkflowFailure known ? known.Details
-                : e is GameConnectionException connect
-                    ? new
-                    {
-                        code = connect.Code,
-                        phase = "connect",
-                        message = e.Message,
-                        nativeDispatched = (bool?)false,
-                        outcomeUnknown = (bool?)false,
-                        retrySafe = true,
-                        stagingPath = (string?)null,
-                        destinationPath = (string?)null,
-                        nextAction = connect.NextAction,
-                    }
-                : e is BridgeRefusal refusal && SingleCommandTool(name)
-                    ? RefusalDetails(refusal, name)
-                : new
-                {
-                    code = e switch
-                    {
-                        ArgumentException => "INVALID_ARGUMENT",
-                        _ when noInput => "FOCUS_NOT_GRANTED",
-                        InvalidDataException => "UNSUPPORTED_OR_INVALID_DATA",
-                        FileNotFoundException => "FILE_NOT_FOUND",
-                        _ => "OPERATION_FAILED",
-                    },
-                    phase = noInput ? "focus"
-                    : safeInspection ? "inspect/preview"
-                    : passedPreflight ? "unknown"
-                    : "preflight",
-                    message = e.Message,
-                    nativeDispatched = (bool?)(unknown ? null : false),
-                    outcomeUnknown = (bool?)(unknown ? null : false),
-                    retrySafe = !unknown,
-                    stagingPath = (string?)null,
-                    destinationPath = (string?)null,
-                    nextAction = noInput
-                        ? "Bring editor window foreground manually (or start the server with AOM_MCP_FOCUS=assertive); no input sent. Inspect state before proceeding."
-                    : safeInspection
-                        ? "Correct unsupported values/format; no native command or file write occurred."
-                    : passedPreflight
-                        ? "Inspect current state before retrying; mutation may have occurred."
-                    : "Fix arguments or unsupported format before retrying; no native operation ran.",
-                };
+            var failure = FailureDetails(
+                e,
+                name,
+                args,
+                passedPreflight,
+                Game.Effects - effectsAtStart
+            );
             return new()
             {
                 Content = [new TextContentBlock { Text = JsonSerializer.Serialize(failure, Json) }],
@@ -475,6 +419,109 @@ internal sealed partial class Server(
                 IsError = true,
             };
         }
+    }
+
+    /// <summary>Structured failure for a tool error: known workflow/connection/refusal codes, else a generic code whose
+    /// dispatch/retry fields come from the effect counter (zero effects = nothing reached the game, retry safe).</summary>
+    /// <param name="e">Caught exception.</param>
+    /// <param name="name">Tool name.</param>
+    /// <param name="args">Tool arguments (preview/operation decide safe inspections).</param>
+    /// <param name="passedPreflight">True once argument validation passed.</param>
+    /// <param name="effectsDelta">Game-affecting actions sent during the call (<see cref="Game.Effects"/>).</param>
+    /// <returns>Serializable failure object.</returns>
+    object FailureDetails(
+        Exception e,
+        string name,
+        JsonElement args,
+        bool passedPreflight,
+        long effectsDelta
+    )
+    {
+        var noInput = e is FocusRefusedException;
+        // Read-only annotated helpers never dispatch native commands or write files, so their failures are inspections.
+        var readOnly = FullIndex.GetValueOrDefault(name)?.Annotations?.ReadOnlyHint == true;
+        var safeInspection =
+            passedPreflight
+            && (
+                noInput
+                || readOnly
+                || WorkflowSafeInspection(name, args)
+                || name
+                    is "editor_search_tools"
+                        or "editor_trigger_list"
+                        or "editor_players"
+                        or "editor_player_dependency_audit"
+                || (name is "editor_set_diplomacy" or "editor_player_settings")
+                    && args.GetProperty("operation").GetString() != "apply"
+                || name == "editor_paint_area" && LayoutPreview(args)
+                || (name is "editor_trigger_edit" or "editor_stage_ai")
+                    && (!args.TryGetProperty("preview", out var preview) || preview.GetBoolean())
+            );
+        // Refused before anything reached the game (no native dispatch, click, key, wheel or drag): scene provably
+        // unchanged. Limited to refusals and the editor-mode check (read at the start of every editor tool): other
+        // failures may follow host file writes, which the counter does not see.
+        var beforeInput =
+            passedPreflight
+            && !safeInspection
+            && effectsDelta == 0
+            && e is BridgeRefusal or NotInEditorException;
+        var unknown = passedPreflight && !safeInspection && !beforeInput;
+        var single = SingleCommandTool(name);
+        var failure =
+            e is WorkflowFailure known ? known.Details
+            : e is GameConnectionException connect
+                ? new
+                {
+                    code = connect.Code,
+                    phase = "connect",
+                    message = e.Message,
+                    nativeDispatched = (bool?)false,
+                    outcomeUnknown = (bool?)false,
+                    retrySafe = true,
+                    stagingPath = (string?)null,
+                    destinationPath = (string?)null,
+                    nextAction = connect.NextAction,
+                }
+            : e is BridgeRefusal refusal && (single || beforeInput)
+                ? RefusalDetails(refusal, name, single ? "dispatch" : "before-input")
+            : new
+            {
+                code = e switch
+                {
+                    ArgumentException => "INVALID_ARGUMENT",
+                    _ when noInput => "FOCUS_NOT_GRANTED",
+                    InvalidDataException => "UNSUPPORTED_OR_INVALID_DATA",
+                    FileNotFoundException => "FILE_NOT_FOUND",
+                    BridgeRefusal => "BRIDGE_REFUSED",
+                    NotInEditorException => "NOT_IN_EDITOR",
+                    _ => "OPERATION_FAILED",
+                },
+                phase = noInput ? "focus"
+                : safeInspection ? "inspect/preview"
+                : beforeInput ? "before-input"
+                : e is BridgeRefusal ? "dispatch"
+                : passedPreflight ? "unknown"
+                : "preflight",
+                message = e.Message,
+                nativeDispatched = unknown ? (effectsDelta > 0 ? true : null) : (bool?)false,
+                outcomeUnknown = (bool?)(unknown ? null : false),
+                retrySafe = !unknown,
+                effectsSent = effectsDelta,
+                stagingPath = (string?)null,
+                destinationPath = (string?)null,
+                nextAction = noInput
+                    ? "Bring editor window foreground manually (or start the server with AOM_MCP_FOCUS=assertive); no input sent. Inspect state before proceeding."
+                : safeInspection
+                    ? "Correct unsupported values/format; no native command or file write occurred."
+                : beforeInput
+                    ? "Nothing was sent to the game (no native command or input); scene unchanged. Fix the cause, then retry."
+                : passedPreflight && effectsDelta > 0
+                    ? $"{effectsDelta} input/native action(s) reached the game before the failure; inspect current state (editor_units_diff, editor_screenshot) before retrying."
+                : passedPreflight
+                    ? "Inspect current state before retrying; no game input was sent, but host file writes may have occurred."
+                : "Fix arguments or unsupported format before retrying; no native operation ran.",
+            };
+        return failure;
     }
 
     CallToolResult Batch(JsonElement args)
@@ -557,7 +604,13 @@ internal sealed partial class Server(
         // argument names in Extras are this host's API, not undocumented engine property names.
         var properties = schema.GetProperty("properties");
         if (path.Length == 0)
-            Catalog.ValidateObject(args, properties.EnumerateObject().Select(p => p.Name));
+        {
+            Catalog.SchemaKeys = properties
+                .EnumerateObject()
+                .Select(p => p.Name)
+                .ToHashSet(StringComparer.Ordinal);
+            Catalog.ValidateObject(args, Catalog.SchemaKeys);
+        }
         else
             foreach (var p in args.EnumerateObject())
                 if (!properties.TryGetProperty(p.Name, out _))
@@ -909,7 +962,7 @@ internal sealed partial class Server(
                 metadataCoverage = "Command/UI counts show shipped coverage, not proof of semantic effects. Toolset resets when MCP host reconnects; call editor_toolset mode=full when needed.",
                 triggerEditing = "editor_trigger_list reads bounded TR v12 exports with player/arg/references filters. editor_trigger_player_parity audits template→target gaps. editor_trigger_edit previews/writes NEW-file patch/clone or up to 64 distinct-trigger edits in one output (value/label replacements, condition/effect removal, duplicates); requires source SHA and expected names, verifies unrelated records. editor_triggers apply requires reviewed live export/hash; game round-trip compared semantically. XS compile/runtime effects unproven.",
                 playerSettings = "editor_players/editor_player_dependency_audit read game-written checkpoints (stances 1 ally, 2 enemy, 3 neutral; 0 self/unset). editor_set_diplomacy changes batches directed cells with per-click RGB gates and one final checkpoint. editor_player_settings supports reviewed fields in both UIs (alternative Players Settings or normal Scenario > Player Data, auto-detected), including AI path via profile Game\\AI (or stock game\\ai) file browser; startAge changes can reset minor gods, requiring observedOnly assertions. Apply is pinned to 2560x1440 or 1920x1080 and requires backups. Player name compares the editable display name. Direct AI-name text entry did not persist. Neither proves XS runtime.",
-                sceneTools = "Core world-space helpers: editor_place_at_world/editor_apply_layout (world X/Z, observed unitIds, optional heading), editor_camera_look_at (minimap closed loop, normal or alternative UI auto-detected; reviewed 2560x1440/1920x1080 layouts, other 16:9 clients 1280..2560 wide get read-only derived geometry with layoutReviewed=false: camera/occluders/OCR presets, world helpers, palette selection untested, writers stay pinned), editor_view_info/editor_ui_state, editor_units_snapshot/diff (undo/redo reidentification), editor_scene_summary, editor_check_footprints, editor_terrain_grid, editor_delete_units (tuple-verified, confirmDestructive). Not saved; no retries.",
+                sceneTools = "Core world-space helpers: editor_place_at_world/editor_apply_layout (world X/Z, observed unitIds, optional heading), editor_camera_look_at (minimap closed loop, normal or alternative UI auto-detected; reviewed 2560x1440/1920x1080 layouts; other clients 1024..3840 wide with aspect 1.25..2.4 get derived geometry (per-axis stretch, anchored minimap) with layoutReviewed=false, best effort: camera/occluders/OCR presets, world helpers, palette selection, gated dialog writers), editor_view_info/editor_ui_state, editor_units_snapshot/diff (undo/redo reidentification), editor_scene_summary, editor_check_footprints, editor_terrain_grid, editor_delete_units (tuple-verified, confirmDestructive). Not saved; no retries.",
                 worldTools = "Core world helpers (research/LIVE-WORLD.md): editor_terrain_info (tile texture/water/passability), editor_live_players (name/team/civ/age/diplomacy without checkpoint), editor_edit_mode (read/enter/exit tool mode, UI kind, paint selections), editor_paint_world (texture/mix/water/forest/cliff along world points), editor_elevation (set/flatten/smooth area), editor_transform_unit (move/rotate with 22.5° steps), editor_terrain_catalog (textures/water/forest/cliff/mixes/lighting/civs/editModes), editor_camera_frame, editor_camera (get/zoom/pitch/reset with readback; wheel: positive steps zoom in, clamped 29..85), editor_capture (fit a world area by zoom, capture or saveTo .png, restore camera), editor_overview (ID-annotated screenshot), editor_resource_balance, editor_mirror_units, editor_scatter. Strokes use the current brush; verify reports included.",
                 scenarioEditing = "Never edit .mythscn directly. Use game editor, game-writer checkpoints and normal Load Scenario UI; native loadScenario disabled after crash.",
                 aiScripts = "Computer-player .xs personality must be under active-profile Games\\Age of Mythology Retold\\<id>\\Game\\AI (or its subdirectory); stock scripts/includes resolve from INSTALLPATH\\game\\ai. Profile <id>\\ai (without Game) is not used. Triggers belong in active-profile trigger directory; use filename stems for uiLoadTriggers/uiSaveTriggers.",
@@ -1241,6 +1294,26 @@ internal sealed partial class Server(
         throw new ArgumentException("Unknown tool. Use tools/list or editor_catalog.");
     }
 
+    /// <summary>Waits until the placement cursor follows the pointer; refuses while it still sits at its previous spot.</summary>
+    /// <param name="game">Connected editor with a placement cursor set.</param>
+    /// <param name="x">Client pixel X.</param>
+    /// <param name="y">Client pixel Y.</param>
+    /// <returns>Hover result for the report.</returns>
+    static PointerState.Hover HoverForPlacement(Game game, int x, int y)
+    {
+        var hover = PointerState.HoverMap(game, x, y);
+        if (hover.CursorStale)
+            throw new WorkflowFailure(
+                "POINTER_NOT_SETTLED",
+                "prepare",
+                $"Placement cursor stayed at its previous position ({hover.Cursor!.Value.X:0.##},{hover.Cursor.Value.Z:0.##}) after {hover.WaitedMs} ms; expected near ({hover.Expected?.X:0.##},{hover.Expected?.Z:0.##}).",
+                false,
+                false,
+                "No placement requested; cursor cleanup follows. Retry; if it repeats, the game is very slow or the point is covered by UI."
+            );
+        return hover;
+    }
+
     /// <summary>Single placement; callers pass schema-checked args (Preflight or Formations' own constructed points).</summary>
     object Place(Game game, JsonElement args)
     {
@@ -1289,14 +1362,22 @@ internal sealed partial class Server(
                 );
             }
             var (selected, owner) = prepared;
-            game.Move(x, y);
-            Thread.Sleep(150); // Host-chosen map-hover settle time before one-shot placement.
+            var hover = HoverForPlacement(game, x, y);
             // Windows GetAsyncKeyState high bit 0x8000 means currently held; low bit is not used.
             if (HeldInputKeys.Any(k => (Win.GetAsyncKeyState(k) & 0x8000) != 0))
                 throw new InvalidOperationException(
                     "Mouse button/modifier held; no placement requested."
                 );
-            steps.Add(_bridge.Execute(game, "uiPlaceAtPointer(false)", true, selected, owner));
+            try
+            {
+                steps.Add(_bridge.Execute(game, "uiPlaceAtPointer(false)", true, selected, owner));
+            }
+            catch (BridgeRefusal r) when (r.Code == PointerOffMapRefusal)
+            {
+                // The refused command did not run; the hover byte is written by the cursor frame, so re-settle once.
+                hover = HoverForPlacement(game, x, y);
+                steps.Add(_bridge.Execute(game, "uiPlaceAtPointer(false)", true, selected, owner));
+            }
             return new
             {
                 placementRequested = true,
@@ -1306,6 +1387,7 @@ internal sealed partial class Server(
                 x,
                 y,
                 selectedProtoId = selected,
+                pointer = hover.Report(),
                 steps,
                 note = "One editor placement command returned. Verify real unit with screenshot after preview cleanup. Scenario not saved.",
             };
@@ -2410,7 +2492,7 @@ internal sealed partial class Server(
         );
         yield return Spec(
             "editor_ui_read",
-            "Read bounded game-client region with embedded PP-OCRv6 tiny model. Supply region [x,y,w,h] or named field preset (players.<1-12>.<name|civ|control|aiPath|food|...>, agePopup.*, fileBrowser.*) for English normal (Scenario > Player Data) or alternative (Players Settings) UI at reviewed 2560×1440/1920×1080 or derived other 16:9 sizes 1280..2560 wide (layoutReviewed=false; OCR weaker at small sizes), auto-detected by panel pixel gates; optional scale 1..4. Returns OCR text/score/boxes, never proof of field state.",
+            "Read bounded game-client region with embedded PP-OCRv6 tiny model. Supply region [x,y,w,h] or named field preset (players.<1-12>.<name|civ|control|aiPath|food|...>, agePopup.*, fileBrowser.*) for English normal (Scenario > Player Data) or alternative (Players Settings) UI at reviewed 2560×1440/1920×1080 or derived other sizes 1024..3840 wide with aspect 1.25..2.4 (layoutReviewed=false, best effort; OCR weaker at small sizes), auto-detected by panel pixel gates; optional scale 1..4. Returns OCR text/score/boxes, never proof of field state.",
             new Dictionary<string, object>
             {
                 ["region"] = new

@@ -150,7 +150,7 @@ internal static class PlayerWorkflow
                 }
                 return n;
             }),
-            limitation = "2560×1440/1920×1080 alternative (Players Settings > Diplomacy) or normal (Scenario > Diplomacy) UI, pre-opened dialog. Pixel gate before/after each click, one final checkpoint; no automatic retry.",
+            limitation = "Reviewed 2560×1440/1920×1080 (other sizes best effort, layoutReviewed=false) alternative (Players Settings > Diplomacy) or normal (Scenario > Diplomacy) UI, pre-opened dialog. Pixel gate before/after each click, one final checkpoint; no automatic retry.",
         };
     }
 
@@ -573,6 +573,8 @@ internal static class PlayerWorkflow
         var triggerProfile = args.GetProperty("triggerProfileDirectory").GetString()!;
         game.Focus();
         var uiKind = ScreenProbe.DiplomacyUi(ScreenProbe.Capture(game));
+        var (clientWidth, clientHeight) = Ui.ClientSize(game);
+        var layoutReviewed = UiLayouts.IsReviewed(clientWidth, clientHeight);
         ScreenProbe.RequireCell(
             ScreenProbe.Capture(game),
             changes[0].From,
@@ -683,6 +685,8 @@ internal static class PlayerWorkflow
             {
                 verified = true,
                 uiKind,
+                layoutReviewed,
+                bestEffort = layoutReviewed ? null : ScreenProbe.BestEffortNote,
                 backupScenarioPath = backupScenario,
                 backupTriggerPath = backupTrigger,
                 finalCheckpointPath = latest,

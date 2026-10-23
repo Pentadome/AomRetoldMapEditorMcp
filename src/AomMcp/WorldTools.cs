@@ -15,6 +15,7 @@ internal sealed partial class Server
         "editor_live_players",
         "editor_edit_mode",
         "editor_paint_world",
+        "editor_paint_area",
         "editor_elevation",
         "editor_transform_unit",
         "editor_terrain_catalog",
@@ -92,6 +93,9 @@ internal sealed partial class Server
                     if (p.GetArrayLength() != 2)
                         throw new ArgumentException("Each point must be [x,z].");
                 break;
+            case "editor_paint_area":
+                PreflightPaintArea(args);
+                break;
             case "editor_elevation":
                 EditorFiles.Confirm(args, "confirmDestructive");
                 if (
@@ -152,6 +156,7 @@ internal sealed partial class Server
             "editor_live_players" => LiveWorld.Players(game, args),
             "editor_edit_mode" => EditModeTool(game, args),
             "editor_paint_world" => PaintWorld(game, args),
+            "editor_paint_area" => PaintArea(game, args),
             "editor_elevation" => Elevation(game, args),
             "editor_transform_unit" => TransformUnit(game, args),
             "editor_terrain_catalog" => TerrainCatalog(game, args),
@@ -852,38 +857,7 @@ internal sealed partial class Server
         var duration = Int(args, "durationMs", Math.Clamp(300 + 60 * points.Length, 300, 3000)); // Host default: slower for longer strokes.
         RequireNoCursor(game);
         var names = LiveWorld.Names(game);
-        string type =
-            kind switch
-            {
-                "water" => ExactName(names.Water, requested),
-                "forest" => ExactName(names.Forest, requested),
-                "cliff" => ExactName(names.Cliff, requested),
-                "texture" => ExactName(names.Subtypes.SelectMany(s => s), requested),
-                "mix" => ExactName(Mixes(), requested),
-                _ => null,
-            }
-            ?? throw new WorkflowFailure(
-                "UNKNOWN_PAINT_TYPE",
-                "preflight",
-                $"Unknown {kind} type '{requested}'. Suggestions: "
-                    + string.Join(
-                        ", ",
-                        GameDataCatalog.Suggest(
-                            requested,
-                            kind switch
-                            {
-                                "water" => names.Water,
-                                "forest" => names.Forest,
-                                "cliff" => names.Cliff,
-                                "mix" => Mixes(),
-                                _ => names.Subtypes.SelectMany(s => s).Where(s => s.Length > 0),
-                            }
-                        )
-                    ),
-                false,
-                false,
-                "Use editor_terrain_catalog for exact names. No input sent."
-            );
+        var type = ResolvePaintType(kind, requested, names, Mixes);
         var view0 = EditorView.ReadView(game);
         foreach (var (x, z) in points)
             if (!view0.InsideMap(x, z))
@@ -902,50 +876,7 @@ internal sealed partial class Server
         var strokes = 0;
         try
         {
-            switch (kind)
-            {
-                case "water":
-                    _bridge.Execute(game, $"uiSetWaterType({Catalog.Quote(type)})");
-                    break;
-                case "forest":
-                    _bridge.Execute(game, $"uiSetForestType({Catalog.Quote(type)})");
-                    break;
-                case "cliff":
-                    _bridge.Execute(game, $"uiSetCliffType({Catalog.Quote(type)})");
-                    break;
-                case "texture":
-                    selectionNote = SelectTexture(game, type, names);
-                    break;
-                case "mix":
-                    selectionNote = SelectFromPalette(game, type, Mixes(), mix: true);
-                    break;
-            }
-            if (kind is not "mix")
-            {
-                var ok = false;
-                for (var i = 0; i < 25 && !ok; i++) // Host 1 s poll; setters apply on following frame.
-                {
-                    var s = LiveWorld.ReadSelections(game);
-                    ok = kind switch
-                    {
-                        "water" => s.WaterName == type,
-                        "forest" => s.ForestName == type,
-                        "cliff" => s.CliffName == type,
-                        _ => s.Texture == type,
-                    };
-                    if (!ok)
-                        Thread.Sleep(40);
-                }
-                if (!ok)
-                    throw new WorkflowFailure(
-                        "PAINT_TYPE_NOT_SELECTED",
-                        "select",
-                        $"Paint selection did not become '{type}' (memory readback).",
-                        true,
-                        false,
-                        "Nothing painted. Inspect editor_edit_mode paintSelections."
-                    );
-            }
+            selectionNote = SelectPaintType(game, kind, type, names, Mixes);
             steps.Add(new { selected = type, selectionNote });
             try
             {
@@ -1083,6 +1014,131 @@ internal sealed partial class Server
             editModeAfter = LiveWorld.ModeName(LiveWorld.EditMode(game)),
             limitation = "Drags the left mouse along projected stroke pixels in the native paint tool with the CURRENT brush size/shape. Verification diffs live tile textures/water grid/heights in the stroke bounds (+8 tiles) and live objects; mixes cannot be read back except through tile changes. Forest painting may remove objects under the brush (panel 'Remove Nature/Non-Nature' options). Strokes that do not fit one view (UI panels, spread) are halved recursively (shared endpoints, camera re-aimed per chunk); `strokes` = painted chunks. Undo with editor_undo (one per stroke chunk). Scenario not saved.",
         };
+    }
+
+    /// <summary>Exact catalog name for a paint request (case/space-insensitive), else UNKNOWN_PAINT_TYPE with suggestions.</summary>
+    /// <param name="kind">texture, mix, water, forest or cliff.</param>
+    /// <param name="requested">Requested type name.</param>
+    /// <param name="names">Live type catalogs.</param>
+    /// <param name="mixes">Generated mix titles (loaded on demand).</param>
+    /// <summary>Names listed when fuzzy suggestions find nothing (host output bound).</summary>
+    const int PaintSuggestionFallback = 8;
+
+    /// <summary>Fuzzy suggestions for an unknown paint type, else the first catalog names (live 2026-10-22: "Oak Forest"
+    /// matched none of the CamelCase forest names and the message listed nothing).</summary>
+    /// <param name="requested">Requested name.</param>
+    /// <param name="candidates">Catalog names of the kind.</param>
+    static string PaintSuggestions(string requested, IEnumerable<string> candidates)
+    {
+        var all = candidates.ToArray();
+        var fuzzy = GameDataCatalog.Suggest(requested, all).ToArray();
+        return fuzzy.Length > 0
+            ? string.Join(", ", fuzzy)
+            : $"(no close match; first of {all.Length}) "
+                + string.Join(", ", all.Take(PaintSuggestionFallback));
+    }
+
+    /// <summary>Exact catalog name for a requested paint type, or UNKNOWN_PAINT_TYPE with suggestions.</summary>
+    /// <param name="kind">texture, mix, water, forest or cliff.</param>
+    /// <param name="requested">Requested name (case-insensitive exact match).</param>
+    /// <param name="names">Live type catalogs.</param>
+    /// <param name="mixes">Generated mix titles (loaded on demand).</param>
+    static string ResolvePaintType(
+        string kind,
+        string requested,
+        LiveWorld.Catalogs names,
+        Func<string[]> mixes
+    ) =>
+        kind switch
+        {
+            "water" => ExactName(names.Water, requested),
+            "forest" => ExactName(names.Forest, requested),
+            "cliff" => ExactName(names.Cliff, requested),
+            "texture" => ExactName(names.Subtypes.SelectMany(s => s), requested),
+            "mix" => ExactName(mixes(), requested),
+            _ => null,
+        }
+        ?? throw new WorkflowFailure(
+            "UNKNOWN_PAINT_TYPE",
+            "preflight",
+            $"Unknown {kind} type '{requested}'. Suggestions: "
+                + PaintSuggestions(
+                    requested,
+                    kind switch
+                    {
+                        "water" => names.Water,
+                        "forest" => names.Forest,
+                        "cliff" => names.Cliff,
+                        "mix" => mixes(),
+                        _ => names.Subtypes.SelectMany(s => s).Where(s => s.Length > 0),
+                    }
+                ),
+            false,
+            false,
+            "Use editor_terrain_catalog for exact names. No input sent."
+        );
+
+    /// <summary>Selects the paint type in the active paint tool and, except for mixes, polls the memory readback.</summary>
+    /// <param name="game">Validated editor connection with the paint tool of <paramref name="kind"/> active.</param>
+    /// <param name="kind">texture, mix, water, forest or cliff.</param>
+    /// <param name="type">Exact catalog name (<see cref="ResolvePaintType"/>).</param>
+    /// <param name="names">Live type catalogs.</param>
+    /// <param name="mixes">Generated mix titles (loaded on demand).</param>
+    /// <returns>Selection note (palette row/sampling) or null.</returns>
+    string? SelectPaintType(
+        Game game,
+        string kind,
+        string type,
+        LiveWorld.Catalogs names,
+        Func<string[]> mixes
+    )
+    {
+        string? selectionNote = null;
+        switch (kind)
+        {
+            case "water":
+                _bridge.Execute(game, $"uiSetWaterType({Catalog.Quote(type)})");
+                break;
+            case "forest":
+                _bridge.Execute(game, $"uiSetForestType({Catalog.Quote(type)})");
+                break;
+            case "cliff":
+                _bridge.Execute(game, $"uiSetCliffType({Catalog.Quote(type)})");
+                break;
+            case "texture":
+                selectionNote = SelectTexture(game, type, names);
+                break;
+            case "mix":
+                selectionNote = SelectFromPalette(game, type, mixes(), mix: true);
+                break;
+        }
+        if (kind is not "mix")
+        {
+            var ok = false;
+            for (var i = 0; i < 25 && !ok; i++) // Host 1 s poll; setters apply on following frame.
+            {
+                var s = LiveWorld.ReadSelections(game);
+                ok = kind switch
+                {
+                    "water" => s.WaterName == type,
+                    "forest" => s.ForestName == type,
+                    "cliff" => s.CliffName == type,
+                    _ => s.Texture == type,
+                };
+                if (!ok)
+                    Thread.Sleep(40);
+            }
+            if (!ok)
+                throw new WorkflowFailure(
+                    "PAINT_TYPE_NOT_SELECTED",
+                    "select",
+                    $"Paint selection did not become '{type}' (memory readback).",
+                    true,
+                    false,
+                    "Nothing painted. Inspect editor_edit_mode paintSelections."
+                );
+        }
+        return selectionNote;
     }
 
     /// <summary>Host bound on recursive stroke halving (2^6 = 64 chunks at most).</summary>
@@ -1254,9 +1310,20 @@ internal sealed partial class Server
                 wz = (c.Z + 0.5) * view.Scale;
             if (PixelFor(view, ui, occ, width, height, wx, wz, 0.9) is not { } px)
                 continue;
-            game.Move(px.X, px.Y);
-            Thread.Sleep(120); // Host hover settle before pointer-dependent native.
-            _bridge.Execute(game, "uiSampleTerrainAtPointer()", true);
+            // uiSampleTerrainAtPointer ray-casts the live pick ray and ignores the hover byte, which mode None never
+            // refreshes (research/LIVE-WORLD.md "Pointer and placement cursor"); the bridge hover guard would refuse
+            // on a stale byte. Guard only when the ray could not be confirmed (no pointer layout).
+            var hover = PointerState.HoverMap(game, px.X, px.Y);
+            if (PointerState.Available(game) && !hover.RayConfirmed)
+                continue;
+            try
+            {
+                _bridge.Execute(game, "uiSampleTerrainAtPointer()", !hover.RayConfirmed);
+            }
+            catch (BridgeRefusal r) when (r.Code == Server.PointerOffMapRefusal)
+            {
+                continue; // Not run; try the next visible tile, then the palette.
+            }
             for (var i = 0; i < 15; i++)
             {
                 if (LiveWorld.ReadSelections(game).Texture == type)
@@ -1320,6 +1387,7 @@ internal sealed partial class Server
             row = wanted;
         }
         ScrollTo(index / perRow);
+        UiRead.ObservedLine? clipped = null;
         for (var attempt = 0; attempt < 6; attempt++) // Host bound on OCR correction rounds.
         {
             Thread.Sleep(200);
@@ -1327,7 +1395,7 @@ internal sealed partial class Server
                 .SelectMany(c => UiRead.Lines(game, c, 2))
                 .Where(l => l.Text.Trim().Length > 2)
                 .ToArray();
-            var hit = lines.FirstOrDefault(l => Norm(l.Text) == Norm(type));
+            var hit = lines.FirstOrDefault(l => Norm(l.Text) == Norm(type)) ?? clipped;
             if (hit is not null)
             {
                 Ui.Click(game, hit.X, hit.Y, "left");
@@ -1337,7 +1405,9 @@ internal sealed partial class Server
                     for (var i = 0; i < 15; i++)
                     {
                         if (LiveWorld.ReadSelections(game).Texture == type)
-                            return $"palette row {row}";
+                            return clipped is null
+                                ? $"palette row {row}"
+                                : $"palette row {row} (clipped label '{clipped.Text}' clicked at calibrated row, memory-verified)";
                         Thread.Sleep(40);
                     }
                     throw new WorkflowFailure(
@@ -1382,6 +1452,25 @@ internal sealed partial class Server
             var firstRow = known[0].i / perRow - visibleRow;
             row = Math.Max(0, firstRow);
             var targetRow = index / perRow;
+            // Narrow (derived 16:10) palettes clip long names on both sides ("ireek Grass Rocks" for "Greek Grass Rocks 1"):
+            // with the scroll calibrated from an exact label, click the target's computed row in its column. Textures
+            // only: the memory readback above rejects a wrong pick.
+            if (!mix && targetRow >= row && targetRow < row + visibleRows)
+            {
+                var column = columns[index % perRow];
+                var rowY = (int)(listRect[1] + (targetRow - row + 0.5) * rowHeight);
+                var label = lines.FirstOrDefault(l =>
+                    (int)((l.Y - listRect[1]) / rowHeight) == targetRow - row
+                    && l.X >= column[0]
+                    && l.X < column[0] + column[2]
+                );
+                clipped = new UiRead.ObservedLine(
+                    label?.Text ?? "",
+                    label?.X ?? column[0] + column[2] / 2,
+                    rowY
+                );
+                continue;
+            }
             // Target should have been visible (OCR miss): shift it to another visible row and read again.
             ScrollTo(
                 targetRow >= row && targetRow < row + visibleRows
@@ -2098,48 +2187,17 @@ internal sealed partial class Server
         ExitEditModes(game);
         if (args.TryGetProperty("x", out var xe))
         {
-            double x = xe.GetDouble(),
-                z = args.GetProperty("z").GetDouble();
-            SelectExact(game, id);
-            Thread.Sleep(300); // uiLookAtAndSelectUnit camera move settles on following frames.
-            EnterMode(game, "moveunit");
-            try
-            {
-                var path = Screen(
-                    game,
-                    [(unit.Position.X, unit.Position.Z), (x, z)],
-                    !args.TryGetProperty("moveCamera", out var mc) || mc.GetBoolean(),
-                    2
-                );
-                RequireNoHeldInput();
-                Ui.DragPath(game, path.Pixels, Int(args, "durationMs", 600));
-                steps.Add(
-                    new
-                    {
-                        move = new
-                        {
-                            from = new[] { path.Pixels[0].X, path.Pixels[0].Y },
-                            to = new[] { path.Pixels[1].X, path.Pixels[1].Y },
-                        },
-                        camera = path.Camera,
-                    }
-                );
-                for (var i = 0; i < 15; i++)
-                {
-                    Thread.Sleep(80);
-                    unit = Live();
-                    if (
-                        Math.Sqrt(
-                            Math.Pow(unit.Position.X - x, 2) + Math.Pow(unit.Position.Z - z, 2)
-                        ) <= tolerance
-                    )
-                        break;
-                }
-            }
-            finally
-            {
-                ExitEditModes(game);
-            }
+            var (moved, step) = MoveUnitTo(
+                game,
+                unit,
+                xe.GetDouble(),
+                args.GetProperty("z").GetDouble(),
+                tolerance,
+                !args.TryGetProperty("moveCamera", out var mc) || mc.GetBoolean(),
+                Int(args, "durationMs", DefaultMoveDurationMs)
+            );
+            unit = moved;
+            steps.Add(step);
         }
         if (args.TryGetProperty("heading", out var he))
         {
@@ -2173,6 +2231,82 @@ internal sealed partial class Server
                 : headingError <= RotationStepDegrees / 2 + 0.01,
             limitation = "Move: exact selection then moveunit-tool drag from the unit's projected pixel to the target (camera may move). Rotate: uiRotateSelection steps of exactly 22.5° (native ignores magnitude), so headings are quantized; heading read from the reviewed transform (180 = editor default). Verified from live memory. Undo with editor_undo. Not saved.",
         };
+    }
+
+    /// <summary>Default moveunit drag duration in ms (host choice, former editor_transform_unit default).</summary>
+    const int DefaultMoveDurationMs = 600;
+
+    /// <summary>Settle after uiLookAtAndSelectUnit: its camera move lands on following frames (host timing).</summary>
+    const int SelectSettleMs = 300;
+
+    /// <summary>Position poll interval and count after a move drag (host bound ≈1.2 s).</summary>
+    const int MovePollMs = 80,
+        MovePolls = 15;
+
+    /// <summary>Moves one unit by exact selection and a moveunit-tool drag from its projected pixel to the target, then
+    /// polls its live position; always leaves edit mode None.</summary>
+    /// <param name="game">Connected editor with selection/unit layouts.</param>
+    /// <param name="unit">Live unit to move.</param>
+    /// <param name="x">Target world X.</param>
+    /// <param name="z">Target world Z.</param>
+    /// <param name="tolerance">Accepted distance in world units (ends polling early).</param>
+    /// <param name="moveCamera">Allow camera moves to make both ends clickable.</param>
+    /// <param name="durationMs">Drag duration.</param>
+    /// <returns>Unit after the move and a report step.</returns>
+    (LiveUnits.Unit Unit, object Step) MoveUnitTo(
+        Game game,
+        LiveUnits.Unit unit,
+        double x,
+        double z,
+        double tolerance,
+        bool moveCamera,
+        int durationMs
+    )
+    {
+        var id = unit.UnitId;
+        LiveUnits.Unit Live() =>
+            LiveUnits.Read(game).FirstOrDefault(u => u.UnitId == id)
+            ?? throw new WorkflowFailure(
+                "UNIT_NOT_FOUND",
+                "observe",
+                $"Unit {id} not present after move.",
+                true,
+                true,
+                "Re-read editor_units."
+            );
+        SelectExact(game, id);
+        Thread.Sleep(SelectSettleMs);
+        EnterMode(game, "moveunit");
+        try
+        {
+            var path = Screen(game, [(unit.Position.X, unit.Position.Z), (x, z)], moveCamera, 2);
+            RequireNoHeldInput();
+            Ui.DragPath(game, path.Pixels, durationMs);
+            var step = new
+            {
+                move = new
+                {
+                    from = new[] { path.Pixels[0].X, path.Pixels[0].Y },
+                    to = new[] { path.Pixels[1].X, path.Pixels[1].Y },
+                },
+                camera = path.Camera,
+            };
+            for (var i = 0; i < MovePolls; i++)
+            {
+                Thread.Sleep(MovePollMs);
+                unit = Live();
+                if (
+                    Math.Sqrt(Math.Pow(unit.Position.X - x, 2) + Math.Pow(unit.Position.Z - z, 2))
+                    <= tolerance
+                )
+                    break;
+            }
+            return (unit, step);
+        }
+        finally
+        {
+            ExitEditModes(game);
+        }
     }
 
     /// <summary>Rotates one unit to an absolute heading with exact selection and 22.5° native steps; verified per step.</summary>
@@ -2227,12 +2361,26 @@ internal sealed partial class Server
 
     // ---------------- catalogs ----------------
 
+    /// <summary>Default editor_terrain_catalog page size.</summary>
+    const int CatalogDefaultLimit = 100;
+
+    /// <summary>Largest editor_terrain_catalog page (plans/wake-session-2-fixes.md F: a 500-entry texture page flooded
+    /// the session-2 context).</summary>
+    const int CatalogMaxLimit = 200;
+
+    /// <summary>editor_terrain_catalog: filtered, paged live name lists.</summary>
+    /// <param name="game">Editor connection (null for host-only kinds).</param>
+    /// <param name="args">Tool arguments.</param>
     static object TerrainCatalog(Game? game, JsonElement args)
     {
         var kind = String(args, "kind");
         var filter = String(args, "filter", "");
+        var group = String(args, "group", "");
+        var compact = args.TryGetProperty("compact", out var cp) && cp.GetBoolean();
         var offset = Int(args, "offset", 0);
-        var limit = Int(args, "limit", 100);
+        var limit = Int(args, "limit", CatalogDefaultLimit);
+        if (group.Length > 0 && kind != "textures")
+            throw new ArgumentException("group applies to kind=textures only.");
         IEnumerable<object> items = kind switch
         {
             "mixes" => MixTitles().Select((n, i) => (object)new { index = i, name = n }),
@@ -2241,12 +2389,27 @@ internal sealed partial class Server
             ),
             _ => LiveCatalog(game!, kind),
         };
+        items = items.ToArray();
+        string?[] Groups() =>
+            [
+                .. items
+                    .Select(i =>
+                        JsonSerializer.SerializeToElement(i).GetProperty("group").GetString()
+                    )
+                    .Distinct(),
+            ];
         var all = items
             .Where(i =>
                 filter.Length == 0
                 || JsonSerializer.Serialize(i).Contains(filter, StringComparison.OrdinalIgnoreCase)
             )
+            .Where(i =>
+                group.Length == 0
+                || JsonSerializer.SerializeToElement(i).GetProperty("group").GetString() is { } g
+                    && g.Equals(group, StringComparison.OrdinalIgnoreCase)
+            )
             .ToArray();
+        var page = all.Skip(offset).Take(limit).ToArray();
         return new
         {
             kind,
@@ -2254,7 +2417,15 @@ internal sealed partial class Server
             offset,
             limit,
             nextOffset = offset + limit < all.Length ? (int?)(offset + limit) : null,
-            entries = all.Skip(offset).Take(limit).ToArray(),
+            group = group.Length > 0 ? group : null,
+            groups = kind == "textures" && (compact || all.Length == 0) ? Groups() : null,
+            entries = compact ? null : page,
+            names = compact
+                ? page.Select(i =>
+                        JsonSerializer.SerializeToElement(i).GetProperty("name").GetString()
+                    )
+                    .ToArray()
+                : null,
             usage = kind switch
             {
                 "textures" => "editor_paint_world kind=texture type=<name>",
@@ -2970,8 +3141,11 @@ internal sealed partial class Server
             );
         var placed = new List<object>();
         string? error = null;
+        object? failure = null;
+        var failedIndex = -1;
         foreach (var (it, i) in items.Select((it, i) => (it, i)))
         {
+            var effects = Game.Effects;
             try
             {
                 var r = PlaceWorld(
@@ -2995,6 +3169,8 @@ internal sealed partial class Server
             catch (Exception e)
             {
                 error = e is WorkflowFailure w ? $"{w.Code}: {w.Message}" : e.Message;
+                failure = FailureDetails(e, PlaceAtWorldTool, Empty, true, Game.Effects - effects);
+                failedIndex = i;
                 break;
             }
         }
@@ -3005,6 +3181,23 @@ internal sealed partial class Server
             placedCount = placed.Count,
             stoppedOnError = error is not null,
             error,
+            failure,
+            remaining = failedIndex < 0
+                ? null
+                : items
+                    .Skip(failedIndex)
+                    .Select(
+                        (it, k) =>
+                            new
+                            {
+                                index = failedIndex + k,
+                                proto = it.Proto,
+                                player = it.Player,
+                                x = it.X,
+                                z = it.Z,
+                            }
+                    )
+                    .ToArray(),
             placed,
             plan,
             atomic = false,
@@ -3106,6 +3299,84 @@ internal sealed partial class Server
             },
             PaintRequired
         );
+        var areaShape = new
+        {
+            type = "object",
+            properties = new Dictionary<string, object>
+            {
+                ["shape"] = new { type = "string", @enum = ShapeKinds },
+                ["points"] = new
+                {
+                    type = "array",
+                    minItems = 2,
+                    maxItems = MaxShapeVertices,
+                    items = point,
+                },
+                ["x"] = coord,
+                ["z"] = coord,
+                ["radius"] = new
+                {
+                    type = "number",
+                    minimum = 0.5,
+                    maximum = 500,
+                },
+                ["radiusX"] = new
+                {
+                    type = "number",
+                    minimum = 0.5,
+                    maximum = 500,
+                },
+                ["radiusZ"] = new
+                {
+                    type = "number",
+                    minimum = 0.5,
+                    maximum = 500,
+                },
+                ["angleDegrees"] = new
+                {
+                    type = "number",
+                    minimum = -360,
+                    maximum = 360,
+                },
+            },
+            required = new[] { "shape" },
+            additionalProperties = false,
+        };
+        yield return Spec(
+            "editor_paint_area",
+            "Fill WORLD shapes with texture, water or forest (lakes, forests, biome patches): shapes 1..16 (same spec as editor_terrain_shape: polygon points | circle x,z,radius | ellipse x,z,radiusX,radiusZ,angleDegrees | capsule points+radius), optional exclude shapes and mirror copy. Plans serpentine strokes on tile centres eroded by the live-measured brush radius (texture/forest ≈0.45 tiles per brush size; water fixed ≈7-tile band, brushSize ignored), default brushSize = largest reaching 90 % predicted coverage (≤20). preview (default true) returns the plan (coverage/leak prediction, strokes) without input. preview=false + confirmDestructive: selects type (verified), sets brush (restored after), paints (camera re-aimed per chunk), verifies coverage/leak from live tiles (forest: new objects per tile), touch-up up to 2 passes (half brush, then size 1). strokes = undo count; failures after painting report undoSteps. Not saved.",
+            new Dictionary<string, object>
+            {
+                ["kind"] = new { type = "string", @enum = AreaPaintKinds },
+                ["type"] = new { type = "string" },
+                ["shapes"] = new
+                {
+                    type = "array",
+                    minItems = 1,
+                    maxItems = MaxAreaShapes,
+                    items = areaShape,
+                },
+                ["exclude"] = new
+                {
+                    type = "array",
+                    minItems = 1,
+                    maxItems = MaxAreaShapes,
+                    items = areaShape,
+                },
+                ["mirror"] = new { type = "string", @enum = MirrorModes },
+                ["brushSize"] = new
+                {
+                    type = "integer",
+                    minimum = 1,
+                    maximum = MaxAreaBrushSize,
+                },
+                ["touchUp"] = new { type = "boolean" },
+                ["moveCamera"] = new { type = "boolean" },
+                ["preview"] = new { type = "boolean" },
+                ["confirmDestructive"] = new { type = "boolean" },
+            },
+            PaintAreaRequired
+        );
         yield return Spec(
             "editor_elevation",
             "Deterministic elevation over a world rectangle: operation=set (exact height via bump+sample closed loop; area ≥7×7 nodes), flatten (to height sampled at referenceX/referenceZ, default area center), smooth (smooth tool stroke). Serpentine stroke inset by the brush radius; verifies node heights (tolerance default 0.05) and reports nodes changed just outside. confirmDestructive=true required. Undo with editor_undo.",
@@ -3171,17 +3442,19 @@ internal sealed partial class Server
         );
         yield return Spec(
             "editor_terrain_catalog",
-            "List exact names the editor accepts: textures (with group/type/subtype), water, forest, cliff, lighting (uiApplyLightingSet index→name), civs (civ id→major god), mixes (titles, palette order; needs editor_generate_catalog), editModes. Live kinds read the running game's loaded definitions. filter substring, offset/limit (≤500). Read-only.",
+            "List exact names the editor accepts: textures (with group/type/subtype), water, forest, cliff, lighting (uiApplyLightingSet index→name), civs (civ id→major god), mixes (titles, palette order; needs editor_generate_catalog), editModes. Live kinds read the running game's loaded definitions. filter substring, group (textures: passability group such as PassableLand|Shoreline|Underwater|NonPassableLand|Ice, case-insensitive), compact=true returns names only (plus the distinct groups of textures), offset/limit (default 100, ≤200; page with nextOffset). Read-only.",
             new Dictionary<string, object>
             {
                 ["kind"] = new { type = "string", @enum = TerrainCatalogKinds },
                 ["filter"] = new { type = "string" },
+                ["group"] = new { type = "string" },
+                ["compact"] = new { type = "boolean" },
                 ["offset"] = new { type = "integer", minimum = 0 },
                 ["limit"] = new
                 {
                     type = "integer",
                     minimum = 1,
-                    maximum = 500,
+                    maximum = CatalogMaxLimit,
                 },
             },
             ["kind"],

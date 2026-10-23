@@ -3,6 +3,11 @@
   "ui": "alternative",
   "width": 1920,
   "height": 1080,
+  "anchors": {
+    "editorScene.minimap": { "x": "right", "y": "bottom" },
+    "editorScene.occluders.minimap": { "x": "right", "y": "bottom" },
+    "note": "Elements scaled uniformly by min(width/2560, height/1440) and pinned to this client edge when the aspect differs from 16:9 (live 1440x900/1920x1200, research/UI-SCALING.md). Everything else stretches per axis."
+  },
   "rowCenterFirst": 302,
   "rowStep": 60.375,
   "playerFields": {

@@ -16,7 +16,11 @@ internal static class UiRead
         RegexOptions.Compiled
     );
 
+    /// <summary>Shipped path of a reviewed layout file.</summary>
     static string LayoutPath(string file) => UiLayouts.Path(file);
+
+    /// <summary>Name prefix of in-memory layouts derived for unreviewed client sizes (<see cref="UiLayouts.Load"/>).</summary>
+    internal const string DerivedPrefix = "derived:";
 
     /// <summary>Alternative-UI preset for the given reviewed client size.</summary>
     internal static int[] Resolve(string field, int width, int height, string hash) =>
@@ -25,10 +29,10 @@ internal static class UiRead
     /// <summary>Reviewed layout file by name, or "derived:&lt;file&gt;" for the in-memory layout derived at this client size.</summary>
     static JsonElement? LoadRoot(string file, int width, int height)
     {
-        if (file.StartsWith("derived:", StringComparison.Ordinal))
+        if (file.StartsWith(DerivedPrefix, StringComparison.Ordinal))
         {
             var layout = UiLayouts.Load(
-                file.StartsWith("derived:normal", StringComparison.Ordinal)
+                file.StartsWith(DerivedPrefix + "normal", StringComparison.Ordinal)
                     ? "normal"
                     : "alternative",
                 width,
@@ -236,7 +240,7 @@ internal static class UiRead
                 buildHash
             );
             uiKind = kind;
-            layoutReviewed = !file.StartsWith("derived:", StringComparison.Ordinal);
+            layoutReviewed = !file.StartsWith(DerivedPrefix, StringComparison.Ordinal);
             region = Resolve(field!, width, height, buildHash, file);
         }
         if (region.Length != 4)
@@ -244,14 +248,16 @@ internal static class UiRead
         // Default 3x zoom, reduced so wide regions stay within the 1600 px crop output bound.
         var scale = args.TryGetProperty("scale", out var s)
             ? s.GetInt32()
-            : Math.Clamp(1600 / Math.Max(1, Math.Max(region[2], region[3])), 1, 3);
+            : Math.Clamp(Ui.MaxCropOutput / Math.Max(1, Math.Max(region[2], region[3])), 1, 3);
         if (region[2] > 600 || region[3] > 400 || (long)region[2] * region[3] > 160_000)
             throw new ArgumentException(
                 "OCR region must be [x,y,w,h] ≤600×400 and ≤160000 pixels."
             );
-        var capture = Ui.CapturePixels(game, 2560);
+        var capture = Ui.CapturePixels(game, Ui.FullResolutionWidth);
         if (capture.Width != width || capture.Height != height)
-            throw new ArgumentException("OCR requires full-resolution client width ≤2560.");
+            throw new ArgumentException(
+                $"OCR requires full-resolution client width ≤{Ui.FullResolutionWidth}."
+            );
         var crop = Ui.CropZoom(capture.Bgra, width, height, region, scale);
         var result = Engine.Value.Run(
             crop.Bgra,
@@ -282,7 +288,7 @@ internal static class UiRead
                     },
                 })
                 .ToArray(),
-            limitation = "OCR guesses text, not widget state or checkpoint proof. Named presets pinned to reviewed normal/alternative English panels at 2560×1440 or 1920×1080 (other 16:9 sizes 1280..2560 wide: derived by scaling, layoutReviewed=false), detected by pixel gates. Do not retry a mutation based solely on OCR.",
+            limitation = "OCR guesses text, not widget state or checkpoint proof. Named presets pinned to reviewed normal/alternative English panels at 2560×1440 or 1920×1080 (other clients 1024..3840 wide, aspect 1.25..2.4: derived per-axis, layoutReviewed=false, best effort), detected by pixel gates. Do not retry a mutation based solely on OCR.",
         };
     }
 
@@ -301,7 +307,7 @@ internal static class UiRead
             || (long)rect[2] * rect[3] > 300_000
         )
             throw new ArgumentException("UI readback region outside guarded bound.");
-        var capture = Ui.CapturePixels(game, 2560);
+        var capture = Ui.CapturePixels(game, Ui.FullResolutionWidth);
         if (!UiLayouts.IsSupported(capture.Width, capture.Height))
             throw new WorkflowFailure(
                 "UI_LAYOUT_MISMATCH",
@@ -332,6 +338,8 @@ internal static class UiRead
             || (long)rect[2] * rect[3] > 300_000
         )
             throw new ArgumentException("UI readback region outside guarded bound.");
+        // Large clients (derived up to 3840 wide) have proportionally larger regions and glyphs: lower the zoom to the crop bound.
+        scale = Math.Clamp(Ui.MaxCropOutput / Math.Max(rect[2], rect[3]), 1, scale);
         var crop = Ui.CropZoom(capture.Bgra, capture.Width, capture.Height, rect, scale);
         return Engine
             .Value.Run(crop.Bgra, crop.Width, crop.Height, format: ImagePixelFormat.Bgra32)
@@ -391,14 +399,14 @@ internal static class UiRead
             1600,
             900,
             hash,
-            "derived:" + UiLayouts.Normal(1600, 900)
+            DerivedPrefix + UiLayouts.Normal(1600, 900)
         );
         var derivedAlt = Resolve(
             "players.6.pop",
             1600,
             900,
             hash,
-            "derived:" + UiLayouts.Alt(1600, 900)
+            DerivedPrefix + UiLayouts.Alt(1600, 900)
         );
         if (derived[0] != 268 || derivedAlt[0] != 1314)
             throw new InvalidDataException("Derived 1600×900 OCR preset geometry changed.");

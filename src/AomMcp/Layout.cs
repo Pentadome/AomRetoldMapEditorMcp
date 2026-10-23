@@ -73,6 +73,9 @@ public sealed record Layout
     /// <summary>Gets optional reviewed live player fields; obfuscated resources are intentionally absent.</summary>
     public PlayerReadLayout? Players { get; init; }
 
+    /// <summary>Gets optional reviewed pointer/placement-cursor fields (research/LIVE-WORLD.md); absent falls back to timed settles.</summary>
+    public PointerReadLayout? Cursor { get; init; }
+
     /// <summary>Gets the dispatcher signature bytes decoded from <see cref="PrefixHex"/>.</summary>
     // Spaces are human-readable byte separators in layout JSON, not part of the runtime signature.
     public byte[] Prefix => Convert.FromHexString(PrefixHex.Replace(" ", ""));
@@ -139,6 +142,8 @@ public sealed record Layout
             LiveWorld.ValidateLayout(world);
         if (layout.Players is { } players)
             LiveWorld.ValidateLayout(players);
+        if (layout.Cursor is { } pointer)
+            PointerState.ValidateLayout(pointer);
         return layout;
     }
 }

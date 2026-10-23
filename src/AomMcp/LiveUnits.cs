@@ -221,6 +221,27 @@ internal static class LiveUnits
         return editor;
     }
 
+    /// <summary>Capture attempts before a torn read is reported (host choice, plans/wake-session-2-fixes.md F).</summary>
+    const int TornReadAttempts = 5;
+
+    /// <summary>Pause between torn-read attempts in milliseconds (host choice: about two frames).</summary>
+    const int TornReadRetryMs = 30;
+
+    /// <summary>Exception data key marking a torn read (InvalidDataException is sealed; callers keep catching it).</summary>
+    const string TornKey = "tornRead";
+
+    /// <summary>A consistent snapshot failed because the game changed objects during the read; retried by
+    /// <see cref="Read"/>.</summary>
+    /// <param name="message">Failure description.</param>
+    static InvalidDataException Torn(string message)
+    {
+        var e = new InvalidDataException(message);
+        e.Data[TornKey] = true;
+        return e;
+    }
+
+    /// <summary>Reads all live objects as one consistent snapshot, retrying torn reads.</summary>
+    /// <param name="game">Validated editor connection.</param>
     internal static Unit[] Read(Game game)
     {
         var layout =
@@ -232,7 +253,19 @@ internal static class LiveUnits
         var editor = ValidateRuntime(game, layout.Signatures);
         if (game.Layout.World is { } world)
             ValidateRuntime(game, world.Signatures); // Heading fields are pinned by world signatures.
-        var units = Capture(game.Read, game.Base, game.Layout);
+        Unit[] units;
+        for (var attempt = 1; ; attempt++)
+            try
+            {
+                units = Capture(game.Read, game.Base, game.Layout);
+                break;
+            }
+            catch (InvalidDataException e)
+                when (e.Data.Contains(TornKey) && attempt < TornReadAttempts)
+            {
+                // The game thread mutated the registry mid-read (session 2: a listing right after placement failed).
+                Thread.Sleep(TornReadRetryMs);
+            }
         if (game.Editor() != editor)
             throw new InvalidDataException(
                 "Editor context changed during unit read; no listing returned."
@@ -363,9 +396,7 @@ internal static class LiveUnits
                 || hp < 0
                 || maximum < 0
             )
-                throw new InvalidDataException(
-                    "Invalid/torn live object record; no listing returned."
-                );
+                throw Torn("Invalid/torn live object record; no listing returned.");
             float? heading = rotation is null
                 ? null
                 : Heading(
@@ -392,9 +423,7 @@ internal static class LiveUnits
                 || Int(address + layout.ProtoOffset) != proto
                 || Int(address + layout.PlayerOffset) != player
             )
-                throw new InvalidDataException(
-                    "Object changed during unit read; no listing returned."
-                );
+                throw Torn("Object changed during unit read; no listing returned.");
         }
         if (
             Pointer(module + checked((int)layout.WorldGlobalRva)) != root
@@ -408,9 +437,7 @@ internal static class LiveUnits
             || Int(protoRoot + layout.ProtoCapacityOffset) != protoCount
             || Pointer(protoRoot + layout.ProtoArrayOffset) != protoTable
         )
-            throw new InvalidDataException(
-                "Registry changed during unit read; no listing returned."
-            );
+            throw Torn("Registry changed during unit read; no listing returned.");
         return results.ToArray();
     }
 

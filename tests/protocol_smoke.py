@@ -1214,7 +1214,7 @@ try:
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
     expected_core = (helper_names - (workflow_names - core_workflow)) | core_native
-    assert len(expected_core) == 94 and len(names) == 944
+    assert len(expected_core) == 95 and len(names) == 945
     assert {'editor_dialog_state', 'editor_dialog_act', 'editor_xs_scripts'} <= expected_core
     # XS Scripts list preflight refuses before any game connection.
     preflight_refusal_xs = [
@@ -1232,7 +1232,7 @@ try:
                    'editor_transform_unit', 'editor_terrain_catalog', 'editor_camera_frame', 'editor_overview',
                    'editor_resource_balance', 'editor_mirror_units', 'editor_scatter', 'editor_camera', 'editor_capture',
                    'editor_project', 'editor_brush', 'editor_stroke', 'editor_terrain_shape', 'editor_land_analysis',
-                   'editor_map_size', 'editor_new_scenario'}
+                   'editor_map_size', 'editor_new_scenario', 'editor_paint_area'}
     assert world_tools <= expected_core, world_tools - expected_core
     # Camera/capture preflight refuses before any game connection.
     for args in ({'operation': 'zoom'}, {'operation': 'pitch'}, {'operation': 'zoom', 'distance': 5}):
@@ -1277,6 +1277,13 @@ try:
         preflight_refusal('editor_overview', {'resolutionScale': bad}, 'INVALID_ARGUMENT')
     # World helpers refuse destructive strokes without confirmation, before any game connection.
     preflight_refusal('editor_paint_world', {'kind': 'water', 'type': 'GreekLake', 'points': [[1, 1]]}, 'INVALID_ARGUMENT')
+    circle = {'shape': 'circle', 'x': 50, 'z': 50, 'radius': 10}
+    preflight_refusal('editor_paint_area', {'kind': 'texture', 'type': 'x', 'shapes': [circle], 'preview': False},
+                      'INVALID_ARGUMENT')
+    preflight_refusal('editor_paint_area', {'kind': 'texture', 'type': 'x', 'shapes': []}, 'INVALID_ARGUMENT')
+    preflight_refusal('editor_paint_area', {'kind': 'cliff', 'type': 'x', 'shapes': [circle]}, 'INVALID_ARGUMENT')
+    preflight_refusal('editor_paint_area', {'kind': 'texture', 'type': 'x', 'shapes': [circle], 'brushSize': 21},
+                      'INVALID_ARGUMENT')
     preflight_refusal('editor_elevation', {'operation': 'set', 'minX': 0, 'minZ': 0, 'maxX': 10, 'maxZ': 10,
                                            'confirmDestructive': True}, 'INVALID_ARGUMENT')
     preflight_refusal('editor_transform_unit', {'unitId': 1, 'proto': 'House', 'player': 1}, 'INVALID_ARGUMENT')

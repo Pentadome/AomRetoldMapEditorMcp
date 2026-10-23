@@ -8,8 +8,16 @@ namespace AomMcp;
 internal static class Ui
 {
     // Win32 SendInput uses AMD64 INPUT's 40-byte size (Win.Input; Windows SDK winuser.h).
-    static void Send(params Win.Input[] input) =>
+    static void Send(params Win.Input[] input)
+    {
+        if (input.Any(i => i.Type != 0 || (i.Mouse.Flags & ~MovementFlags) != 0))
+            Game.CountEffect();
         Win.Check(Win.SendInput((uint)input.Length, input, 40) == input.Length, "SendInput");
+    }
+
+    /// <summary>winuser.h MOUSEEVENTF_MOVE (0x1) | MOUSEEVENTF_ABSOLUTE (0x8000) | MOUSEEVENTF_VIRTUALDESK (0x4000): pure
+    /// pointer movement, not counted as a game effect.</summary>
+    const uint MovementFlags = 0xC001;
 
     static Win.Input Mouse(uint flags, uint data = 0) =>
         new()
@@ -293,8 +301,15 @@ internal static class Ui
     /// <remarks>Reads the window's own surface via PrintWindow without focusing; falls back to a focused screen copy.</remarks>
     public static byte[] Screenshot(Game game, int maxWidth) => Screenshot(game, maxWidth, null, 1);
 
-    /// <summary>Host capture width cap (tested 2560-wide client).</summary>
+    /// <summary>Host capture width cap for screenshots returned to clients (tested 2560-wide client).</summary>
     internal const int MaxCaptureWidth = 2560;
+
+    /// <summary>Full-resolution readback cap for in-host OCR/pixel checks: the widest derived UI client (<see cref="UiLayouts.MaxDerivedWidth"/>),
+    /// so client-pixel rects index the capture directly at every supported size.</summary>
+    internal const int FullResolutionWidth = UiLayouts.MaxDerivedWidth;
+
+    /// <summary>Largest crop output side (host OCR allocation policy).</summary>
+    internal const int MaxCropOutput = 1600;
 
     /// <summary>Host default screenshot width: half the tested 2560-wide client.</summary>
     internal const int DefaultScreenshotWidth = 1280;
@@ -315,6 +330,8 @@ internal static class Ui
             throw new ArgumentException("Screenshot scale must be 1..4.");
         if (region is null && scale != 1)
             throw new ArgumentException("scale requires region.");
+        if (maxWidth is < 320 or > MaxCaptureWidth)
+            throw new ArgumentException($"Screenshot maxWidth 320..{MaxCaptureWidth}.");
         if (
             !double.IsFinite(resolutionScale)
             || resolutionScale < MinResolutionScale
@@ -324,7 +341,7 @@ internal static class Ui
         // Full frame: GDI HALFTONE scales once straight to the reduced size (no second resample).
         var (width, height, pixels) = CapturePixels(
             game,
-            region is null ? maxWidth : 2560,
+            region is null ? maxWidth : FullResolutionWidth,
             region is null ? resolutionScale : 1
         );
         if (region is null)
@@ -332,7 +349,7 @@ internal static class Ui
         var (clientWidth, clientHeight) = ClientSize(game);
         if (clientWidth != width || clientHeight != height)
             throw new ArgumentException(
-                "Region requires full-resolution client ≤2560 pixels wide."
+                $"Region requires full-resolution client ≤{FullResolutionWidth} pixels wide."
             );
         var crop = CropZoom(pixels, width, height, region, scale);
         var small = Downscale(crop.Bgra, crop.Width, crop.Height, resolutionScale);
@@ -398,8 +415,8 @@ internal static class Ui
             || h < 1
             || (long)x + w > width
             || (long)y + h > height
-            || (long)w * scale > 1600
-            || (long)h * scale > 1600
+            || (long)w * scale > MaxCropOutput
+            || (long)h * scale > MaxCropOutput
             || pixels.Length != checked(width * height * 4)
         )
             throw new ArgumentException(
@@ -422,8 +439,8 @@ internal static class Ui
     {
         // Host output/allocation policy: 320..2560 px, default 1280 in Server; 2560 matches tested client.
         // 80 ms below allows focus/render to settle; timing is empirical, not a GDI requirement.
-        if (maxWidth is < 320 or > 2560)
-            throw new ArgumentException("Screenshot maxWidth 320..2560.");
+        if (maxWidth is < 320 or > FullResolutionWidth)
+            throw new ArgumentException($"Screenshot maxWidth 320..{FullResolutionWidth}.");
         if (
             !double.IsFinite(resolutionScale)
             || resolutionScale < MinResolutionScale

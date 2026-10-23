@@ -157,11 +157,15 @@ internal sealed class Bridge : IDisposable
         uint result = view.ReadUInt32(28),
             started = view.ReadUInt32(108);
         if (!delivered || state != 1)
+        {
+            Game.CountEffect(); // Outcome unknown: the command may have run.
             throw new TimeoutException(
                 $"Native call did not acknowledge completion. started={started}; outcome unknown. Do not automatically retry a mutation."
             );
+        }
         if (result != 1)
             throw new BridgeRefusal(result, command);
+        Game.CountEffect();
         return new
         {
             nativeReturned = true,

@@ -206,29 +206,17 @@ internal static class TriggerEdits
         {
             Catalog.ValidateObject(
                 args,
-                Preview(args)
-                    ?
-                    [
-                        "path",
-                        "expectedSha256",
-                        "edits",
-                        "preview",
-                        "allowRawXsInjection",
-                        "basePath",
-                        "baseSha256",
-                    ]
-                    :
-                    [
-                        "path",
-                        "expectedSha256",
-                        "edits",
-                        "preview",
-                        "outputPath",
-                        "confirmWrite",
-                        "allowRawXsInjection",
-                        "basePath",
-                        "baseSha256",
-                    ]
+                [
+                    "path",
+                    "expectedSha256",
+                    "edits",
+                    "preview",
+                    "outputPath",
+                    "confirmWrite",
+                    "allowRawXsInjection",
+                    "basePath",
+                    "baseSha256",
+                ]
             );
             if (list.ValueKind != JsonValueKind.Array || list.GetArrayLength() is < 1 or > 64)
                 throw new ArgumentException("edits must contain 1..64 operations.");
@@ -276,57 +264,31 @@ internal static class TriggerEdits
         {
             Catalog.ValidateObject(
                 args,
-                Preview(args)
-                    ?
-                    [
-                        "operation",
-                        "path",
-                        "triggerId",
-                        "expectedSha256",
-                        "expectedName",
-                        "newId",
-                        "newName",
-                        "active",
-                        "loop",
-                        "replacements",
-                        "removeEffects",
-                        "removeConditions",
-                        "labels",
-                        "duplicates",
-                        "objectReplacements",
-                        "copyEffects",
-                        "copyValues",
-                        "preview",
-                        "allowRawXsInjection",
-                        "basePath",
-                        "baseSha256",
-                    ]
-                    :
-                    [
-                        "operation",
-                        "path",
-                        "triggerId",
-                        "expectedSha256",
-                        "expectedName",
-                        "newId",
-                        "newName",
-                        "active",
-                        "loop",
-                        "replacements",
-                        "removeEffects",
-                        "removeConditions",
-                        "labels",
-                        "duplicates",
-                        "objectReplacements",
-                        "copyEffects",
-                        "copyValues",
-                        "preview",
-                        "outputPath",
-                        "confirmWrite",
-                        "allowRawXsInjection",
-                        "basePath",
-                        "baseSha256",
-                    ]
+                [
+                    "operation",
+                    "path",
+                    "triggerId",
+                    "expectedSha256",
+                    "expectedName",
+                    "newId",
+                    "newName",
+                    "active",
+                    "loop",
+                    "replacements",
+                    "removeEffects",
+                    "removeConditions",
+                    "labels",
+                    "duplicates",
+                    "objectReplacements",
+                    "copyEffects",
+                    "copyValues",
+                    "preview",
+                    "outputPath",
+                    "confirmWrite",
+                    "allowRawXsInjection",
+                    "basePath",
+                    "baseSha256",
+                ]
             );
             ValidateEdit(args);
         }
@@ -1563,6 +1525,17 @@ internal static class TriggerEdits
         var batch = args.TryGetProperty("edits", out var list);
         var operations = batch ? Merge(list.EnumerateArray().ToArray()) : [args];
         var warnings = PrototypeWarnings(operations).ToList();
+        if (
+            Preview(args)
+            && (
+                args.TryGetProperty("outputPath", out _)
+                || args.TryGetProperty("confirmWrite", out _)
+            )
+        )
+            // Session 2: preview calls carrying outputPath failed validation; accept them, write nothing, say so.
+            warnings.Add(
+                "preview=true: outputPath/confirmWrite ignored, nothing written. Repeat with preview=false to write."
+            );
         var allowRaw = args.TryGetProperty("allowRawXsInjection", out var raw) && raw.GetBoolean();
         var current = input;
         // copyValues needs the exemplar index's value-type proofs; load them once per call.
