@@ -333,18 +333,43 @@ internal static class EditorFiles
     /// <param name="bytes">Verified bytes the game wrote.</param>
     /// <param name="triggerDirectory">Validated profile trigger directory.</param>
     /// <returns>New backup path; hash re-verified after the move.</returns>
-    static string RetainTriggerBackup(string written, byte[] bytes, string triggerDirectory)
+    static string RetainTriggerBackup(string written, byte[] bytes, string triggerDirectory) =>
+        RetainInBackup(written, bytes, triggerDirectory, TriggerBackupFolder, ".trg");
+
+    /// <summary>Moves verified game-written checkpoint staging out of the profile scenario folder into &lt;id&gt;\scenario_backup
+    /// (session 3: AomMcp-checkpoint-* files cluttered the scenario list).</summary>
+    /// <param name="written">Game-written staging file in the profile scenario directory.</param>
+    /// <param name="bytes">Verified bytes the game wrote.</param>
+    /// <param name="scenarioDirectory">Validated profile scenario directory.</param>
+    /// <returns>New staging path; hash re-verified after the move.</returns>
+    static string RetainScenarioStaging(string written, byte[] bytes, string scenarioDirectory) =>
+        RetainInBackup(written, bytes, scenarioDirectory, ScenarioBackupFolder, ".mythscn");
+
+    /// <summary>Moves a verified file from a profile kind folder into its &lt;id&gt;\*_backup sibling, keeping the name.</summary>
+    /// <param name="written">File inside <paramref name="kindDirectory"/>.</param>
+    /// <param name="bytes">Verified bytes of the file.</param>
+    /// <param name="kindDirectory">Validated profile scenario/trigger directory.</param>
+    /// <param name="folder">One of the *BackupFolder constants.</param>
+    /// <param name="extension">Required extension.</param>
+    /// <returns>New path; hash re-verified after the move.</returns>
+    static string RetainInBackup(
+        string written,
+        byte[] bytes,
+        string kindDirectory,
+        string folder,
+        string extension
+    )
     {
         var target = ApprovedNewPath(
             Path.Combine(
-                BackupDirectory(ProfileHomeOf(triggerDirectory), TriggerBackupFolder, true),
+                BackupDirectory(ProfileHomeOf(kindDirectory), folder, true),
                 Path.GetFileName(written)
             ),
-            ".trg"
+            extension
         );
         File.Move(written, target);
         if (Layout.Hash(target) != Convert.ToHexStringLower(SHA256.HashData(bytes)))
-            throw new IOException("Trigger backup changed while moving to " + target + ".");
+            throw new IOException("Backup changed while moving to " + target + ".");
         return target;
     }
 
@@ -383,7 +408,9 @@ internal static class EditorFiles
                 "loop",
                 "code",
                 "confirmWrite",
+                "expectedSha256",
             ],
+            "create" => ["operation", "path", "name", "active", "loop", "code", "confirmWrite"],
             "export" => ["operation", "path", "profileDirectory", "confirmWrite"],
             "apply" =>
             [
@@ -408,6 +435,12 @@ internal static class EditorFiles
             ApprovedNewPath(path, ".trg");
             _ = ProfileDirectory(args, "trigger"); // Native output uses fresh GUID staging, never caller-named basename.
         }
+        else if (operation == "create")
+        {
+            // Session 3: an empty live trigger set has no controller to inspect/patch; create starts one from the template.
+            Confirm(args, "confirmWrite");
+            ApprovedNewPath(path, ".trg");
+        }
         else
         {
             if (operation == "apply")
@@ -427,6 +460,13 @@ internal static class EditorFiles
                     && !args.TryGetProperty("code", out _)
                 )
                     throw new ArgumentException("Patch requires at least one edited field.");
+                if (
+                    args.TryGetProperty("expectedSha256", out var expected)
+                    && (expected.GetString() is not { Length: 64 } sha || !sha.All(Uri.IsHexDigit))
+                )
+                    throw new ArgumentException(
+                        "expectedSha256 must be the 64-digit SHA-256 of path (from inspect)."
+                    );
             }
             if (operation == "apply")
             {
@@ -438,7 +478,7 @@ internal static class EditorFiles
                     if (known.Length > 0)
                         throw new ArgumentException(
                             $"Import resets the Triggers -> XS Scripts list and lastKnown is not empty ({string.Join(", ", known.Select(k => k.Name))}): "
-                                + "pass scripts=\"restore\" (re-include through the Script Manager, normal or alternative UI at 2560x1440) or scripts=\"ignore\" (re-add by hand)."
+                                + "pass scripts=\"restore\" (re-include through the Script Manager, normal or alternative UI; 2560x1440 and 1920x1080 live-verified, other supported sizes best effort) or scripts=\"ignore\" (re-add by hand)."
                         );
                 }
                 var auto =
@@ -544,11 +584,59 @@ internal static class EditorFiles
         }
     }
 
-    internal static void PreflightCheckpoint(JsonElement args)
+    /// <summary>Extension of the side file the game writer creates next to a saved scenario (live 2026-10-25: empty .bak).</summary>
+    const string WriterBackupExtension = ".bak";
+
+    /// <summary>Purpose tag of the backup of a checkpoint replaced by overwrite=true (scenario_backup name).</summary>
+    const string ReplacedCheckpointPurpose = "checkpoint-replaced";
+
+    /// <summary>editor_save_checkpoint preflight: new destination, or overwrite=true + expectedSha256 of the existing one.</summary>
+    /// <param name="args">Tool arguments.</param>
+    /// <returns>Validated destination path.</returns>
+    internal static string PreflightCheckpoint(JsonElement args)
     {
         Confirm(args, "confirmWrite");
-        ApprovedNewPath(args.GetProperty("path").GetString()!, ".mythscn");
         _ = ProfileDirectory(args, "scenario");
+        var path = args.GetProperty("path").GetString()!;
+        var overwrite =
+            args.TryGetProperty("overwrite", out var flag) && flag.ValueKind == JsonValueKind.True;
+        var hasHash = args.TryGetProperty("expectedSha256", out var expected);
+        if (!overwrite)
+        {
+            if (hasHash)
+                throw new ArgumentException(
+                    "expectedSha256 is the overwrite=true lost-update check; omit it for a new destination."
+                );
+            return ApprovedNewPath(path, ".mythscn");
+        }
+        path = LocalPath(path);
+        if (!path.EndsWith(".mythscn", StringComparison.OrdinalIgnoreCase) || !File.Exists(path))
+            throw new ArgumentException(
+                "overwrite=true needs an existing .mythscn destination; use a new path without overwrite instead."
+            );
+        if (!hasHash || expected.GetString() is not { Length: 64 } sha || !sha.All(Uri.IsHexDigit))
+            throw new ArgumentException(
+                "overwrite=true requires expectedSha256 (64-digit SHA-256 of the current destination)."
+            );
+        RequireDestination(path, sha, false);
+        return path;
+    }
+
+    /// <summary>Refuses with DESTINATION_CHANGED when the existing checkpoint differs from the reviewed hash.</summary>
+    /// <param name="path">Existing destination.</param>
+    /// <param name="sha256">Caller-reviewed SHA-256.</param>
+    /// <param name="dispatched">Whether the game writer already ran (staging exists).</param>
+    static void RequireDestination(string path, string sha256, bool dispatched)
+    {
+        if (!string.Equals(Layout.Hash(path), sha256, StringComparison.OrdinalIgnoreCase))
+            throw new WorkflowFailure(
+                "DESTINATION_CHANGED",
+                dispatched ? "copy" : "preflight",
+                "Destination SHA-256 differs from expectedSha256; destination untouched.",
+                dispatched,
+                false,
+                "Hash the destination again (or pick a new path) before overwriting."
+            );
     }
 
     internal static void PreflightRecovery(JsonElement args)
@@ -1062,21 +1150,66 @@ internal static class EditorFiles
     /// <returns>Destination, retained game-written staging file, hash and structural verification limits.</returns>
     public static object Checkpoint(Game game, JsonElement args, Action<string, JsonElement> native)
     {
-        PreflightCheckpoint(args);
-        var output = ApprovedNewPath(args.GetProperty("path").GetString()!, ".mythscn");
-        var staged = Scratch(ProfileDirectory(args, "scenario"), "checkpoint", ".mythscn");
+        var output = PreflightCheckpoint(args);
+        var overwrite = File.Exists(output);
+        var scenarioDirectory = ProfileDirectory(args, "scenario");
+        var staged = Scratch(scenarioDirectory, "checkpoint", ".mythscn");
+        string? replaced = null;
         try
         {
             var bytes = Export(staged, true, native, () => _ = game.Editor());
+            string? replacedSha256 = null;
+            if (overwrite)
+            {
+                replacedSha256 = args.GetProperty("expectedSha256").GetString()!.ToLowerInvariant();
+                RequireDestination(output, replacedSha256, true);
+                var target = BackupPath(
+                    args,
+                    "",
+                    ProfileHomeOf(scenarioDirectory),
+                    ScenarioBackupFolder,
+                    ".mythscn",
+                    ReplacedCheckpointPurpose,
+                    true
+                );
+                File.Move(output, target);
+                replaced = target;
+                if (Layout.Hash(target) != replacedSha256)
+                    throw new IOException(
+                        "Replaced checkpoint changed while moving to " + target + "."
+                    );
+            }
             var sha256 = CopyNew(bytes, output);
+            string retained = staged,
+                stagingNote;
+            try
+            {
+                retained = RetainScenarioStaging(staged, bytes, scenarioDirectory);
+                // The game writer also leaves an empty <stem>.bak (live 2026-10-25); the GUID stem is ours alone.
+                var writerBackup = Path.ChangeExtension(staged, WriterBackupExtension);
+                if (File.Exists(writerBackup))
+                    File.Move(writerBackup, Path.ChangeExtension(retained, WriterBackupExtension));
+                stagingNote =
+                    "Staging moved to " + ScenarioBackupFolder + " after the verified copy.";
+            }
+            catch (IOException e)
+            {
+                stagingNote =
+                    "Staging left in the scenario folder (move failed: " + e.Message + ").";
+            }
             return new
             {
                 path = output,
-                stagedPath = staged,
+                stagedPath = retained,
                 sha256,
                 fileVerified = true,
-                overwrite = false,
-                limitation = "Game-written l33t/zlib snapshot with decoded length and zlib Adler-32 verified, not semantic reload validation. Four-byte game trailer preserved but not interpreted/validated. Staging file retained. Writer may change editor save-name/dirty state. No existing destination ever overwritten.",
+                overwrite,
+                replacedBackupPath = replaced,
+                replacedSha256,
+                staging = stagingNote,
+                limitation = "Game-written l33t/zlib snapshot with decoded length and zlib Adler-32 verified, not semantic reload validation. Four-byte game trailer preserved but not interpreted/validated. Writer may change editor save-name/dirty state. An existing destination is only replaced with overwrite=true + matching expectedSha256, after moving it to "
+                    + ScenarioBackupFolder
+                    + ".",
             };
         }
         catch (WorkflowFailure e)
@@ -1101,7 +1234,11 @@ internal static class EditorFiles
                 e.Message,
                 true,
                 true,
-                "Inspect staging/destination before any other operation; no native retry.",
+                replaced is null
+                    ? "Inspect staging/destination before any other operation; no native retry."
+                    : "Inspect staging/destination before any other operation; no native retry. The replaced checkpoint was moved to "
+                        + replaced
+                        + ".",
                 staged,
                 output,
                 e

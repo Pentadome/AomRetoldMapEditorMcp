@@ -72,7 +72,7 @@ internal static class TriggerCodec
         GeneralTriggerCount(bytes) switch
         {
             0 =>
-                "File is a valid TR export with 0 triggers (empty trigger set); this tool only handles the single Always/CodeSnippet controller shape. Use editor_trigger_list for general exports.",
+                "File is a valid TR export with 0 triggers (empty trigger set); this tool only handles the single Always/CodeSnippet controller shape. Start one with editor_triggers operation=create (then apply), or use editor_trigger_list for general exports.",
             1 => null, // Same shape family; original message is specific enough.
             { } n =>
                 $"File is a TR export with {n} triggers, not the single verified controller shape. Use editor_trigger_list / editor_trigger_edit.",
@@ -221,20 +221,67 @@ internal static class TriggerCodec
         return findings.ToArray();
     }
 
+    /// <summary>Default controller name of operation=create (host choice).</summary>
+    const string CreateDefaultName = "AomMcp controller";
+
+    /// <summary>editor_triggers create: serializes a new single Always/CodeSnippet controller from the pinned template
+    /// and writes it to a NEW .trg (round-trip verified). For empty live trigger sets (session 3).</summary>
+    /// <param name="args">Preflighted path (new .trg), optional name/active/loop/code, confirmWrite.</param>
+    /// <returns>Inspect result of the written file.</returns>
+    internal static object Create(JsonElement args)
+    {
+        var output = EditorFiles.ApprovedNewPath(args.GetProperty("path").GetString()!, ".trg");
+        var template = Parse(Template());
+        var created = new Controller(
+            args.TryGetProperty("name", out var name) ? name.GetString()! : CreateDefaultName,
+            args.TryGetProperty("active", out var active) ? active.GetBoolean() : template.Active,
+            args.TryGetProperty("loop", out var loop) ? loop.GetBoolean() : template.Loop,
+            args.TryGetProperty("code", out var code) ? Crlf(code.GetString()!) : template.Code
+        );
+        var bytes = Serialize(created);
+        if (Parse(bytes) != created)
+            throw new InvalidDataException(
+                "Trigger serialization round-trip failed; output not written."
+            );
+        using (
+            var file = new FileStream(output, FileMode.CreateNew, FileAccess.Write, FileShare.None)
+        )
+            file.Write(bytes);
+        return Inspect(output);
+    }
+
+    /// <summary>Normalizes line breaks to CRLF (TR controller code convention).</summary>
+    /// <param name="code">Caller code with any line breaks.</param>
+    static string Crlf(string code) =>
+        code.Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace("\n", "\r\n", StringComparison.Ordinal);
+
     internal static object Patch(JsonElement args)
     {
         var source = args.GetProperty("path").GetString()!;
         var original = ReadFile(source);
+        if (
+            args.TryGetProperty("expectedSha256", out var expected)
+            && !string.Equals(
+                Convert.ToHexStringLower(SHA256.HashData(original)),
+                expected.GetString(),
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+            throw new WorkflowFailure(
+                "SOURCE_CHANGED",
+                "preflight",
+                "Trigger file SHA-256 differs from expectedSha256.",
+                false,
+                false,
+                "Inspect the file again; nothing was written."
+            );
         var current = Parse(original);
         var updated = new Controller(
             args.TryGetProperty("name", out var name) ? name.GetString()! : current.Name,
             args.TryGetProperty("active", out var active) ? active.GetBoolean() : current.Active,
             args.TryGetProperty("loop", out var loop) ? loop.GetBoolean() : current.Loop,
-            args.TryGetProperty("code", out var code)
-                ? code.GetString()!
-                    .Replace("\r\n", "\n", StringComparison.Ordinal)
-                    .Replace("\n", "\r\n", StringComparison.Ordinal)
-                : current.Code
+            args.TryGetProperty("code", out var code) ? Crlf(code.GetString()!) : current.Code
         );
         var output = EditorFiles.ApprovedNewPath(
             args.GetProperty("outputPath").GetString()!,

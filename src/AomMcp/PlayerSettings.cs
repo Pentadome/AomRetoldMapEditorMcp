@@ -358,7 +358,7 @@ internal static class PlayerSettings
     }
 
     /// <summary>Levenshtein distance.</summary>
-    static int Distance(string a, string b)
+    internal static int Distance(string a, string b)
     {
         var row = Enumerable.Range(0, b.Length + 1).ToArray();
         for (var i = 1; i <= a.Length; i++)

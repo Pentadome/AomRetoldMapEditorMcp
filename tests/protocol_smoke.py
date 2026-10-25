@@ -507,6 +507,18 @@ try:
             'confirmWrite': True, 'profileDirectory': str(profile).replace('\\', '/')})
         assert slashed['isError'] and 'GAME_NOT_RUNNING' in str(slashed), slashed
         assert not (directory / 'new.mythscn').exists()
+        # overwrite=true needs expectedSha256 of an existing destination; a stale hash is DESTINATION_CHANGED before any game call.
+        existing_sha = hashlib.sha256(existing.read_bytes()).hexdigest()
+        base = {'path': str(existing), 'confirmWrite': True, 'profileDirectory': str(profile)}
+        for invalid in (base | {'overwrite': True}, base | {'expectedSha256': existing_sha},
+                        base | {'path': str(directory / 'missing.mythscn'), 'overwrite': True, 'expectedSha256': existing_sha}):
+            result = tool('editor_save_checkpoint', invalid)
+            assert result['isError'] and 'GAME_NOT_RUNNING' not in str(result), result
+        stale = tool('editor_save_checkpoint', base | {'overwrite': True, 'expectedSha256': '0' * 64})
+        assert stale['isError'] and 'DESTINATION_CHANGED' in str(stale), stale
+        pinned = tool('editor_save_checkpoint', base | {'overwrite': True, 'expectedSha256': existing_sha})
+        assert pinned['isError'] and 'GAME_NOT_RUNNING' in str(pinned), pinned
+        assert existing.read_bytes() == b'USER FILE MUST REMAIN UNCHANGED'
     with tempfile.TemporaryDirectory(prefix='aom-recovery-test-') as temporary:
         directory = pathlib.Path(temporary)
         profile = directory / 'trigger'
@@ -709,6 +721,21 @@ try:
         # Source remains unchanged; output exists means repeated patch refuses rather than overwrites.
         assert tool('editor_triggers', {'operation': 'patch', 'path': str(original),
             'outputPath': str(output), 'name': 'no-overwrite', 'confirmWrite': True})['isError']
+        # Session 3: patch pins the source hash; create starts a controller for empty trigger sets.
+        original_sha = hashlib.sha256(original.read_bytes()).hexdigest()
+        stale_patch = tool('editor_triggers', {'operation': 'patch', 'path': str(original), 'expectedSha256': '0' * 64,
+            'outputPath': str(pathlib.Path(temporary) / 'stale.trg'), 'name': 'x', 'confirmWrite': True})
+        assert stale_patch['isError'] and 'SOURCE_CHANGED' in str(stale_patch), stale_patch
+        assert not (pathlib.Path(temporary) / 'stale.trg').exists()
+        assert not tool('editor_triggers', {'operation': 'patch', 'path': str(original), 'expectedSha256': original_sha,
+            'outputPath': str(pathlib.Path(temporary) / 'pinned.trg'), 'name': 'x', 'confirmWrite': True})['isError']
+        created_path = pathlib.Path(temporary) / 'created.trg'
+        assert tool('editor_triggers', {'operation': 'create', 'path': str(created_path)})['isError']  # confirmWrite required
+        created = tool('editor_triggers', {'operation': 'create', 'path': str(created_path), 'code': 'xsSetContextPlayer(0);\n', 'confirmWrite': True})
+        assert not created['isError'], created
+        made = created['structuredContent']['triggers'][0]
+        assert made['name'] == 'AomMcp controller' and made['effects'][0]['parameters']['codeSnippet'].endswith('\r\n'), made
+        assert tool('editor_triggers', {'operation': 'create', 'path': str(created_path), 'confirmWrite': True})['isError']  # no overwrite
         malformed = pathlib.Path(temporary) / 'bad.trg'
         malformed.write_bytes(b'TR' + bytes(8))
         assert tool('editor_triggers', {'operation': 'inspect', 'path': str(malformed)})['isError']

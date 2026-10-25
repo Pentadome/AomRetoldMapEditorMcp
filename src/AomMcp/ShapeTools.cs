@@ -188,6 +188,14 @@ internal sealed partial class Server
                     throw new ArgumentException(
                         "referenceX/referenceZ apply to tool=flatten only."
                     );
+                if (args.TryGetProperty("height", out _) && String(args, "tool") != "flatten")
+                    throw new ArgumentException("height applies to tool=flatten only.");
+                if (
+                    args.TryGetProperty("height", out _) && args.TryGetProperty("referenceX", out _)
+                )
+                    throw new ArgumentException(
+                        "Give either height (exact sample made by a bump at the first vertex) or referenceX/referenceZ (sample existing terrain), not both."
+                    );
                 break;
             case "editor_terrain_shape":
                 EditorFiles.Confirm(args, "confirmDestructive");
@@ -474,6 +482,102 @@ internal sealed partial class Server
         return flags;
     }
 
+    /// <summary>Brush size for the exact-height sample loop of editor_stroke flatten height=: SetSample was live-tuned with
+    /// a ≈2.2-2.5-node brush (research/LIVE-WORLD.md "Elevation tools"; elevation mode showed size 3 live). Larger stroke
+    /// brushes would make the bump and the test dab paint far outside the stroke.</summary>
+    const int SampleBrushSize = 3;
+
+    /// <summary>Node radius around the sample anchor checked for bump/test-dab residue: test node 3 nodes from the
+    /// anchor per axis (diagonal ≈4.2) plus the ≈2.5-node dab radius (SetSample).</summary>
+    const double SampleResidueNodes = 7;
+
+    /// <summary>
+    /// Makes an exact elevation-sample height for flatten: both elevation tools get <see cref="SampleBrushSize"/>
+    /// (originals queued in <paramref name="restore"/>, restored by the caller), then <see cref="SetSample"/> raises or
+    /// lowers a bump at the anchor, bisects the slope sample and verifies a test dab, all inside a 7×7-node square.
+    /// </summary>
+    /// <param name="game">Validated editor connection.</param>
+    /// <param name="height">Requested node height.</param>
+    /// <param name="x">Anchor world X (first stroke vertex).</param>
+    /// <param name="z">Anchor world Z.</param>
+    /// <param name="tolerance">Accepted sample error.</param>
+    /// <param name="moveCamera">Camera may move to show the anchor.</param>
+    /// <param name="steps">Step log.</param>
+    /// <param name="restore">Receives (mode, original size) pairs to restore afterwards.</param>
+    /// <param name="strokes">Undo counter; bump and test dabs are added.</param>
+    /// <returns>Sampled height now active in the elevationsample tool.</returns>
+    float SampleExactHeight(
+        Game game,
+        double height,
+        double x,
+        double z,
+        double tolerance,
+        bool moveCamera,
+        List<object> steps,
+        List<(string Mode, int Size)> restore,
+        ref int strokes
+    )
+    {
+        foreach (var sampleMode in new[] { "elevation", SampleMode })
+        {
+            EnterMode(game, sampleMode);
+            if (LiveWorld.ReadBrush(game) is not { } current)
+                continue;
+            var original = (int)Math.Round(current.Size);
+            if (original == SampleBrushSize)
+                continue;
+            if (!SetBrushSize(game, SampleBrushSize).Applied)
+                throw new WorkflowFailure(
+                    "BRUSH_SIZE_NOT_APPLIED",
+                    "brush",
+                    $"{sampleMode} brush size did not change to {SampleBrushSize} for the sample loop.",
+                    false,
+                    false,
+                    "Nothing painted. Set the brush with editor_brush and retry."
+                );
+            restore.Add((sampleMode, original));
+        }
+        var view = EditorView.ReadView(game);
+        var half = (ShapeSampleNodes - 1) / 2 * view.Scale;
+        _ = Screen(game, [(x, z), (x - half, z - half), (x + half, z + half)], moveCamera, 1);
+        _elevationEdits = 0;
+        double sampled;
+        try
+        {
+            steps.AddRange(
+                SetSample(
+                    game,
+                    height,
+                    x,
+                    z,
+                    x - half,
+                    z - half,
+                    x + half,
+                    z + half,
+                    tolerance,
+                    out sampled
+                )
+            );
+        }
+        finally
+        {
+            strokes += _elevationEdits;
+        }
+        steps.Add(
+            new
+            {
+                exactSample = new
+                {
+                    x,
+                    z,
+                    requested = height,
+                    sampled,
+                },
+            }
+        );
+        return (float)sampled;
+    }
+
     /// <summary>editor_stroke: one world polyline with raise/lower/smooth/roughen/flatten, optionally mirrored.</summary>
     /// <param name="game">Validated editor connection.</param>
     /// <param name="args">Tool arguments.</param>
@@ -514,6 +618,10 @@ internal sealed partial class Server
             rz = Dbl(args, "referenceZ", points[0].Z);
         if (tool == "flatten" && !view.InsideMap(rx, rz))
             throw OutsideMap(view);
+        double? requestedHeight =
+            tool == "flatten" && args.TryGetProperty("height", out var wanted)
+                ? wanted.GetDouble()
+                : null;
         var all = instances.SelectMany(i => i.Points).ToArray();
         int bx0 = (int)(all.Min(p => p.X) * view.InverseScale) - StrokeMarginNodes,
             bz0 = (int)(all.Min(p => p.Z) * view.InverseScale) - StrokeMarginNodes,
@@ -527,9 +635,24 @@ internal sealed partial class Server
         float? sampled = null;
         object? brush = null;
         double brushSize = 1;
+        var restoreBrushes = new List<(string Mode, int Size)>();
+        int? sampleTouchUps = null;
         try
         {
-            EnterMode(game, mode);
+            if (requestedHeight is { } exact)
+                sampled = SampleExactHeight(
+                    game,
+                    exact,
+                    rx,
+                    rz,
+                    tolerance,
+                    moveCamera,
+                    steps,
+                    restoreBrushes,
+                    ref strokes
+                );
+            else // SetSample leaves elevationsample active with the sample set; re-entering it is not live-verified.
+                EnterMode(game, mode);
             if (args.TryGetProperty("brushSize", out var bs))
             {
                 var (after, applied) = SetBrushSize(game, bs.GetInt32());
@@ -548,7 +671,7 @@ internal sealed partial class Server
                 brush = new { size = b.Size, type = b.Type };
                 brushSize = b.Size;
             }
-            if (tool == "flatten")
+            if (tool == "flatten" && requestedHeight is null)
             {
                 var refPixel = Screen(game, [(rx, rz)], moveCamera, 1).Pixels[0];
                 RequireNoHeldInput();
@@ -567,6 +690,7 @@ internal sealed partial class Server
                 {
                     var path = pass % 2 == 0 ? pts : [.. pts.Reverse()];
                     steps.Add(new { instance = name, pass });
+                    ProgressReporter.Report(strokes, null, $"{name} pass {pass}, strokes");
                     PaintChunks(
                         game,
                         path,
@@ -587,6 +711,44 @@ internal sealed partial class Server
                 }
             }
             Thread.Sleep(StrokeSettleMs);
+            if (requestedHeight is not null && sampled is { } goal)
+            {
+                // Bump/test-dab residue the drag did not cover (small brushes): dab changed nodes near the sample anchor
+                // to the requested height. Nodes the call did not change are left alone.
+                var r = (int)Math.Ceiling(SampleResidueNodes);
+                int ax = (int)Math.Round(rx * view.InverseScale),
+                    az = (int)Math.Round(rz * view.InverseScale);
+                var now = EditorView.ReadView(game);
+                bool Changed(int ix, int iz) =>
+                    ix - before.X0 is var i
+                    && iz - before.Z0 is var j
+                    && i >= 0
+                    && j >= 0
+                    && i < before.Heights.Length
+                    && j < before.Heights[i].Length
+                    && Math.Abs(now.HeightRow(ix, iz, 1)[0] - before.Heights[i][j]) > HeightEpsilon;
+                _elevationEdits = 0;
+                try
+                {
+                    TouchUpNodes(
+                        game,
+                        Changed,
+                        ax - r,
+                        az - r,
+                        ax + r,
+                        az + r,
+                        goal,
+                        tolerance,
+                        moveCamera,
+                        steps
+                    );
+                }
+                finally
+                {
+                    sampleTouchUps = _elevationEdits;
+                    strokes += _elevationEdits;
+                }
+            }
         }
         catch (Exception e) when (strokes > 0 && e is not WorkflowFailure { UndoSteps: not null })
         {
@@ -604,6 +766,11 @@ internal sealed partial class Server
         }
         finally
         {
+            foreach (var (restoreMode, size) in restoreBrushes)
+            {
+                EnterMode(game, restoreMode);
+                SetBrushSize(game, size);
+            }
             ExitEditModes(game);
         }
         var viewAfter = EditorView.ReadView(game);
@@ -657,6 +824,12 @@ internal sealed partial class Server
             passes,
             strokes,
             brush,
+            requestedHeight,
+            sampledHeight = sampled,
+            sampleSource = tool != "flatten" ? null
+            : requestedHeight is null ? "reference"
+            : "bump",
+            sampleTouchUps,
             steps,
             verification = new
             {
@@ -1240,9 +1413,14 @@ internal sealed partial class Server
                                     .Reverse()
                                     .Select(s => s.AsEnumerable().Reverse().ToList()),
                             ];
-                    foreach (var stroke in ordered)
+                    for (var index = 0; index < ordered.Count; index++)
                     {
-                        var pts = World(m, stroke);
+                        ProgressReporter.Report(
+                            index,
+                            ordered.Count,
+                            $"shape pass {pass + 1}/2 scanline"
+                        );
+                        var pts = World(m, ordered[index]);
                         var prior = chunks;
                         try
                         {
@@ -2229,7 +2407,7 @@ internal sealed partial class Server
         );
         yield return Spec(
             "editor_stroke",
-            "One WORLD polyline (1..256 [x,z]) with an elevation-family tool: raise/lower (elevation tool left/right drag), smooth, roughen, flatten (elevationsample: samples at referenceX/Z, default first vertex, then drags at that height). passes 1..10 (alternating direction), optional brushSize (verified), mirror point|flipX|flipZ|swapXZ about the map center (adds the mirrored stroke), durationMs >=800 (shorter drags painted nothing live). Camera moves/splits strokes as needed (UI-panel aware). Verifies node raises/lowers and water-flag changes in the stroke bbox; strokes = undo count. confirmDestructive=true required.",
+            "One WORLD polyline (1..256 [x,z]) with an elevation-family tool: raise/lower (elevation tool left/right drag), smooth, roughen, flatten (elevationsample: samples at referenceX/Z, default first vertex, then drags at that height; or height=<exact> builds the sample with a size-3 bump + test dab at the first vertex (as editor_elevation set; brushes restored), drags over it and dabs leftover bump nodes, sampleTouchUps). passes 1..10 (alternating direction), optional brushSize (verified), mirror point|flipX|flipZ|swapXZ about the map center (adds the mirrored stroke), durationMs >=800 (shorter drags painted nothing live). Camera moves/splits strokes as needed (UI-panel aware). Verifies node raises/lowers and water-flag changes in the stroke bbox; strokes = undo count. confirmDestructive=true required.",
             new Dictionary<string, object>
             {
                 ["tool"] = new { type = "string", @enum = StrokeTools },
@@ -2249,6 +2427,7 @@ internal sealed partial class Server
                 ["mirror"] = mirror,
                 ["referenceX"] = coord,
                 ["referenceZ"] = coord,
+                ["height"] = height,
                 ["tolerance"] = tolerance,
                 ["durationMs"] = new
                 {

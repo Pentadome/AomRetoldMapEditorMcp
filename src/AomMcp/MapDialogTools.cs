@@ -860,6 +860,7 @@ internal sealed partial class Server
         var left = false;
         var cameraReset = false;
         var stable = 0;
+        ProgressReporter.Report(0, null, "waiting for new scenario");
         while (Win.GetTickCount64() < deadline && stable < 2)
         {
             Thread.Sleep(NewScenarioPollMs);

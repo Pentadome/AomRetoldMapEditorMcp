@@ -8,6 +8,15 @@ The catalog below is a historical generated reference from an earlier 28-helper 
 
 ## Recent additions (see live `tools/list` for schemas)
 
+- Wake Island session 3 fixes (2026-10-25, build 100.19.17020.0; live-verified 1920×1080 normal and alternative UI; plan `plans/wake-session-3-fixes.md`, details `research/LIVE-WORLD.md` "Session 3 fixes"):
+  - Long calls send MCP `notifications/progress` every 10 s when the request carries `_meta.progressToken` (resets client timeouts; paint_area, stroke, terrain_shape, new_scenario and XS restore report their phase).
+  - `editor_camera_look_at`: a target past the camera clamp returns `atLimit:true` + `reachable` instead of `MINIMAP_NO_EFFECT` (inward probe click proves the minimap responds; dead corner pixels are walked inward). `MINIMAP_NO_EFFECT` remains when the probe does not move the camera either.
+  - Flatten to an exact height: `editor_stroke tool=flatten height=<h>` and `editor_elevation operation=flatten height=<h>` (exclusive with `referenceX/Z`); results report `requestedHeight`/`sampledHeight`/`sampleSource` (`bump`|`reference`). The exact-height sampler retries the other bump slopes before `SAMPLE_NOT_CONVERGED`.
+  - `editor_xs_scripts` and the Script Manager work at 1920×1080 (and other supported sizes) on scaled 2560 signatures (`bestEffort`; OCR label/clipped-row tolerance).
+  - `editor_triggers operation=create` writes a NEW single-controller `.trg` (name default "AomMcp controller", `active`/`loop`/`code`, `confirmWrite`) for empty trigger sets; `patch` accepts `expectedSha256` (`SOURCE_CHANGED`, nothing written).
+  - `editor_playtest`: `inspect`/`quit`/`dismiss` accept `expectedPid`/`expectedWindowThread`; verification gates tolerate ±10 per channel on 80 % of pixels and report `gate` {matched, total, mismatches}; `start` returns `hints.cheats` (`CLEAR SKIES`, `LAY OF THE LAND`) once playing.
+  - `editor_save_checkpoint`: staging (and the writer's empty `.bak`) moves to `<id>\scenario_backup` after a verified copy (stays in `scenario\` on failure for `editor_export_recovery`). `overwrite=true` + `expectedSha256` replaces an existing destination (`DESTINATION_CHANGED` on mismatch; old file to `scenario_backup`, `replacedBackupPath`/`replacedSha256`).
+
 - Wake Island session 2 fixes (2026-10-22, build 100.19.17020.0; live-verified 1920×1080/1920×1200 normal and alternative UI, 1440×900 alternative; plan `plans/wake-session-2-fixes.md`):
   - Placement waits for the hover map to confirm the pointer (`POINTER_NOT_SETTLED`), retries bridge refusal 10 once, and `editor_place_at_world` auto-corrects off-target placements with the `editor_transform_unit` move (`correction`; `PLACEMENT_OFFSET` if the correction fails). `PLACEMENT_NOT_OBSERVED` is `retrySafe:true` after a verified-unchanged rescan. `editor_camera_look_at` parks the pointer off the minimap (`pointerParked`). Texture sampling (`paint_world kind=texture`) waits for hover.
   - Game input is serialized across MCP processes by a named mutex per game pid (30 s wait, then `GAME_BUSY`).

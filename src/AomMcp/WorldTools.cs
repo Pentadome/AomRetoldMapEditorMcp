@@ -105,6 +105,18 @@ internal sealed partial class Server
                     throw new ArgumentException("Area requires minX<maxX and minZ<maxZ.");
                 if (String(args, "operation") == "set" && !args.TryGetProperty("height", out _))
                     throw new ArgumentException("operation=set requires height.");
+                if (String(args, "operation") == "smooth" && args.TryGetProperty("height", out _))
+                    throw new ArgumentException("height applies to operation=set/flatten only.");
+                if (
+                    args.TryGetProperty("height", out _)
+                    && (
+                        args.TryGetProperty("referenceX", out _)
+                        || args.TryGetProperty("referenceZ", out _)
+                    )
+                )
+                    throw new ArgumentException(
+                        "Give either height (exact sample by the set loop) or referenceX/referenceZ (sample existing terrain), not both."
+                    );
                 break;
             case "editor_terrain_info":
                 if (
@@ -1619,7 +1631,11 @@ internal sealed partial class Server
         var before = AreaHeights(view, minX, minZ, maxX, maxZ, 0, 0);
         var exited = ExitEditModes(game);
         var steps = new List<object> { new { exitedMode = LiveWorld.ModeName(exited.Before) } };
-        double? target = op == "set" ? args.GetProperty("height").GetDouble() : null;
+        // flatten with height = set: the exact sample comes from the bump loop instead of a reference point.
+        double? target =
+            op is "set" or "flatten" && args.TryGetProperty("height", out var exact)
+                ? exact.GetDouble()
+                : null;
         double? sampled = null;
         _elevationEdits = 0;
         try
@@ -1652,16 +1668,16 @@ internal sealed partial class Server
             }
             else
             {
-                if (op == "set")
+                if (target is not null)
                 {
                     if (maxX - minX < 7 * view.Scale || maxZ - minZ < 7 * view.Scale)
                         throw new WorkflowFailure(
                             "AREA_TOO_SMALL",
                             "preflight",
-                            "operation=set needs an area of at least 7×7 nodes (bump + test dab inside the area).",
+                            $"operation={op} with height needs an area of at least 7×7 nodes (bump + test dab inside the area).",
                             false,
                             false,
-                            "Enlarge the area or use operation=flatten with a reference point at the wanted height. No input sent."
+                            "Enlarge the area, use operation=flatten with a reference point at the wanted height, or editor_stroke tool=flatten height=. No input sent."
                         );
                     steps.AddRange(
                         SetSample(
@@ -1777,6 +1793,9 @@ internal sealed partial class Server
             },
             target,
             sampledHeight = sampled,
+            sampleSource = op == "smooth" ? null
+            : target is null ? "reference"
+            : "bump",
             steps,
             before = new
             {
@@ -1907,6 +1926,9 @@ internal sealed partial class Server
         return touched;
     }
 
+    /// <summary>Bump slope directions (unit node steps along X/Z) tried in order by <see cref="SetSample"/>.</summary>
+    static readonly (int X, int Z)[] SampleSlopes = [(1, 0), (0, 1), (-1, 0), (0, -1)];
+
     /// <summary>Closed loop for an exact sample height: bump at area center, slope bisection sampling, test dab verification.</summary>
     List<object> SetSample(
         Game game,
@@ -2008,22 +2030,41 @@ internal sealed partial class Server
             }
         );
         EnterMode(game, "elevationsample");
-        // Slope along +X from anchor: find node pair (k,k+1) whose heights bracket h; bilinear along X at z=az.
-        float H(double x) => v.Height(x, az).Height;
+        var tested = new List<(double T, double M)>();
+        var slopes = new List<string>();
+        double measured = double.NaN;
         double lo = ax,
-            hi = ax;
-        for (var k = 0; k < 6; k++)
+            hi = ax,
+            ha = 0,
+            hb = 0;
+        // Slope along +X first, then the other axis slopes of the same bump. Live alternative UI 1920x1080 (2026-10-25):
+        // on a steep +X slope neighbouring pixels sampled 7.126/6.948 around a 7 target (0.18 per pixel), so the secant
+        // never converged; another direction projects to other pixels and height steps.
+        foreach (var (dirX, dirZ) in SampleSlopes)
         {
-            double a = ax + k * s,
-                b = ax + (k + 1) * s;
-            if ((H(a) - h) * (H(b) - h) <= 0)
+            // Find node pair (k,k+1) along the direction whose heights bracket h; bilinear along it.
+            float H(double d) => v.Height(ax + d * dirX, az + d * dirZ).Height;
+            lo = hi = 0;
+            for (var k = 0; k < 6; k++)
             {
-                lo = a;
-                hi = b;
-                break;
+                double a = k * s,
+                    b = (k + 1) * s;
+                if ((H(a) - h) * (H(b) - h) <= 0)
+                {
+                    lo = a;
+                    hi = b;
+                    break;
+                }
             }
+            if (lo == hi)
+                continue;
+            slopes.Add(FormattableString.Invariant($"({dirX},{dirZ})"));
+            ha = H(lo);
+            hb = H(hi);
+            if (SampleSlope(dirX, dirZ))
+                break;
         }
-        if (lo == hi)
+        if (slopes.Count == 0)
             throw new WorkflowFailure(
                 "SLOPE_NOT_BRACKETED",
                 "sample",
@@ -2032,75 +2073,79 @@ internal sealed partial class Server
                 false,
                 "Undo bump (editor_undo) and retry."
             );
-        double ha = H(lo),
-            hb = H(hi);
-        var t = Math.Abs(hb - ha) < 1e-6 ? 0.5 : (h - ha) / (hb - ha);
-        var tested = new List<(double T, double M)>();
-        double measured = double.NaN;
-        for (var iter = 0; iter < 6; iter++) // Host bound: secant iterations on (t, measured).
+        bool SampleSlope(int dirX, int dirZ)
         {
-            v = EditorView.ReadView(game);
-            var sx = lo + t * (hi - lo);
-            var sh = (float)(ha + t * (hb - ha));
-            frame = SceneUi.Capture(game);
-            occ = ui?.Occluders(frame);
-            var sp =
-                PixelFor(v, ui, occ, width, height, sx, az, 2, sh)
-                ?? throw new WorkflowFailure(
-                    "TARGET_NOT_CLICKABLE",
-                    "sample",
-                    "Sample point not clickable.",
-                    true,
-                    false,
-                    "Undo bump and retry with camera closer."
-                );
-            if (iter == 0)
+            var t = Math.Abs(hb - ha) < 1e-6 ? 0.5 : (h - ha) / (hb - ha);
+            var first = tested.Count;
+            for (var iter = 0; iter < 6; iter++) // Host bound: secant iterations on (t, measured).
             {
-                var pick = Array.FindIndex(
-                    corners,
-                    c =>
-                        PixelFor(v, ui, occ, width, height, c.X + s / 2, c.Z + s / 2, 2) is not null
-                );
-                if (pick < 0)
-                    throw new WorkflowFailure(
+                v = EditorView.ReadView(game);
+                var d = lo + t * (hi - lo);
+                double sx = ax + d * dirX,
+                    sz = az + d * dirZ;
+                var sh = (float)(ha + t * (hb - ha));
+                frame = SceneUi.Capture(game);
+                occ = ui?.Occluders(frame);
+                var sp =
+                    PixelFor(v, ui, occ, width, height, sx, sz, 2, sh)
+                    ?? throw new WorkflowFailure(
                         "TARGET_NOT_CLICKABLE",
                         "sample",
-                        "No area corner clickable for the test node.",
+                        "Sample point not clickable.",
                         true,
                         false,
                         "Undo bump and retry with camera closer."
                     );
-                (tx, tz) = corners[pick];
+                if (tested.Count == 0)
+                {
+                    var pick = Array.FindIndex(
+                        corners,
+                        c =>
+                            PixelFor(v, ui, occ, width, height, c.X + s / 2, c.Z + s / 2, 2)
+                                is not null
+                    );
+                    if (pick < 0)
+                        throw new WorkflowFailure(
+                            "TARGET_NOT_CLICKABLE",
+                            "sample",
+                            "No area corner clickable for the test node.",
+                            true,
+                            false,
+                            "Undo bump and retry with camera closer."
+                        );
+                    (tx, tz) = corners[pick];
+                }
+                var tp =
+                    PixelFor(v, ui, occ, width, height, tx + s / 2, tz + s / 2, 2)
+                    ?? throw new WorkflowFailure(
+                        "TARGET_NOT_CLICKABLE",
+                        "sample",
+                        $"Test node not clickable: {PixelWhy(v, ui, occ, width, height, tx + s / 2, tz + s / 2, 2)}.",
+                        true,
+                        false,
+                        "Undo bump and retry with camera closer."
+                    );
+                RequireNoHeldInput();
+                Ui.SettledClick(game, sp.X, sp.Y, "right"); // Unsettled presses sampled/painted at the previous pointer spot (live).
+                Thread.Sleep(80);
+                Ui.SettledClick(game, tp.X, tp.Y, "left");
+                _elevationEdits++;
+                Thread.Sleep(200);
+                measured = EditorView.ReadView(game).Height(tx, tz).Height;
+                tested.Add((t, measured));
+                if (Math.Abs(measured - h) <= tolerance)
+                    return true;
+                if (tested.Count - first >= 2 && Math.Abs(tested[^1].M - tested[^2].M) > 1e-6)
+                    t =
+                        tested[^1].T
+                        + (h - tested[^1].M)
+                            * (tested[^1].T - tested[^2].T)
+                            / (tested[^1].M - tested[^2].M);
+                else
+                    t += (h - measured) / (hb - ha == 0 ? 1 : hb - ha);
+                t = Math.Clamp(t, -0.5, 1.5);
             }
-            var tp =
-                PixelFor(v, ui, occ, width, height, tx + s / 2, tz + s / 2, 2)
-                ?? throw new WorkflowFailure(
-                    "TARGET_NOT_CLICKABLE",
-                    "sample",
-                    $"Test node not clickable: {PixelWhy(v, ui, occ, width, height, tx + s / 2, tz + s / 2, 2)}.",
-                    true,
-                    false,
-                    "Undo bump and retry with camera closer."
-                );
-            RequireNoHeldInput();
-            Ui.SettledClick(game, sp.X, sp.Y, "right"); // Unsettled presses sampled/painted at the previous pointer spot (live).
-            Thread.Sleep(80);
-            Ui.SettledClick(game, tp.X, tp.Y, "left");
-            _elevationEdits++;
-            Thread.Sleep(200);
-            measured = EditorView.ReadView(game).Height(tx, tz).Height;
-            tested.Add((t, measured));
-            if (Math.Abs(measured - h) <= tolerance)
-                break;
-            if (tested.Count >= 2 && Math.Abs(tested[^1].M - tested[^2].M) > 1e-6)
-                t =
-                    tested[^1].T
-                    + (h - tested[^1].M)
-                        * (tested[^1].T - tested[^2].T)
-                        / (tested[^1].M - tested[^2].M);
-            else
-                t += (h - measured) / (hb - ha == 0 ? 1 : hb - ha);
-            t = Math.Clamp(t, -0.5, 1.5);
+            return false;
         }
         sampled = measured;
         steps.Add(
@@ -2108,13 +2153,14 @@ internal sealed partial class Server
             {
                 sampleIterations = tested.Select(p => new { t = p.T, measured = p.M }).ToArray(),
                 testNode = new { x = tx, z = tz },
+                slopes,
             }
         );
         if (Math.Abs(measured - h) > tolerance)
             throw new WorkflowFailure(
                 "SAMPLE_NOT_CONVERGED",
                 "sample",
-                $"Sampled height {measured:F3} not within {tolerance} of {h} after {tested.Count} tries (t/measured: {string.Join("; ", tested.Select(p => FormattableString.Invariant($"{p.T:F3}/{p.M:F3}")))}; slope nodes {lo}->{hi} heights {ha:F3}->{hb:F3}).",
+                $"Sampled height {measured:F3} not within {tolerance} of {h} after {tested.Count} tries (t/measured: {string.Join("; ", tested.Select(p => FormattableString.Invariant($"{p.T:F3}/{p.M:F3}")))}; slopes {string.Join(" ", slopes)}, last from anchor {lo}->{hi} heights {ha:F3}->{hb:F3}).",
                 true,
                 false,
                 "Bump and test dabs remain inside the area; editor_undo reverts them, or raise tolerance."
@@ -3374,7 +3420,7 @@ internal sealed partial class Server
         );
         yield return Spec(
             "editor_elevation",
-            "Deterministic elevation over a world rectangle: operation=set (exact height via bump+sample closed loop; area ≥7×7 nodes), flatten (to height sampled at referenceX/referenceZ, default area center), smooth (smooth tool stroke). Serpentine stroke inset by the brush radius; verifies node heights (tolerance default 0.05) and reports nodes changed just outside. confirmDestructive=true required. Undo with editor_undo.",
+            "Deterministic elevation over a world rectangle: operation=set (exact height via bump+sample closed loop; area ≥7×7 nodes), flatten (to height sampled at referenceX/referenceZ, default area center; flatten with height= behaves as set), smooth (smooth tool stroke). Serpentine stroke inset by the brush radius; verifies node heights (tolerance default 0.05) and reports nodes changed just outside. confirmDestructive=true required. Undo with editor_undo.",
             new Dictionary<string, object>(area)
             {
                 ["operation"] = new { type = "string", @enum = ElevationOperations },

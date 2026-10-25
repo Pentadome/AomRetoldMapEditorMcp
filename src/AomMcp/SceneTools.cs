@@ -260,6 +260,30 @@ internal sealed partial class Server
 
     // ---------------- camera ----------------
 
+    /// <summary>Minimap clicks stay this many pixels inside the chrome border (host policy).</summary>
+    const int MinimapInsetPx = 3;
+
+    /// <summary>Camera moves below this many world units count as "did not move" (host policy).</summary>
+    const float MinCameraMove = 0.25f;
+
+    /// <summary>A first click without effect only matters when the camera was this far (world units) from the target.</summary>
+    const double NoEffectMinError = 5;
+
+    /// <summary>World units of the inward responsiveness probe after a no-effect click (host choice: several minimap
+    /// pixels on a 440-unit map, small enough to stay near the clamp).</summary>
+    const double ProbeStepWorld = 20;
+
+    /// <summary>Pixel step of the inward walk when the return click on the target pixel had no effect (host choice).</summary>
+    const int ReturnStepPx = 3;
+
+    /// <summary>Centers the camera on world (x,z) by minimap clicks. A target past the camera clamp near the map edge
+    /// returns atLimit=true with the reachable centre (an inward probe click proves the minimap responds).</summary>
+    /// <param name="game">Connected editor.</param>
+    /// <param name="x">World X.</param>
+    /// <param name="z">World Z.</param>
+    /// <param name="tolerance">Accepted residual in world units.</param>
+    /// <param name="maxClicks">Correction click budget (probe/return clicks are extra).</param>
+    /// <returns>Before/after camera centre, residual, atLimit, clicks.</returns>
     object CameraLookAt(Game game, double x, double z, double tolerance, int maxClicks)
     {
         var view = EditorView.ReadView(game);
@@ -317,6 +341,42 @@ internal sealed partial class Server
         var clicks = new List<object>();
         var current = before;
         (int X, int Y)? last = null;
+        var atLimit = false;
+        (int X, int Y) MinimapAt(double wx, double wz)
+        {
+            var (mx, my) = SceneGeometry.MinimapPixel(
+                wx,
+                wz,
+                width,
+                depth,
+                ui.MinimapX,
+                ui.MinimapY,
+                ui.MinimapHalf
+            );
+            return SceneGeometry.ClampDiamond(
+                mx,
+                my,
+                ui.MinimapX,
+                ui.MinimapY,
+                ui.MinimapHalf,
+                MinimapInsetPx
+            );
+        }
+        Vector3? ClickAt((int X, int Y) pixel, string role)
+        {
+            Ui.Click(game, pixel.X, pixel.Y, "left");
+            var target = WaitCamera(game).Target();
+            clicks.Add(
+                new
+                {
+                    pixel = new { x = pixel.X, y = pixel.Y },
+                    role,
+                    target = target is { } t ? P(t) : null,
+                    residual = Error(target),
+                }
+            );
+            return target;
+        }
         for (var i = 0; i < maxClicks; i++)
         {
             var pixel = SceneGeometry.ClampDiamond(
@@ -325,38 +385,69 @@ internal sealed partial class Server
                 ui.MinimapX,
                 ui.MinimapY,
                 ui.MinimapHalf,
-                3
-            ); // 3 px inside chrome border.
-            if (last == pixel)
-                break; // Correction below pixel resolution or clamped at camera bounds.
-            last = pixel;
-            Ui.Click(game, pixel.X, pixel.Y, "left");
-            var settled = WaitCamera(game);
-            var previous = current;
-            current = settled.Target();
-            clicks.Add(
-                new
-                {
-                    pixel = new { x = pixel.X, y = pixel.Y },
-                    target = current is { } t ? P(t) : null,
-                    residual = Error(current),
-                }
+                MinimapInsetPx
             );
+            if (last == pixel)
+            {
+                // Correction below pixel resolution or clamped at camera bounds.
+                atLimit = Error(current) > tolerance;
+                break;
+            }
+            last = pixel;
+            var previous = current;
+            current = ClickAt(pixel, "target");
             if (
                 i == 0
                 && previous is { } p0
                 && current is { } p1
-                && Vector3.Distance(p0, p1) < 0.25f
-                && Error(previous) > 5
+                && Vector3.Distance(p0, p1) < MinCameraMove
+                && Error(previous) > NoEffectMinError
             )
-                throw new WorkflowFailure(
-                    "MINIMAP_NO_EFFECT",
-                    "ui-observe",
-                    "Minimap click did not move the camera.",
-                    false,
-                    true,
-                    "Take editor_screenshot to inspect; one left click was sent to the minimap area. Do not repeat blindly."
+            {
+                // Session 3 (2026-10-23): the camera sat at the x edge clamp (x~6.25) and an edge target did not move it.
+                // Probe inward: a camera that follows the probe proves the minimap works, so the target is clamped.
+                double cx = width / 2,
+                    cz = depth / 2;
+                var toCentre = Math.Sqrt(Math.Pow(cx - p1.X, 2) + Math.Pow(cz - p1.Z, 2));
+                var step = Math.Min(ProbeStepWorld, toCentre) / Math.Max(toCentre, 1);
+                var probe = ClickAt(
+                    MinimapAt(p1.X + (cx - p1.X) * step, p1.Z + (cz - p1.Z) * step),
+                    "probe"
                 );
+                if (probe is not { } moved || Vector3.Distance(p1, moved) < MinCameraMove)
+                    throw new WorkflowFailure(
+                        "MINIMAP_NO_EFFECT",
+                        "ui-observe",
+                        $"Neither the target click nor an inward probe click moved the camera ({clicks.Count} minimap clicks).",
+                        false,
+                        true,
+                        "Take editor_screenshot to inspect; two left clicks were sent to the minimap area. Do not repeat blindly."
+                    );
+                current = ClickAt(pixel, "return");
+                // Alternative UI 1920x1080 (2026-10-25): the corner pixel itself was dead (return did not move the camera
+                // back), so walk from the target pixel toward the probe pixel until a click takes effect.
+                var probePixel = MinimapAt(moved.X, moved.Z);
+                var span = Math.Max(
+                    Math.Abs(probePixel.X - pixel.X),
+                    Math.Abs(probePixel.Y - pixel.Y)
+                );
+                for (
+                    var inward = ReturnStepPx;
+                    inward < span
+                        && current is { } stuck
+                        && Vector3.Distance(stuck, moved) < MinCameraMove;
+                    inward += ReturnStepPx
+                )
+                    current = ClickAt(
+                        (
+                            pixel.X + (probePixel.X - pixel.X) * inward / span,
+                            pixel.Y + (probePixel.Y - pixel.Y) * inward / span
+                        ),
+                        "return"
+                    );
+                atLimit = true;
+                break;
+            }
             if (Error(current) <= tolerance || current is null)
                 break;
             var (dx, dy) = SceneGeometry.MinimapDelta(
@@ -378,12 +469,16 @@ internal sealed partial class Server
             after = current is { } a ? P(a) : null,
             residual,
             withinTolerance = residual <= tolerance,
+            atLimit,
+            reachable = atLimit && current is { } r ? P(r) : null,
             clicks,
             pointerParked = parked,
             cameraOnly = true,
             note = residual <= tolerance
                 ? "Camera center (forward ray on quantized terrain) verified by live camera read."
-                : "Residual above tolerance: camera bounds near map edges/minimap pixel resolution limit. Projection of target still usable if visible.",
+            : atLimit
+                ? "Camera clamped at its bound near the map edge (atLimit; reachable = closest centre). The target is still usable when it projects on screen (editor_map_info world)."
+            : "Residual above tolerance: minimap pixel resolution limit. Projection of target still usable if visible.",
             limitation = ui.Reviewed
                 ? "Left clicks on the reviewed minimap (normal or alternative UI); no scene mutation intended. Camera center measured from live pose, not occlusion proof."
                 : "Left clicks on a derived (scaled, not live-reviewed at this size) minimap; no scene mutation intended. Camera center measured from live pose, not occlusion proof.",
@@ -1646,7 +1741,7 @@ internal sealed partial class Server
         };
         yield return Spec(
             "editor_camera_look_at",
-            "Center editor camera on world X/Z by clicking the minimap (normal or alternative UI, auto-detected; reviewed 2560×1440/1920×1080 or derived best effort for other clients 1024..3840 wide with aspect 1.25..2.4, pinned build) in a closed loop: each click is verified from the live camera pose and corrected (maxClicks 1..6, default 4; tolerance world units default 3). Refuses if placement cursor active, minimap pixel gate fails, or first click has no effect. Camera only; no scene mutation. Edge targets may stay offset because of camera bounds.",
+            "Center editor camera on world X/Z by clicking the minimap (normal or alternative UI, auto-detected; reviewed 2560×1440/1920×1080 or derived best effort for other clients 1024..3840 wide with aspect 1.25..2.4, pinned build) in a closed loop: each click is verified from the live camera pose and corrected (maxClicks 1..6, default 4; tolerance world units default 3). Refuses if placement cursor active or minimap pixel gate fails. A target past the camera clamp near the map edge returns atLimit=true and reachable (closest centre; an inward probe click proved the minimap works, then the target is clicked again); MINIMAP_NO_EFFECT only when the probe does not move the camera either. Camera only; no scene mutation.",
             new Dictionary<string, object>
             {
                 ["x"] = coord,

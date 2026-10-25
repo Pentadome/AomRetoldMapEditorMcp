@@ -38,11 +38,11 @@ internal sealed partial class Server
     const string AltPopupCaptionControl = "NewName-TXT",
         AltPopupCaption = "New Script Name";
 
-    /// <summary>Alternative UI: height of the "Scripts list" caption inside the list control rect, in client pixels
-    /// (live 2560x1440, 2026-10-14: control y 206, first row text at y about 279, list body from y 246).</summary>
+    /// <summary>Alternative UI: height of the "Scripts list" caption inside the list control rect, in 2560-reference
+    /// client pixels (scaled by client width; live 2560x1440, 2026-10-14: control y 206, first row text at y about 279, list body from y 246).</summary>
     const int AltListHeaderPx = 41;
 
-    /// <summary>Script list row pitch in client pixels (live: rows at y 386 and 417 on 2560x1440).</summary>
+    /// <summary>Script list row pitch in 2560-reference client pixels (live: rows at y 386 and 417 on 2560x1440).</summary>
     const int ScriptRowPitch = 31;
 
     /// <summary>Maximum names per include/verify call.</summary>
@@ -68,7 +68,7 @@ internal sealed partial class Server
                 + "include (types each missing name into the name field, clicks Include Script, verifies one new matching row; already listed names are skipped; result.resolution says whether the name resolves under the profile trigger\\ folder, an enabled mod's trigger\\ folder (mods\\myth-mod-status.json) or the stock archive; confirmDestructive=true) | "
                 + "remove (exactly one name; clicks its row, then Remove Script, verifies the list lost only that row; confirmDestructive=true). "
                 + "Names are relative .xs paths as the editor lists them, e.g. om10\\om10_diffbonus.xs. The editor accepts names that do not exist. Changes stay in the open scenario until it is saved. "
-                + "Live-verified on the normal UI at 2560x1440 and on the alternative UI at 2560x1440 (list, include, remove, verify; result.list.uiKind says which). The alternative UI has no name field: include presses Add Script, types into its 'New Script Name' popup and clicks the confirm button, and its list clips long names, so rows match by their start and verify reports prefixMatched instead of verified. "
+                + "Live-verified on the normal and alternative UI at 2560x1440 and 1920x1080 (2026-10-25, scaled signatures, bestEffort); other supported client sizes reuse the scaled signatures untested (list, include, remove, verify; result.list.uiKind says which). The alternative UI has no name field: include presses Add Script, types into its 'New Script Name' popup and clicks the confirm button, and its list clips long names, so rows match by their start and verify reports prefixMatched instead of verified. "
                 + "Other client sizes and moved windows are refused before any input (re-add by hand there); 1920x1080 is untested. "
                 + "OCR is evidence (a backslash often reads as 'l'); after saving, editor_xs_check scenarioPath=\"latest\" is authoritative. editor_triggers apply scripts=\"restore\" uses this to undo the import's list reset. Failures carry code/nativeDispatched/outcomeUnknown/nextAction; never retry blindly.",
             new Dictionary<string, object>
@@ -260,15 +260,17 @@ internal sealed partial class Server
             throw new WorkflowFailure(
                 "UI_LAYOUT_UNREVIEWED",
                 "ui-preflight",
-                $"Script Manager not detected at calibrated geometry (uiKind={uiKind}). Dialog signatures exist for the normal and alternative UI at 2560x1440 only; "
-                    + "other client sizes and moved windows are refused. No input sent.",
+                $"Script Manager not detected at its default geometry (uiKind={uiKind}). Moved windows and unsupported client sizes are refused ({UiLayouts.SupportedText}). No input sent.",
                 false,
                 false,
-                "Close and reopen the dialog at its default position, or use a 2560x1440 client. Otherwise edit Triggers -> XS Scripts by hand (editor_dialog_act open gadget=ScriptManager + editor_screenshot), then verify with editor_xs_check scenarioPath=\"latest\" after saving."
+                "Close and reopen the dialog at its default position. Otherwise edit Triggers -> XS Scripts by hand (editor_dialog_act open gadget=ScriptManager + editor_screenshot), then verify with editor_xs_check scenarioPath=\"latest\" after saving."
             );
         var alternative = uiKind == AlternativeUi;
+        // Pixel constants were measured at 2560 wide; other 16:9 clients (1920×1080 session 3) scale them uniformly.
+        var scale = UiLayouts.Scale(Ui.ClientSize(game).Width);
+        var header = (int)Math.Round(AltListHeaderPx * scale);
         if (alternative)
-            list = [list[0], list[1] + AltListHeaderPx, list[2], list[3] - AltListHeaderPx];
+            list = [list[0], list[1] + header, list[2], list[3] - header];
         var rows = UiRead
             .Lines(game, list)
             .Where(l => l.Text.Trim().Length > 0)
@@ -279,7 +281,7 @@ internal sealed partial class Server
             uiKind,
             list,
             rows,
-            rows.Length >= list[3] / ScriptRowPitch,
+            rows.Length >= list[3] / Math.Max(1, ScriptRowPitch * scale),
             alternative
         );
     }
@@ -471,6 +473,7 @@ internal sealed partial class Server
         var steps = new List<object>();
         foreach (var name in names)
         {
+            ProgressReporter.Report(steps.Count, null, "scripts included");
             var before = ReadScripts(game);
             if (Matching(before, name).Length > 0)
             {

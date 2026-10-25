@@ -57,6 +57,7 @@ internal sealed partial class Server(
         "inspect",
         "validate",
         "patch",
+        "create",
         "export",
         "apply",
     ]; // Host workflow vocabulary.
@@ -156,6 +157,43 @@ internal sealed partial class Server(
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
+    /// <summary>Host policy: progress heartbeat period while a call runs; well under the 60 s default request timeout
+    /// of the pi MCP client (pi-mcp dist/client.js, re-armed on each notifications/progress).</summary>
+    const int ProgressIntervalMs = 10_000;
+
+    /// <summary>Sends notifications/progress every <see cref="ProgressIntervalMs"/> until <paramref name="work"/> ends,
+    /// so clients that re-arm their timeout on progress do not abort long calls. Progress is the heartbeat sequence
+    /// (strictly increasing, as MCP requires); the message carries the tool's latest <see cref="ProgressReporter"/> report.</summary>
+    /// <param name="server">Session that received the call.</param>
+    /// <param name="token">Client progress token from the request _meta.</param>
+    /// <param name="work">Running tool call.</param>
+    static async Task Heartbeat(McpServer server, ProgressToken token, Task work)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var sequence = 0;
+        while (await Task.WhenAny(work, Task.Delay(ProgressIntervalMs)) != work)
+        {
+            sequence++;
+            try
+            {
+                await server.NotifyProgressAsync(
+                    token,
+                    new ProgressNotificationValue
+                    {
+                        Progress = sequence,
+                        Message = ProgressReporter.Describe(clock.Elapsed),
+                    },
+                    cancellationToken: CancellationToken.None
+                );
+            }
+            catch (Exception e)
+                when (e is IOException or ObjectDisposedException or InvalidOperationException)
+            {
+                return; // Transport gone: the call still finishes; nothing to keep alive.
+            }
+        }
+    }
+
     /// <summary>Runs SDK stdio MCP until stdin EOF, then disposes the bridge.</summary>
     /// <remarks>Calls are serialized; cancellation never interrupts an in-flight native mutation.</remarks>
     public async Task RunAsync()
@@ -184,10 +222,15 @@ internal sealed partial class Server(
                             cancellationToken.ThrowIfCancellationRequested();
                             // Once started, finish bounded operations/cleanup even if cancelled.
                             var previous = _fullTools;
-                            var result = Call(
-                                request.Params.Name,
-                                JsonSerializer.SerializeToElement(request.Params.Arguments, Json)
+                            var arguments = JsonSerializer.SerializeToElement(
+                                request.Params.Arguments,
+                                Json
                             );
+                            ProgressReporter.Begin();
+                            var work = Task.Run(() => Call(request.Params.Name, arguments));
+                            if (request.Params.ProgressToken is { } progressToken)
+                                await Heartbeat(request.Server, progressToken, work);
+                            var result = await work;
                             if (previous != _fullTools)
                                 // Surface already changed; announce it even if caller cancels afterward.
                                 await request.Server.SendNotificationAsync(
@@ -790,6 +833,7 @@ internal sealed partial class Server(
                         is "inspect"
                             or "validate"
                             or "patch"
+                            or "create"
                 )
                 || (name == "editor_place_formation" && Formations.Preview(args));
 
@@ -1013,9 +1057,12 @@ internal sealed partial class Server(
         if (name == "editor_place_formation" && Formations.Preview(args))
             return Formations.PreviewResult(args);
         if (name == "editor_triggers" && ConnectionFree(name, args))
-            return String(args, "operation") == "patch"
-                ? TriggerCodec.Patch(args)
-                : TriggerCodec.Inspect(String(args, "path"), XsScripts.Report(args));
+            return String(args, "operation") switch
+            {
+                "patch" => TriggerCodec.Patch(args),
+                "create" => TriggerCodec.Create(args),
+                _ => TriggerCodec.Inspect(String(args, "path"), XsScripts.Report(args)),
+            };
         if (name == "editor_dependencies")
             return (_gameData ??= new GameDataCatalog()).Dependencies(exe, _layout.ExeSha256, args);
         if (GameDataCatalog.ToolKinds.TryGetValue(name, out var kind))
@@ -2109,8 +2156,14 @@ internal sealed partial class Server(
         // Same host page and reference-list bound as live-unit queries. IDs are current full live IDs, not scenario-name strings.
         yield return Spec(
             "editor_save_checkpoint",
-            "Save through native game writer to unique active-profile scenario staging file, verify stable l33t/zlib payload/decoded length, copy/hash-verify to caller-approved NEW absolute local .mythscn path. confirmWrite=true required. No overwrite option; original scenario files never silently overwritten. profileDirectory selects active scenario directory when ambiguous. Staging retained; native writer may change editor save-name/dirty state. Not semantic reload validation; never retry unknown outcomes.",
-            Props(("path", "string"), ("profileDirectory", "string"), ("confirmWrite", "boolean")),
+            "Save through native game writer to unique active-profile scenario staging file, verify stable l33t/zlib payload/decoded length, copy/hash-verify to caller-approved NEW absolute local .mythscn path. confirmWrite=true required. overwrite=true + expectedSha256 (current destination hash) replaces an existing checkpoint: DESTINATION_CHANGED on mismatch (preflight and again after the save), the old file moves to <id>\\scenario_backup (replacedBackupPath/replacedSha256) before the copy; never silent. profileDirectory selects active scenario directory when ambiguous. Staging retained in <id>\\scenario_backup after a verified copy (stays in scenario\\ for editor_export_recovery on failure); native writer may change editor save-name/dirty state. Not semantic reload validation; never retry unknown outcomes.",
+            Props(
+                ("path", "string"),
+                ("profileDirectory", "string"),
+                ("confirmWrite", "boolean"),
+                ("overwrite", "boolean"),
+                ("expectedSha256", "string")
+            ),
             ["path", "confirmWrite"]
         );
         yield return Spec(
@@ -2214,7 +2267,7 @@ internal sealed partial class Server(
         );
         yield return Spec(
             "editor_triggers",
-            "Inspect/validate/legacy-patch strict TR v12 single Always/CodeSnippet controllers; editor_trigger_list/edit handles read-only campaign/preview/new-file patch/clone. export verifies game-writer staging; apply replaces whole trigger set only after expectedSha256 for prepared file AND expectedLivePath/expectedLiveSha256 of reviewed game export; fresh game-written backup must match its trigger/camera semantics (export basenames differ). The game-written backup is moved to active-profile <id>\\trigger_backup and returned as backupPath. confirmDestructive=true, guarded round-trip of body/cameras (export-basename metadata may differ). No XS effect/persistence proof; no retry/rollback. autoBackup=true takes the backup itself (no expectedLive*); add expectedBasePath/expectedBaseSha256 (editor_trigger_edit basePath/baseSha256) so a live trigger set changed since that export is refused with LIVE_SOURCE_CHANGED listing differing triggers; without them lostUpdateCheck=\"skipped\". Import RESETS the scenario's Triggers->XS Scripts list (.trg carries none): inspect/validate/apply return xsScripts {warning, lastKnown (trigtemp.xs includes + newest profile save), sources, reAdd}; re-add the scripts before playtesting. apply needs scripts=\"restore\"|\"ignore\" whenever lastKnown is non-empty (refused otherwise). restore reads the Script Manager list first, then re-includes every lastKnown name that matched a listed row and verifies by OCR readback (result {apply, scriptRestore {snapshot, restored, unrestorable, list, verified, prefixMatched}}); normal and alternative UI at 2560x1440 only (otherwise refused before the apply, no input; the alternative UI clips list rows, so names match by start and verified stays false), unrestorable rows must be re-added by hand (editor_xs_scripts).",
+            "Inspect/validate/legacy-patch strict TR v12 single Always/CodeSnippet controllers (patch: optional expectedSha256 of path, SOURCE_CHANGED on mismatch); create writes a NEW controller .trg at path (name default \"AomMcp controller\", active/loop/code optional, confirmWrite) for empty trigger sets, then apply it; editor_trigger_list/edit handles read-only campaign/preview/new-file patch/clone. export verifies game-writer staging; apply replaces whole trigger set only after expectedSha256 for prepared file AND expectedLivePath/expectedLiveSha256 of reviewed game export; fresh game-written backup must match its trigger/camera semantics (export basenames differ). The game-written backup is moved to active-profile <id>\\trigger_backup and returned as backupPath. confirmDestructive=true, guarded round-trip of body/cameras (export-basename metadata may differ). No XS effect/persistence proof; no retry/rollback. autoBackup=true takes the backup itself (no expectedLive*); add expectedBasePath/expectedBaseSha256 (editor_trigger_edit basePath/baseSha256) so a live trigger set changed since that export is refused with LIVE_SOURCE_CHANGED listing differing triggers; without them lostUpdateCheck=\"skipped\". Import RESETS the scenario's Triggers->XS Scripts list (.trg carries none): inspect/validate/apply return xsScripts {warning, lastKnown (trigtemp.xs includes + newest profile save), sources, reAdd}; re-add the scripts before playtesting. apply needs scripts=\"restore\"|\"ignore\" whenever lastKnown is non-empty (refused otherwise). restore reads the Script Manager list first, then re-includes every lastKnown name that matched a listed row and verifies by OCR readback (result {apply, scriptRestore {snapshot, restored, unrestorable, list, verified, prefixMatched}}); normal and alternative UI at supported client sizes (2560x1440 and 1920x1080 live-verified, others best effort; moved dialog or unsupported size refused before the apply, no input; the alternative UI clips list rows, so names match by start and verified stays false), unrestorable rows must be re-added by hand (editor_xs_scripts).",
             new Dictionary<string, object>
             {
                 ["operation"] = new { type = "string", @enum = TriggerOperations },

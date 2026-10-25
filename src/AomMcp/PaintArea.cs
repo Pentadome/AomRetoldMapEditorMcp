@@ -717,9 +717,10 @@ internal sealed partial class Server
         ref int strokes
     )
     {
-        foreach (var stroke in plan)
+        for (var index = 0; index < plan.Count; index++)
         {
-            var points = AreaWorld(mask, stroke, scale);
+            ProgressReporter.Report(index, plan.Count, "area stroke");
+            var points = AreaWorld(mask, plan[index], scale);
             PaintChunks(
                 game,
                 points,

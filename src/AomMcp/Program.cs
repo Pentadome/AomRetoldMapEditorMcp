@@ -127,6 +127,7 @@ if (selfTest)
     ScenarioChecks.SelfTest();
     Formations.SelfTest();
     SceneGeometry.SelfTest();
+    ProgressReporter.SelfTest();
     using var native = new Bridge(bridge);
     native.SelfTest();
     if (localOnly)

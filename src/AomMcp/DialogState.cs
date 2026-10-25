@@ -230,8 +230,9 @@ internal static class DialogState
         /// <summary>Client pixels per 2560-reference pixel along y (differs from <see cref="Scale"/> off 16:9).</summary>
         internal double ScaleY => UiLayouts.ScaleY(Height);
 
-        /// <summary>True when signatures are reused on a derivable (unreviewed) client size: pixel actions are best effort.</summary>
-        internal bool BestEffort => !Exact && UiLayouts.IsDerivable(Width, Height);
+        /// <summary>True when signatures calibrated at another size are reused on a supported client (reviewed scene layout
+        /// without own dialog signatures, e.g. 1920×1080 in session 3, or derivable): pixel actions are best effort.</summary>
+        internal bool BestEffort => !Exact && UiLayouts.IsSupported(Width, Height);
 
         /// <summary>Score of one gadget's signature.</summary>
         internal Match? Find(string gadget) =>
@@ -292,7 +293,7 @@ internal static class DialogState
             warnings.Add(
                 $"Signatures calibrated at {set.Width}x{set.Height}; reused on {width}x{height} (signatureReviewed=false, points mapped per axis). "
                     + (
-                        UiLayouts.IsDerivable(width, height)
+                        UiLayouts.IsSupported(width, height)
                             ? "Pixel clicks/typing are best effort (layoutReviewed=false)."
                             : "Pixel clicks/typing refused."
                     )
@@ -412,6 +413,33 @@ internal static class DialogState
         };
     }
 
+    /// <summary>Shortest normalized label that may match with OCR edits on best-effort client sizes.</summary>
+    const int FuzzyLabelMinChars = 6;
+
+    /// <summary>Normalized label characters per tolerated OCR edit. Live 1920×1080 (session 3 follow-up, 2026-10-25):
+    /// "Include Script" read as "Inelude Seript" (2 edits in 13 characters).</summary>
+    const int FuzzyLabelCharsPerEdit = 6;
+
+    /// <summary>True when some window of <paramref name="read"/> lies within len/<see cref="FuzzyLabelCharsPerEdit"/>
+    /// Levenshtein edits of <paramref name="label"/> (both normalized). Used only for scaled (best-effort) signatures.</summary>
+    /// <param name="read">Normalized OCR text.</param>
+    /// <param name="label">Normalized expected label.</param>
+    internal static bool NearLabel(string read, string label)
+    {
+        if (label.Length < FuzzyLabelMinChars)
+            return false;
+        var edits = label.Length / FuzzyLabelCharsPerEdit;
+        for (var start = 0; start < read.Length; start++)
+        for (var length = label.Length - edits; length <= label.Length + edits; length++)
+            if (
+                length > 0
+                && start + length <= read.Length
+                && PlayerSettings.Distance(read.Substring(start, length), label) <= edits
+            )
+                return true;
+        return false;
+    }
+
     internal static string Norm(string? s) =>
         new((s ?? "").ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
 
@@ -437,10 +465,22 @@ internal static class DialogState
     /// <param name="read">OCR text of a possibly clipped row.</param>
     internal static bool StartsText(string typed, string read) =>
         Norm(read) is { Length: >= MinPrefixChars } observed
-        && MatchesVariant(
-            typed,
-            observed,
-            (candidate, seen) => candidate.StartsWith(seen, StringComparison.Ordinal)
+        && (
+            MatchesVariant(
+                typed,
+                observed,
+                (candidate, seen) => candidate.StartsWith(seen, StringComparison.Ordinal)
+            )
+            // The clip edge may cut the last glyph (alternative UI 1920x1080, 2026-10-25: "aommcp_probe.xs" read as
+            // "aommcp_prok"), so its read is unreliable; the rest must still match.
+            || (
+                observed.Length > MinPrefixChars
+                && MatchesVariant(
+                    typed,
+                    observed[..^1],
+                    (candidate, seen) => candidate.StartsWith(seen, StringComparison.Ordinal)
+                )
+            )
         );
 
     /// <summary>True when OCR text lies inside typed text (a text field shows only the part around its caret, and OCR may drop or
@@ -1708,7 +1748,10 @@ internal static class DialogState
         var own = assigned.GetValueOrDefault(control) ?? [];
         var labelVerified =
             label.Length >= 2
-            && own.Any(l => Norm(l.Text).Contains(label, StringComparison.Ordinal));
+            && own.Any(l =>
+                Norm(l.Text).Contains(label, StringComparison.Ordinal)
+                || (o.BestEffort && NearLabel(Norm(l.Text), label))
+            );
         if (label.Length >= 2 && !labelVerified)
             throw new WorkflowFailure(
                 "LABEL_NOT_VERIFIED",
@@ -1967,11 +2010,24 @@ internal static class DialogState
     /// <summary>Self-test sample: a read shorter than <see cref="MinPrefixChars"/> normalized characters.</summary>
     const string SampleTooShortRead = "om";
 
+    /// <summary>Self-test sample: a probe script name as typed (live alternative UI 1920x1080, 2026-10-25).</summary>
+    const string SampleProbe = "aommcp_probe.xs";
+
+    /// <summary>Self-test sample: how the alternative-UI list clipped <see cref="SampleProbe"/>, last glyph cut (live 2026-10-25).</summary>
+    const string SampleProbeClippedRead = "aommcp_prok";
+
     /// <summary>Self-test sample: the popup field's visible part of <see cref="SampleModifiers"/>, OCR-misread (live 2026-10-14).</summary>
     const string SampleModifiersFieldRead = "wrket _modifiers.x$";
 
     internal static void SelfTest()
     {
+        // Live 1920×1080 OCR misread; short labels and unrelated text stay refused.
+        if (
+            !NearLabel(Norm("Inelude Seript"), Norm("Include Script"))
+            || NearLabel(Norm("Remove Script"), Norm("Include Script"))
+            || NearLabel(Norm("Oh"), Norm("OK"))
+        )
+            throw new InvalidOperationException("Dialog fuzzy label self-test failed.");
         var sets = LoadAll(Path.Combine(AppContext.BaseDirectory, "uilayouts"));
         var normal =
             sets.SingleOrDefault(s => s.UiKind == "normal" && s.Width == 2560)
@@ -2025,6 +2081,8 @@ internal static class DialogState
             !StartsText(SampleDiffBonus, SampleDiffBonusClippedRead)
             || StartsText(SampleModifiers, SampleDiffBonusClippedRead)
             || StartsText(SampleDiffBonus, SampleTooShortRead)
+            || !StartsText(SampleProbe, SampleProbeClippedRead)
+            || StartsText(SampleModifiers, SampleProbeClippedRead)
             || !InsideText(SampleModifiers, SampleModifiersFieldRead)
             || InsideText(SampleDiffBonus, SampleModifiersFieldRead)
         )

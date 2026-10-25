@@ -281,3 +281,32 @@ Facts found while building them:
   the label; the list starts ~30% in) and read back. A single-digit seed ("5") OCRs as "n": seeds are refused only
   when the field reads a different number, otherwise reported `seedVerified:false`.
 * The catalog size radio-set rect (469..517 at 900 px) covers only Normal and half of Large; rows are at y 490/519/548.
+
+## Session 3 fixes (live 2026-10-25, build 100.19.17020.0, 1920×1080 normal and alternative UI; plan `plans/wake-session-3-fixes.md`)
+
+* Progress: with `_meta.progressToken` the host sends `notifications/progress` every 10 s while a call runs
+  (`progress` strictly increasing, message = last `ProgressReporter.Report` + elapsed). Seen live at 10/20 s on
+  `editor_elevation`/`editor_stroke` calls of 13–26 s. Cancellation still never interrupts in-flight native work.
+* Camera clamp: on a 256×256 map the normal UI pinned the camera at (3.64, 3.64) for target (0,0). A target click
+  without effect is followed by an inward probe click (20 world units); when the probe moves the camera the target
+  is re-clicked and the result is `atLimit:true`, `reachable`, `withinTolerance:false` (no `MINIMAP_NO_EFFECT`).
+  Alternative UI: the minimap corner pixel (1739,1048) is dead (no camera move even from x=113); the return click
+  therefore walks 3 px steps from the target pixel toward the probe pixel until the camera moves (reached (5.3, 2.0)).
+* Flatten `height`: `editor_elevation flatten height=7` reached 7.03 (normal) / 7.02 (alternative), 81/81 nodes;
+  `editor_stroke tool=flatten height=6` sampled 6.009 (normal) / 5.963 (alternative). The exact-height sampler is
+  pixel-quantized: on one alternative-UI bump adjacent pixels sampled 7.126/6.948 for target 7 (0.18 per pixel),
+  so `SetSample` now retries the slopes +X, +Z, −X, −Z of the same bump (`slopes` in the step) before
+  `SAMPLE_NOT_CONVERGED`. The fallback directions were not needed in the passing runs (untested live).
+* Checkpoints: the game writer leaves an empty `<stem>.bak` next to each save; after the verified copy both the
+  staging `.mythscn` and its `.bak` move to `<id>\scenario_backup`. `overwrite=true` + stale `expectedSha256`
+  refused `DESTINATION_CHANGED` before any game call; the matching hash moved the old file to
+  `scenario_backup\AomMcp-checkpoint-replaced-<stamp>-<id>.mythscn` and wrote the new one. 47 older
+  `AomMcp-checkpoint-*` files from earlier sessions remain in `scenario\` (not moved automatically).
+* Playtest: start/quit on both UIs with `expectedPid`/`expectedWindowThread` (a wrong value is refused before
+  input); verification gates matched 5/5 (playing) and 14/14 (normal) / 5/5 (alternative) on return. The session 3
+  false `PLAYTEST_OUTCOME_UNKNOWN` did not reproduce on a blank scene, so the tolerant path (±10 per channel,
+  80 % of pixels, `gate.mismatches`) is not live-exercised by a real mismatch.
+* Script Manager at 1920×1080 runs on the 2560 signatures scaled (score 1.0, `bestEffort`). OCR of the small
+  button label read "Inelude Seript": scaled sizes accept labels of ≥6 normalized characters within one edit per
+  6 characters. Alternative UI clips list rows and cut the last glyph ("aommcp_probe.xs" → "aommcp_prok"): clipped
+  rows also match with the last read glyph dropped. include/verify/remove live-verified on both UIs.

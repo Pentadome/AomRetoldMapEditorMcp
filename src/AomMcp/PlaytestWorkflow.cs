@@ -64,7 +64,54 @@ internal sealed class PlaytestWorkflow
 
         /// <summary>Game executable path (stock AI root for dialog source excerpts), when readable.</summary>
         internal string? Exe { get; set; }
+
+        /// <summary>Last verification gate report (matched/total/mismatches), null before the first verification.</summary>
+        internal GateReport? Gate { get; set; }
     }
+
+    /// <summary>Result of one pixel gate check.</summary>
+    /// <param name="Matched">Gate pixels within <see cref="GateChannelTolerance"/> on every channel.</param>
+    /// <param name="Total">Gate pixels.</param>
+    /// <param name="Mismatches">Failing pixels {x, y, expected [r,g,b], actual [r,g,b]}.</param>
+    internal sealed record GateReport(int Matched, int Total, object[] Mismatches);
+
+    /// <summary>Per-channel gate tolerance, same as the dialog signatures' "tolerance" (uilayouts/dialogs-*.json).</summary>
+    internal const int GateChannelTolerance = 10;
+
+    /// <summary>Fraction of verification-gate pixels (playing/editor gate after a transition) that must match, same as
+    /// the dialog signatures' "openFraction" (uilayouts/dialogs-*.json). Session 3: the quit back to the editor failed the
+    /// all-pixel editor gate although the editor was back. Click-precondition gates still need every pixel.</summary>
+    internal const double GateMatchFraction = 0.8;
+
+    /// <summary>Chat cheat: removes the black map and disables fog of war; typing it again re-enables both
+    /// (source: user-provided, AoM Retold).</summary>
+    internal const string ClearSkiesCheat = "CLEAR SKIES";
+
+    /// <summary>Chat cheat: reveals the map, a returning cheat from the original game (source: user-provided, AoM Retold).</summary>
+    internal const string LayOfTheLandCheat = "LAY OF THE LAND";
+
+    /// <summary>Playing-state hints: editor reads do not work during a playtest (session 3: editor_units → NOT_IN_EDITOR).</summary>
+    internal static readonly object PlayingHints = new
+    {
+        cheats = new[]
+        {
+            new
+            {
+                code = ClearSkiesCheat,
+                effect = "Removes the black map and disables fog of war; typing it again re-enables both.",
+            },
+            new
+            {
+                code = LayOfTheLandCheat,
+                effect = "Reveals the map (returning cheat from the original game).",
+            },
+        },
+        howTo = "Type a cheat in chat: Enter, the code, Enter (editor_key ENTER, editor_text, editor_key ENTER). Check the result with editor_screenshot.",
+        editorReads = "Editor read tools (editor_units, editor_terrain_info, ...) answer NOT_IN_EDITOR during a playtest; use screenshots, then quit.",
+    };
+
+    /// <summary>Floating-point slack when turning a fraction into a pixel count (0.8 × 15 is 12.000000000000002).</summary>
+    const double FractionEpsilon = 1e-9;
 
     /// <summary>Thrown inside a gate wait when an error dialog was read; ends the wait without input.</summary>
     sealed class DialogShown : Exception;
@@ -169,9 +216,26 @@ internal sealed class PlaytestWorkflow
                     "confirmPlaytest",
                     "timeoutMs",
                 ],
-                "inspect" => ["operation", "token"],
-                "quit" => ["operation", "token", "confirmQuit", "timeoutMs"],
-                "dismiss" => ["operation", "token", "confirmDismiss", "timeoutMs"],
+                // Session 3: start returns the identity, so callers echo expectedPid/expectedWindowThread on later calls.
+                "inspect" => ["operation", "token", "expectedPid", "expectedWindowThread"],
+                "quit" =>
+                [
+                    "operation",
+                    "token",
+                    "confirmQuit",
+                    "timeoutMs",
+                    "expectedPid",
+                    "expectedWindowThread",
+                ],
+                "dismiss" =>
+                [
+                    "operation",
+                    "token",
+                    "confirmDismiss",
+                    "timeoutMs",
+                    "expectedPid",
+                    "expectedWindowThread",
+                ],
                 _ => throw new ArgumentException("operation: preview/start/inspect/dismiss/quit"),
             }
         );
@@ -304,6 +368,7 @@ internal sealed class PlaytestWorkflow
         if (operation is "inspect" or "quit" or "dismiss")
         {
             var session = RequireToken(args.GetProperty("token").GetString()!);
+            RequireIdentity(args, session.Identity);
             if (operation == "quit" && session.State != "playing")
                 throw new ArgumentException(
                     "Unknown/inactive session cannot authorize Quit input."
@@ -389,6 +454,7 @@ internal sealed class PlaytestWorkflow
             return Describe(_session);
         }
         var session = RequireToken(args.GetProperty("token").GetString()!);
+        RequireIdentity(args, session.Identity);
         if (
             operation == "inspect"
             && session.State is not "playing" and not "returned" and not "dialog"
@@ -424,14 +490,24 @@ internal sealed class PlaytestWorkflow
                 if (session.State == "returned")
                 {
                     CheckIdentity(session.Identity, Observe(current, session.Profile, true));
-                    RequirePixels(current, session.Profile, session.Profile.EditorGate);
+                    session.Gate = RequirePixels(
+                        current,
+                        session.Profile,
+                        session.Profile.EditorGate,
+                        GateMatchFraction
+                    );
                     return Describe(session);
                 }
                 // Playing or dialog: a modal error dialog hides the playing gate, so read it first (read-only OCR).
                 if (ReadDialog(current, session))
                     return Describe(session);
                 CheckIdentity(session.Identity, Observe(current, session.Profile, false));
-                RequirePixels(current, session.Profile, session.Profile.PlayingGate);
+                session.Gate = RequirePixels(
+                    current,
+                    session.Profile,
+                    session.Profile.PlayingGate,
+                    GateMatchFraction
+                );
                 if (session.State == "dialog")
                 {
                     Advance(session, "playing");
@@ -455,6 +531,25 @@ internal sealed class PlaytestWorkflow
         return Describe(session);
     }
 
+    /// <summary>Optional expectedPid/expectedWindowThread on inspect/quit/dismiss must equal the session identity
+    /// (refused before any input).</summary>
+    /// <param name="args">Tool arguments.</param>
+    /// <param name="identity">Identity recorded at start.</param>
+    static void RequireIdentity(JsonElement args, Identity identity)
+    {
+        if (args.TryGetProperty("expectedPid", out var pid) && pid.GetUInt32() != identity.Pid)
+            throw new ArgumentException(
+                $"expectedPid {pid.GetUInt32()} differs from the session process {identity.Pid}; no input."
+            );
+        if (
+            args.TryGetProperty("expectedWindowThread", out var thread)
+            && thread.GetUInt32() != identity.Thread
+        )
+            throw new ArgumentException(
+                $"expectedWindowThread {thread.GetUInt32()} differs from the session window thread {identity.Thread}; no input."
+            );
+    }
+
     Session RequireToken(string token) =>
         _session is { } session && string.Equals(session.Token, token, StringComparison.Ordinal)
             ? session
@@ -476,9 +571,20 @@ internal sealed class PlaytestWorkflow
             uiKind = session.Profile.Interface,
             dialog = session.State == "dialog" ? session.DialogView : null,
             dismissed = session.Dismissed,
+            gate = session.Gate is { } gate
+                ? new
+                {
+                    gate.Matched,
+                    gate.Total,
+                    gate.Mismatches,
+                    channelTolerance = GateChannelTolerance,
+                    requiredFraction = GateMatchFraction,
+                }
+                : null,
             compileEvidence = session.State is "prepared"
                 ? null
                 : XsDiagnostics.PlaytestEvidence(session.StartedAtUtc.UtcDateTime),
+            hints = session.State == "playing" ? PlayingHints : null,
             next = session.State == "dialog"
                 ? "Fix the reported script in the editor later; now dismiss (confirmDismiss) to continue loading, inspect/dismiss further dialogs, then quit."
                 : null,
@@ -573,7 +679,12 @@ internal sealed class PlaytestWorkflow
                     try
                     {
                         CheckIdentity(session.Identity, Observe(game, session.Profile, false));
-                        RequirePixels(game, session.Profile, session.Profile.PlayingGate);
+                        session.Gate = RequirePixels(
+                            game,
+                            session.Profile,
+                            session.Profile.PlayingGate,
+                            GateMatchFraction
+                        );
                         Advance(session, "playing");
                         session.Dialog = null;
                         session.DialogView = null;
@@ -748,19 +859,57 @@ internal sealed class PlaytestWorkflow
             );
     }
 
-    static void RequirePixels(Game game, Profile profile, Pixel[] gate)
+    /// <summary>Scores a gate on a BGRA image: a pixel matches when every channel is within <see cref="GateChannelTolerance"/>.</summary>
+    /// <param name="bgra">Client pixels, BGRA rows.</param>
+    /// <param name="width">Image width.</param>
+    /// <param name="gate">Reviewed gate pixels.</param>
+    internal static GateReport GateMatch(byte[] bgra, int width, Pixel[] gate)
+    {
+        var mismatches = new List<object>();
+        foreach (var p in gate)
+        {
+            var i = (p.Y * width + p.X) * 4;
+            byte r = bgra[i + 2],
+                g = bgra[i + 1],
+                b = bgra[i];
+            if (
+                Math.Abs(r - p.R) > GateChannelTolerance
+                || Math.Abs(g - p.G) > GateChannelTolerance
+                || Math.Abs(b - p.B) > GateChannelTolerance
+            )
+                mismatches.Add(
+                    new
+                    {
+                        x = p.X,
+                        y = p.Y,
+                        expected = new[] { p.R, p.G, p.B },
+                        actual = new[] { r, g, b },
+                    }
+                );
+        }
+        return new(gate.Length - mismatches.Count, gate.Length, [.. mismatches]);
+    }
+
+    /// <summary>Captures the client and requires the gate: all pixels (default, click preconditions) or at least
+    /// <paramref name="fraction"/> of them (transition verification; memory guards stay strict in <see cref="Observe"/>).</summary>
+    /// <param name="game">Connected game.</param>
+    /// <param name="profile">Registered profile.</param>
+    /// <param name="gate">Gate pixels.</param>
+    /// <param name="fraction">Required matched fraction.</param>
+    /// <returns>Gate report (mismatches may be non-empty when tolerated).</returns>
+    static GateReport RequirePixels(Game game, Profile profile, Pixel[] gate, double fraction = 1)
     {
         var image = Ui.CapturePixels(game, profile.Width);
         if (image.Width != profile.Width || image.Height != profile.Height)
             throw new InvalidDataException("Playtest screenshot size changed.");
-        foreach (var p in gate)
-        {
-            var i = (p.Y * image.Width + p.X) * 4;
-            if (image.Bgra[i + 2] != p.R || image.Bgra[i + 1] != p.G || image.Bgra[i] != p.B)
-                throw new InvalidDataException(
-                    "Playtest pixel gate mismatch; no guessed UI input."
-                );
-        }
+        var report = GateMatch(image.Bgra, image.Width, gate);
+        if (report.Matched < Math.Ceiling(report.Total * fraction - FractionEpsilon))
+            throw new InvalidDataException(
+                $"Playtest pixel gate mismatch ({report.Matched}/{report.Total} match, need {fraction:P0}): "
+                    + JsonSerializer.Serialize(report.Mismatches)
+                    + "; no guessed UI input."
+            );
+        return report;
     }
 
     static void Click(Game game, Session session, Step step)
@@ -901,10 +1050,11 @@ internal sealed class PlaytestWorkflow
                     try
                     {
                         CheckIdentity(session.Identity, Observe(game, session.Profile, returned));
-                        RequirePixels(
+                        session.Gate = RequirePixels(
                             game,
                             session.Profile,
-                            returned ? session.Profile.EditorGate : session.Profile.PlayingGate
+                            returned ? session.Profile.EditorGate : session.Profile.PlayingGate,
+                            GateMatchFraction
                         );
                         CheckIdentity(session.Identity, Observe(game, session.Profile, returned));
                     }
@@ -940,6 +1090,22 @@ internal sealed class PlaytestWorkflow
 
     internal static void SelfTest()
     {
+        // Gate tolerance: one pixel within the channel tolerance, one off by more; 1 of 2 match.
+        Pixel[] probe = [new(0, 0, 100, 100, 100), new(1, 0, 50, 50, 255)];
+        byte[] gateBgra =
+        [
+            100,
+            100,
+            100 + GateChannelTolerance,
+            0,
+            255,
+            50,
+            50 + GateChannelTolerance + 1,
+            0,
+        ];
+        var gateReport = GateMatch(gateBgra, 2, probe);
+        if (gateReport.Matched != 1 || gateReport.Total != 2 || gateReport.Mismatches.Length != 1)
+            throw new InvalidOperationException("Playtest gate tolerance self-test failed.");
         var workflow = new PlaytestWorkflow();
         var called = false;
         try
