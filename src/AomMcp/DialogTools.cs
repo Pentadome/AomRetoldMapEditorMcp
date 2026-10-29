@@ -9,6 +9,7 @@ internal sealed partial class Server
     {
         DialogState.StateTool,
         DialogState.ActTool,
+        DialogCalibration.Tool,
     };
     static readonly string[] DialogActRequired = ["gadget", "action"];
     DialogState.SignatureSet[]? _dialogSignatures; // Shipped calibrated signatures; immutable per host.
@@ -17,6 +18,8 @@ internal sealed partial class Server
     {
         if (name == DialogState.ActTool)
             DialogState.Preflight(args);
+        if (name == DialogCalibration.Tool)
+            DialogCalibration.Preflight(args);
     }
 
     DialogState.Dialogs DialogMetadata()
@@ -51,7 +54,50 @@ internal sealed partial class Server
             expression => _bridge.Execute(game, expression),
             () => RequireNoCursor(game)
         );
+        if (name == DialogCalibration.Tool)
+        {
+            var result = DialogCalibration.Calibrate(
+                game,
+                _layout.ExeSha256,
+                metadata,
+                _dialogSignatures,
+                native,
+                (x, z) => CameraLookAt(game, x, z, CalibrationLookTolerance, CalibrationLookClicks),
+                args
+            );
+            _dialogSignatures = null; // Reload: the new file is used from the next dialog call on.
+            return result;
+        }
         return DialogState.Act(game, _layout.ExeSha256, metadata, _dialogSignatures, native, args);
+    }
+
+    /// <summary>Camera centring tolerance (world units) of the calibration poses (same as the paint camera,
+    /// WorldTools.Screen).</summary>
+    const double CalibrationLookTolerance = 2;
+
+    /// <summary>Minimap click budget of one calibration pose (same as the paint camera, WorldTools.Screen).</summary>
+    const int CalibrationLookClicks = 4;
+
+    /// <summary>editor_dialog_calibrate spec (full toolset only).</summary>
+    static IEnumerable<object> DialogFullExtras()
+    {
+        yield return Spec(
+            DialogCalibration.Tool,
+            "Record open-dialog pixel signatures for the CURRENT UI kind (normal/alternative, pixel-gated) and client size into a NEW uilayouts/dialogs-<normal|alt>-en-<W>x<H>.json (refuses FILE_EXISTS before any input; never overwrites). Per gadget (default: every gadget of the shipped signature sets that this UI's catalog resolves; or gadgets=[...]) at four camera poses (map centre, both corners, a quarter point): gadgetReal, capture, gadgetUnreal with the catalog close names (verified by pixels; DIALOG_STILL_OPEN stops without writing). Keeps up to 24 points per gadget that are stable across poses while the background behind them changed (opacity proof), differ from a fresh pre-open frame (ambient motion such as cloud shadows masked out), are not dark (max channel <= 40: off-map void, modal dim), avoid catalog control rects (state-dependent colours) and are unique against the other gadgets' open frames (shared chrome only while each rival matches <30%). Reports per gadget ownScore/maxClosedScore/maxRivalScore and skipped gadgets (no visible window). Moves the camera (restored to its start) and opens/closes dialogs; no scenario data changes. Close all dialogs first. Takes minutes (progress notifications). The host loads the file at once; copy it into the repository uilayouts/ to ship it.",
+            new Dictionary<string, object>
+            {
+                ["gadgets"] = new
+                {
+                    type = "array",
+                    items = new { type = "string" },
+                    minItems = 1,
+                },
+            },
+            [],
+            false,
+            false,
+            false
+        );
     }
 
     static IEnumerable<object> DialogExtras()

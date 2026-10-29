@@ -434,17 +434,19 @@ internal sealed partial class Server
             "expectedTriggerSha256",
             "token"
         );
-        play["operation"] = WEnum("preview", "start", "inspect", "dismiss", "quit");
+        play["operation"] = WEnum("preview", "start", "inspect", "dismiss", "quit", "cheat");
         play["expectedPid"] = WInt(1);
         play["expectedWindowThread"] = WInt(1);
-        play["timeoutMs"] = WInt(1000, 15_000);
+        play["timeoutMs"] = WInt(PlaytestWorkflow.MinTimeoutMs, PlaytestWorkflow.MaxTimeoutMs);
         play["confirmDisposableScene"] = WBool();
         play["confirmPlaytest"] = WBool();
         play["confirmQuit"] = WBool();
         play["confirmDismiss"] = WBool();
+        play["code"] = WEnum(PlaytestWorkflow.AllowedCheats);
+        play["confirmCheat"] = WBool();
         yield return Spec(
             "editor_playtest",
-            "FULL ONLY. Fail-closed host-owned UI Play/Quit sessions; preview metadata needs no game. Start requires registered pinned build/language/interface/client pixel profile, explicit PID/thread/build, fresh disposable checkpoint/TR and retained original checkpoint/hash, confirmDisposableScene + confirmPlaytest. Saved/live tuples verified, not assumed persistent. Inspect/quit need THIS host token; only known playing token + confirmQuit authorizes narrow outside-editor Quit. Mode/pixel checks, bounded reads, no input retry/rollback/cleanup/load/native start. Registered profiles: uilayouts/playtest-{alt,normal}-en-{2560x1440,1920x1080}.json (English, Player1/Standard); other clients/languages refused before connection/input. Trigger/AI compile errors block loading with a modal \"Trigger Error.\" dialog that MythLog does not record: start/inspect read it by OCR (state \"dialog\", dialog.parsed[{file,line,code,message,source}], compileEvidence = MythLog + trigtemp.xs freshness); dismiss (token + confirmDismiss) re-reads the same dialog and clicks its OK/Next/Close, then reports the next dialog or the playing gate. Dialog reading live-verified on normal UI 2560x1440 only. Telemetry/gameplay/reload evidence unavailable; no dialog is not proof of compilation.",
+            "FULL ONLY. Fail-closed host-owned UI Play/Quit sessions; preview metadata needs no game. Start requires registered pinned build/language/interface/client pixel profile, explicit PID/thread/build, fresh disposable checkpoint/TR and retained original checkpoint/hash, confirmDisposableScene + confirmPlaytest. Saved/live tuples verified, not assumed persistent. Inspect/quit need THIS host token; only known playing token + confirmQuit authorizes narrow outside-editor Quit. Mode/pixel checks, bounded reads, no input retry/rollback/cleanup/load/native start. Registered profiles: uilayouts/playtest-{alt,normal}-en-{2560x1440,1920x1080}.json (English, Player1/Standard); other clients/languages refused before connection/input. Trigger/AI compile errors block loading with a modal \"Trigger Error.\" dialog that MythLog does not record: start/inspect read it by OCR (state \"dialog\", dialog.parsed[{file,line,code,message,source}], compileEvidence = MythLog + trigtemp.xs freshness); dismiss (token + confirmDismiss) re-reads the same dialog and clicks its OK/Next/Close, then reports the next dialog or the playing gate. Dialog reading live-verified on normal UI 2560x1440 only. Unknown outcomes: inspect re-observes read-only (identity + editor flag + gate) and recovers to returned (editor gate >= 80%) or playing (every playing-gate pixel); start first runs the same recovery. profilePath also accepts the registered id uilayouts/<file>; preview may omit expectedProfileSha256 and returns it. cheat (token + playing + confirmCheat, code CLEAR SKIES or LAY OF THE LAND) types Enter, code, Enter in chat with identity/playing-gate checks; verify with editor_screenshot. Scene check ignores Gaia (player 0) positions (mobile units) and names mismatching units. Default transition wait 30 s (max 60 s). Telemetry/gameplay/reload evidence unavailable; no dialog is not proof of compilation.",
             play,
             ["operation"]
         );

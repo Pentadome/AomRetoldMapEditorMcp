@@ -1240,9 +1240,11 @@ try:
     core_native = {'editor_undo', 'editor_redo', 'editor_uiClearSelection', 'editor_uiSelectType',
                    'editor_uiLookAtAndSelectUnit', 'editor_uiSetCameraStartLoc', 'editor_saveScenario',
                    'editor_uiLoadTriggers', 'editor_uiSaveTriggers'}
-    expected_core = (helper_names - (workflow_names - core_workflow)) | core_native
-    assert len(expected_core) == 95 and len(names) == 945
-    assert {'editor_dialog_state', 'editor_dialog_act', 'editor_xs_scripts'} <= expected_core
+    full_only_helpers = {'editor_dialog_calibrate'}  # full-only helpers outside the workflow capability list
+    expected_core = (helper_names - (workflow_names - core_workflow) - full_only_helpers) | core_native
+    assert len(expected_core) == 96 and len(names) == 947
+    assert {'editor_dialog_state', 'editor_dialog_act', 'editor_xs_scripts', 'editor_camera_start'} <= expected_core
+    assert 'editor_dialog_calibrate' not in expected_core
     # XS Scripts list preflight refuses before any game connection.
     preflight_refusal_xs = [
         {'operation': 'include', 'names': ['a.xs']},

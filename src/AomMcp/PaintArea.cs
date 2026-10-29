@@ -9,7 +9,19 @@ namespace AomMcp;
 internal sealed partial class Server
 {
     /// <summary>editor_paint_area kinds (host API subset of <see cref="PaintKinds"/> with tile readback).</summary>
-    static readonly string[] AreaPaintKinds = ["texture", "water", "forest"];
+    static readonly string[] AreaPaintKinds = ["texture", "mix", "water", "forest"];
+
+    /// <summary>band.distanceTo values: distance from live water tiles or from dry (land) tiles.</summary>
+    static readonly string[] BandTargets = ["water", "land"];
+
+    /// <summary>Required properties of the band argument.</summary>
+    static readonly string[] BandRequired = ["distanceTo", "maxTiles"];
+
+    /// <summary>Largest band distance in tiles (host bound: wider bands are ordinary shapes).</summary>
+    const int MaxBandTiles = 32;
+
+    /// <summary>Directory below generated/data holding the exported mix definitions (editor_generate_catalog).</summary>
+    const string MixDirectory = "mixes";
 
     /// <summary>Required arguments of editor_paint_area.</summary>
     static readonly string[] PaintAreaRequired = ["kind", "type", "shapes"];
@@ -95,6 +107,140 @@ internal sealed partial class Server
             }
         if (args.GetProperty("shapes").GetArrayLength() == 0)
             throw new ArgumentException("shapes: at least one shape.");
+        if (args.TryGetProperty("band", out var band))
+            _ = ParseBand(band);
+    }
+
+    /// <summary>Coast band filter: area tiles whose 8-connected tile distance to the nearest live water (or land) tile
+    /// lies in [Min, Max]; distance 0 is a water (land) tile itself.</summary>
+    /// <param name="To">"water" or "land".</param>
+    /// <param name="Min">Smallest distance in tiles.</param>
+    /// <param name="Max">Largest distance in tiles.</param>
+    internal sealed record Band(string To, int Min, int Max);
+
+    /// <summary>Parses and checks the band argument.</summary>
+    /// <param name="band">band object.</param>
+    static Band ParseBand(JsonElement band)
+    {
+        Catalog.ValidateObject(band, ["distanceTo", "minTiles", "maxTiles"]);
+        var to = band.TryGetProperty("distanceTo", out var t) ? t.GetString() : null;
+        if (to is null || !BandTargets.Contains(to, StringComparer.Ordinal))
+            throw new ArgumentException("band.distanceTo: water or land.");
+        var min = band.TryGetProperty("minTiles", out var lo) ? lo.GetInt32() : 0;
+        var max = band.TryGetProperty("maxTiles", out var hi)
+            ? hi.GetInt32()
+            : throw new ArgumentException("band.maxTiles required.");
+        if (min < 0 || max > MaxBandTiles || min > max)
+            throw new ArgumentException($"band: 0 <= minTiles <= maxTiles <= {MaxBandTiles}.");
+        return new(to, min, max);
+    }
+
+    /// <summary>Multi-source 8-connected (Chebyshev step) tile distance from every source tile; int.MaxValue where no
+    /// source exists.</summary>
+    /// <param name="source">Source tiles (distance 0).</param>
+    internal static int[,] TileDistances(bool[,] source)
+    {
+        int w = source.GetLength(0),
+            h = source.GetLength(1);
+        var distance = new int[w, h];
+        var queue = new Queue<(int X, int Z)>();
+        for (var x = 0; x < w; x++)
+        for (var z = 0; z < h; z++)
+        {
+            distance[x, z] = source[x, z] ? 0 : int.MaxValue;
+            if (source[x, z])
+                queue.Enqueue((x, z));
+        }
+        while (queue.Count > 0)
+        {
+            var (x, z) = queue.Dequeue();
+            for (var dx = -1; dx <= 1; dx++)
+            for (var dz = -1; dz <= 1; dz++)
+            {
+                int nx = x + dx,
+                    nz = z + dz;
+                if (nx < 0 || nz < 0 || nx >= w || nz >= h || distance[nx, nz] != int.MaxValue)
+                    continue;
+                distance[nx, nz] = distance[x, z] + 1;
+                queue.Enqueue((nx, nz));
+            }
+        }
+        return distance;
+    }
+
+    /// <summary>Keeps only area tiles inside the band (live water grid at call time).</summary>
+    /// <param name="mask">Area mask.</param>
+    /// <param name="tiles">Live tiles.</param>
+    /// <param name="band">Band filter.</param>
+    /// <returns>Filtered mask and the number of area tiles the band removed.</returns>
+    static (AreaMask Mask, int Removed) ApplyBand(AreaMask mask, LiveWorld.Tiles tiles, Band band)
+    {
+        var source = new bool[tiles.TilesX, tiles.TilesZ];
+        for (var x = 0; x < tiles.TilesX; x++)
+        for (var z = 0; z < tiles.TilesZ; z++)
+            source[x, z] = (tiles.WaterName(tiles.At(x, z)) is not null) == (band.To == "water");
+        var distance = TileDistances(source);
+        var inside = (bool[,])mask.Inside.Clone();
+        var removed = 0;
+        for (var i = 0; i < mask.W; i++)
+        for (var j = 0; j < mask.H; j++)
+        {
+            if (!inside[i, j])
+                continue;
+            int x = mask.X0 + i,
+                z = mask.Z0 + j;
+            var d =
+                x >= 0 && z >= 0 && x < tiles.TilesX && z < tiles.TilesZ
+                    ? distance[x, z]
+                    : int.MaxValue;
+            if (d >= band.Min && d <= band.Max)
+                continue;
+            inside[i, j] = false;
+            removed++;
+        }
+        return (mask with { Inside = inside }, removed);
+    }
+
+    /// <summary>Live texture names a mix paints: its &lt;paint&gt;&lt;texture&gt; paths (generated/data/mixes) matched
+    /// to live texture names by normalized file name ("greek\greek_grass_rocks_2" ↔ "Greek Grass Rocks 2").</summary>
+    /// <param name="title">Mix title.</param>
+    /// <param name="names">Live catalogs.</param>
+    /// <returns>Mapped live names and the mix texture paths without a live name.</returns>
+    static (HashSet<string> Live, string[] Unmapped) MixTextures(
+        string title,
+        LiveWorld.Catalogs names
+    )
+    {
+        var live = new HashSet<string>(StringComparer.Ordinal);
+        var unmapped = new List<string>();
+        var byNorm = names
+            .Subtypes.SelectMany(n => n)
+            .Where(n => n.Length > 0)
+            .GroupBy(Norm)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        for (DirectoryInfo? d = new(AppContext.BaseDirectory); d != null; d = d.Parent)
+        {
+            var dir = Path.Combine(d.FullName, "generated", "data", MixDirectory);
+            if (!Directory.Exists(dir))
+                continue;
+            foreach (var file in Directory.GetFiles(dir, "*.xml"))
+            {
+                var root = System.Xml.Linq.XDocument.Load(file).Root;
+                if (root?.Element("title")?.Value.Trim() != title)
+                    continue;
+                foreach (var t in root.Element("paint")?.Elements("texture") ?? [])
+                {
+                    var path = t.Value.Trim();
+                    var leaf = path[(path.LastIndexOfAny(['\\', '/']) + 1)..];
+                    if (byNorm.TryGetValue(Norm(leaf), out var name))
+                        live.Add(name);
+                    else
+                        unmapped.Add(path);
+                }
+            }
+            break;
+        }
+        return (live, [.. unmapped]);
     }
 
     /// <summary>Brush disc radius in tiles for a paint kind and brush size.</summary>
@@ -458,11 +604,41 @@ internal sealed partial class Server
         var tiles0 = new LiveWorld.Tiles(game, view);
         var pad = (int)Math.Ceiling(AreaRadius(kind, MaxAreaBrushSize)) + AreaLeakMarginTiles;
         var mask = AreaTiles(view, tiles0.TilesX, tiles0.TilesZ, include, exclude, mirror, pad);
+        object? bandReport = null;
+        if (args.TryGetProperty("band", out var bandArg))
+        {
+            var band = ParseBand(bandArg);
+            var shapeTiles = mask.Count;
+            (mask, var removed) = ApplyBand(mask, tiles0, band);
+            bandReport = new
+            {
+                distanceTo = band.To,
+                minTiles = band.Min,
+                maxTiles = band.Max,
+                shapeTiles,
+                bandTiles = mask.Count,
+                removedTiles = removed,
+            };
+        }
+        HashSet<string>? mixSet = null;
+        if (kind == "mix")
+        {
+            var (live, unmapped) = MixTextures(type, names);
+            mixSet = live;
+            if (unmapped.Length > 0)
+                warnings.Add(
+                    $"Mix textures without a live texture name (not counted as coverage): {string.Join(", ", unmapped)}."
+                );
+            if (live.Count == 0)
+                warnings.Add(
+                    "No mix texture maps to a live texture name: coverage counts every changed area tile."
+                );
+        }
         if (mask.Count == 0)
             throw new WorkflowFailure(
                 "AREA_EMPTY",
                 "preflight",
-                "No tile centre lies inside the shapes (after exclusions).",
+                "No tile centre lies inside the shapes (after exclusions and band).",
                 false,
                 false,
                 "Enlarge the shapes or reduce exclusions. No input sent."
@@ -483,6 +659,8 @@ internal sealed partial class Server
                 worldLength = Math.Round(plannedLength, 1),
                 predictedCoveragePercent = Math.Round(Percent * plan.Covered / mask.Count, 1),
                 predictedLeakTiles = plan.Leaked,
+                band = bandReport,
+                mixTextures = mixSet?.Order(StringComparer.Ordinal).ToArray(),
             };
         if (preview)
             return new
@@ -552,7 +730,7 @@ internal sealed partial class Server
                 ref strokes
             );
             Thread.Sleep(StrokeSettleMs);
-            coverage = MeasureArea(game, mask, kind, type, tilesBefore, unitsBefore);
+            coverage = MeasureArea(game, mask, kind, type, tilesBefore, unitsBefore, mixSet);
             passes.Add(
                 new
                 {
@@ -608,7 +786,7 @@ internal sealed partial class Server
                     ref strokes
                 );
                 Thread.Sleep(StrokeSettleMs);
-                coverage = MeasureArea(game, mask, kind, type, tilesBefore, unitsBefore);
+                coverage = MeasureArea(game, mask, kind, type, tilesBefore, unitsBefore, mixSet);
                 passes.Add(
                     new
                     {
@@ -777,13 +955,15 @@ internal sealed partial class Server
     /// <param name="type">Requested type name.</param>
     /// <param name="before">Tile snapshot from <see cref="SnapshotArea"/>.</param>
     /// <param name="unitsBefore">Objects before painting.</param>
+    /// <param name="mixSet">Live texture names of the mix (kind=mix); empty: any texture change counts.</param>
     static AreaCoverage MeasureArea(
         Game game,
         AreaMask mask,
         string kind,
         string type,
         LiveWorld.Tile?[,] before,
-        LiveUnits.Unit[] unitsBefore
+        LiveUnits.Unit[] unitsBefore,
+        HashSet<string>? mixSet = null
     )
     {
         var view = EditorView.ReadView(game);
@@ -816,6 +996,9 @@ internal sealed partial class Server
                 {
                     "texture" => tiles.TextureName(t) == type,
                     "water" => tiles.WaterName(t) == type,
+                    "mix" => mixSet is { Count: > 0 }
+                        ? tiles.TextureName(t) is { } name && mixSet.Contains(name)
+                        : t != b,
                     _ => false,
                 };
             var match = kind == "forest" ? withNew[i, j] : Match(a);
@@ -880,5 +1063,32 @@ internal sealed partial class Server
                 .Any(i => Enumerable.Range(0, mask.H).Any(j => fixedUp[i, j] && !inside[i, j]))
         )
             throw new InvalidOperationException("Paint area touch-up fixture failed.");
+        // Band: one water tile in a 5×5 grid; Chebyshev distances 0..2.
+        var water = new bool[5, 5];
+        water[2, 2] = true;
+        var distances = TileDistances(water);
+        if (
+            distances[2, 2] != 0
+            || distances[1, 1] != 1
+            || distances[0, 4] != 2
+            || TileDistances(new bool[2, 2])[0, 0] != int.MaxValue
+        )
+            throw new InvalidOperationException("Paint area band distance fixture failed.");
+        foreach (
+            var bad in new[]
+            {
+                """{"distanceTo":"sea","maxTiles":1}""",
+                """{"distanceTo":"water","minTiles":2,"maxTiles":1}""",
+                """{"distanceTo":"water"}""",
+            }
+        )
+        {
+            try
+            {
+                _ = ParseBand(JsonDocument.Parse(bad).RootElement);
+                throw new InvalidOperationException("Invalid band accepted: " + bad);
+            }
+            catch (ArgumentException) { }
+        }
     }
 }

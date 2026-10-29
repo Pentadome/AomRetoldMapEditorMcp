@@ -195,9 +195,10 @@ internal static class Ui
     /// <param name="game">Validated editor connection.</param>
     /// <param name="name">Supported letter, digit, function key, or named navigation/control key.</param>
     /// <param name="modifiers">Up to three distinct CTRL, SHIFT, or ALT modifiers.</param>
-    public static void Press(Game game, string name, string[] modifiers)
+    /// <param name="requireEditor">False only for the gated playtest chat path (editor_playtest operation=cheat).</param>
+    public static void Press(Game game, string name, string[] modifiers, bool requireEditor = true)
     {
-        game.Focus();
+        game.Focus(requireEditor);
         // Three supported modifiers only: VK_CONTROL=0x11, VK_SHIFT=0x10, VK_MENU/ALT=0x12.
         // Names are this host's input API; numbers come from Windows SDK virtual-key codes.
         if (
@@ -272,13 +273,14 @@ internal static class Ui
     /// <summary>Types Unicode text into the focused editor control without changing the clipboard.</summary>
     /// <param name="game">Validated editor connection.</param>
     /// <param name="text">Text up to 4096 characters with no NUL characters.</param>
-    public static void Text(Game game, string text)
+    /// <param name="requireEditor">False only for the gated playtest chat path (editor_playtest operation=cheat).</param>
+    public static void Text(Game game, string text, bool requireEditor = true)
     {
         // Host 4096 UTF-16-unit input ceiling; NUL is rejected to avoid native text truncation.
         // INPUT_KEYBOARD=1, KEYEVENTF_UNICODE=4 and UNICODE|KEYUP=6 (Windows SDK).
         if (text.Length > 4096 || text.Contains('\0'))
             throw new ArgumentException("Text exceeds limit or contains NUL.");
-        game.Focus();
+        game.Focus(requireEditor);
         foreach (var c in text)
             Send(
                 new Win.Input

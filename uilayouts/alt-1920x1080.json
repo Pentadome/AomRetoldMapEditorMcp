@@ -155,6 +155,96 @@
   "notes": "Only observed alternative editor UI. Rects are full-res client pixels; gated against build/UI/size before preset use. Verify OCR and checkpoint; some positions approximate until live tests. Normal UI must use a separate measured layout.",
   "editorScene": {
     "notes": "Measured 2026-10-06 on blank 128x128 alternative-UI editor. Rects full-res client px [x,y,w,h]; gates are 1280x720 half-res screenshot samples (ScreenProbe frame). Minimap orientation: screen up = world +X+Z, screen right = world +X-Z; closed-loop camera reads correct residual error. Minimap gate uses diamond-frame pixels stable across 4 captures (corner buttons excluded: hover highlight changes).",
+    "detect": {
+      "note": "Added 2026-10-29: gold rings of the 4 top-right buttons (play/test, diamond, close, menu), 3 points each. Without it a stacked-dialog normal frame (menu bar covered, minimap visible) was detected as alternative. Measured 12/12 on 4 alternative frames, 0/12 on clean and dialog-stacked normal frames, alternative under modal dim and the main menu; minimumMatches 8 tolerates one hovered button.",
+      "minimumMatches": 8,
+      "gate": [
+        {
+          "x": 1158,
+          "y": 24,
+          "r": 163,
+          "g": 112,
+          "b": 42
+        },
+        {
+          "x": 1173,
+          "y": 4,
+          "r": 156,
+          "g": 130,
+          "b": 85
+        },
+        {
+          "x": 1182,
+          "y": 11,
+          "r": 168,
+          "g": 139,
+          "b": 87
+        },
+        {
+          "x": 1200,
+          "y": 4,
+          "r": 168,
+          "g": 131,
+          "b": 80
+        },
+        {
+          "x": 1191,
+          "y": 12,
+          "r": 167,
+          "g": 127,
+          "b": 73
+        },
+        {
+          "x": 1214,
+          "y": 11,
+          "r": 180,
+          "g": 162,
+          "b": 108
+        },
+        {
+          "x": 1230,
+          "y": 4,
+          "r": 168,
+          "g": 132,
+          "b": 80
+        },
+        {
+          "x": 1221,
+          "y": 12,
+          "r": 168,
+          "g": 128,
+          "b": 73
+        },
+        {
+          "x": 1244,
+          "y": 11,
+          "r": 181,
+          "g": 162,
+          "b": 110
+        },
+        {
+          "x": 1274,
+          "y": 11,
+          "r": 181,
+          "g": 163,
+          "b": 110
+        },
+        {
+          "x": 1251,
+          "y": 12,
+          "r": 170,
+          "g": 129,
+          "b": 74
+        },
+        {
+          "x": 1260,
+          "y": 4,
+          "r": 168,
+          "g": 132,
+          "b": 80
+        }
+      ]
+    },
     "minimap": {
       "center": [
         1739,

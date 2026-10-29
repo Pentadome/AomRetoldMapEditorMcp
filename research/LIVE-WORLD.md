@@ -310,3 +310,38 @@ Facts found while building them:
   button label read "Inelude Seript": scaled sizes accept labels of ≥6 normalized characters within one edit per
   6 characters. Alternative UI clips list rows and cut the last glyph ("aommcp_probe.xs" → "aommcp_prok"): clipped
   rows also match with the last read glyph dropped. include/verify/remove live-verified on both UIs.
+
+## Session 4 fixes (live 2026-10-28/29, build 100.19.17020.0, 1920×1080 normal and alternative UI; plan `plans/wake-session-4-fixes.md`)
+
+* Playtest recovery: a quit that timed out (`PLAYTEST_OUTCOME_UNKNOWN`) was followed by `inspect`, which re-observed
+  read-only and returned `playing` (Quit re-authorized); the `nextAction` now carries the token. Cheat `CLEAR SKIES`
+  and the token-bound Quit then passed. `start` warned about players without a camera start.
+* Windowed client quit: the in-game menu needs the pointer to hover the item before the click (a jump-and-click was
+  ignored); the same holds for the main-menu Settings controls and the editor File menu.
+* `editor_terrain_shape`: one call over 4 view cells, sampled once; rotated ellipse (150,200) rx 60 rz 14 height 3
+  gave 17 edits, sampled 2.997. Bug fixed: ellipse bounds used a bounding circle `max(rx, rz)`, so a flat ellipse near
+  the edge refused `TARGET_OUTSIDE_MAP`; bounds now use the exact rotated half-extents
+  `sqrt((rx·cos)² + (rz·sin)²)` / `sqrt((rx·sin)² + (rz·cos)²)` (self-test "rotated ellipse bounds").
+* `editor_paint_area kind=mix` and `band` live-verified on both UIs (mix textures matched by leaf name to the mix XML
+  `<paint><texture>` set). Finding (not fixed): a relief-heavy area at (75,137) r14 refused `TARGET_NOT_CLICKABLE`;
+  paint_area has no preflight ladder like terrain_shape.
+* Camera start: the PL P9 player record (59 bytes) ends in a flag byte plus x/y/z floats = the stored start;
+  `Pb` holds the Town Center position. Native `uiSetCameraStartLoc`/`uiDeleteCameraStartLoc` returned but stored
+  nothing, so `editor_camera_start` drives the dialog buttons. set P1 (190,88) residual 0, show, delete and
+  `PLAYER_NOT_LISTED` for player 3 passed on both UIs. The Target Player list OCR included a "Set" row (the Set
+  button under the open list).
+* Dialog calibration: cloud shadows move without input (masked by a two-frame motion diff grown by 2 px) and modal
+  dimming/off-map void give dark points (max channel ≤ 40, dropped). Normal 1920×1080 recalibrated: 37 gadgets, each
+  own 1 / closed 0 / rival 0 (CombatCommands skipped: no opaque point); a cross-check opened and closed every gadget
+  (all verified, one dialog each). Alternative: 31 gadgets.
+* UI misdetection: stacked dialogs covering the normal menu bar made `uiKind` alternative; fixed by a positive
+  `editorScene.detect` gate in `alt-1920x1080.json` (see `research/ALTERNATIVE-UI.md`). xsDebugger (full screen)
+  matches both UIs equally: `uiKind` null plus warning.
+* Scenario writer race: a checkpoint copied as soon as the zlib stream was complete lacked the 4 bytes the game
+  appends after zlib EOF and failed in Load Scenario ("failed to load"); a copy of `WakeIsland.mythscn` with the
+  trailer cut and any recompressed copy failed too. The trailer is not CRC32, Adler-32, CRC32C, FNV-1a, xxHash32,
+  Murmur3, MD5, SHA-1 or a byte sum of body, stream or decoded data, so the host cannot recreate it. Exports now wait
+  until the trailer is present (self-test with a 200 ms delayed trailer). A re-saved checkpoint (174334 B) loaded on
+  both UIs.
+* Build: `build.ps1` reports the pre-existing NU1903 package advisory as an error under warnings-as-errors; build
+  with `-p:WarningsNotAsErrors=NU1903` until the package is updated.

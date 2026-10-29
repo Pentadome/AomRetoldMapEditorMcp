@@ -31,8 +31,43 @@ internal static class ScenarioReader
         int Visibility,
         float Handicap,
         byte[][] Sections,
-        string DisplayName = ""
+        string DisplayName = "",
+        CameraStart? Camera = null
     );
+
+    /// <summary>Player camera start from the P9 tail (Camera Start Location dialog Set/Delete, session 4 live diff,
+    /// 2026-10-29: flag 1 + the camera look point after Set at the target player's index, flag 0 and zeros after Delete).</summary>
+    /// <param name="Set">True when a start is stored (flag byte 1).</param>
+    /// <param name="X">World X of the stored look point.</param>
+    /// <param name="Y">World Y of the stored look point.</param>
+    /// <param name="Z">World Z of the stored look point.</param>
+    internal sealed record CameraStart(bool Set, float X, float Y, float Z);
+
+    /// <summary>Reviewed P9 length (game writer v319 player block; session 4 checkpoints).</summary>
+    const int P9Length = 59;
+
+    /// <summary>Camera start record size at the P9 tail: flag byte + three little-endian floats.</summary>
+    const int CameraStartBytes = 13;
+
+    /// <summary>Byte size of one little-endian float.</summary>
+    const int FloatBytes = 4;
+
+    /// <summary>Camera start at the tail of a P9 body; null when the layout is not the reviewed one.</summary>
+    /// <param name="body">P9 body.</param>
+    internal static CameraStart? ReadCameraStart(ReadOnlySpan<byte> body)
+    {
+        if (body.Length != P9Length)
+            return null;
+        var at = body.Length - CameraStartBytes;
+        if (body[at] > 1)
+            return null;
+        var x = BinaryPrimitives.ReadSingleLittleEndian(body[(at + 1)..]);
+        var y = BinaryPrimitives.ReadSingleLittleEndian(body[(at + 1 + FloatBytes)..]);
+        var z = BinaryPrimitives.ReadSingleLittleEndian(body[(at + 1 + 2 * FloatBytes)..]);
+        return float.IsFinite(x) && float.IsFinite(y) && float.IsFinite(z)
+            ? new(body[at] == 1, x, y, z)
+            : null;
+    }
 
     internal sealed record Snapshot(
         string Path,
@@ -231,6 +266,14 @@ internal static class ScenarioReader
             if (p8Len is < 12 or > 256 || bp.Length - sub < p8Len)
                 throw new InvalidDataException("PL P8 layout unreviewed.");
             visibility = U32(bp.Slice(sub, p8Len), p8Len - 4);
+            sub += p8Len;
+            CameraStart? camera = null;
+            if (bp.Length - sub >= 6 && bp[sub] == 'P' && bp[sub + 1] == '9')
+            {
+                var p9Len = U32(bp, sub + 2);
+                if (p9Len <= bp.Length - sub - 6)
+                    camera = ReadCameraStart(bp.Slice(sub + 6, p9Len));
+            }
             if (visibility is < 0 or > 2 || !float.IsFinite(handicap))
                 throw new InvalidDataException("PL visibility/handicap outside reviewed bounds.");
             if (playerId != i || name is null || ai is null || diplomacy is null)
@@ -257,7 +300,8 @@ internal static class ScenarioReader
                 visibility,
                 handicap,
                 sections,
-                displayName ?? ""
+                displayName ?? "",
+                camera
             );
         }
         return players;

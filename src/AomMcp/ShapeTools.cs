@@ -916,16 +916,30 @@ internal sealed partial class Server
             }
         }
 
+        /// <summary>Half extent of the rotated ellipse along world X.</summary>
+        double EllipseHalfX() =>
+            Math.Sqrt(
+                Math.Pow(RadiusX * Math.Cos(Angle), 2) + Math.Pow(RadiusZ * Math.Sin(Angle), 2)
+            );
+
+        /// <summary>Half extent of the rotated ellipse along world Z.</summary>
+        double EllipseHalfZ() =>
+            Math.Sqrt(
+                Math.Pow(RadiusX * Math.Sin(Angle), 2) + Math.Pow(RadiusZ * Math.Cos(Angle), 2)
+            );
+
         /// <summary>Axis-aligned world bounds (minX, minZ, maxX, maxZ).</summary>
         internal (double MinX, double MinZ, double MaxX, double MaxZ) Bounds() =>
             Kind switch
             {
                 "circle" => (X - Radius, Z - Radius, X + Radius, Z + Radius),
+                // Exact extents of the rotated ellipse (session 4 live: the bounding circle refused a flat
+                // radiusX 60 / radiusZ 14 ellipse 42 nodes inside the map edge with TARGET_OUTSIDE_MAP).
                 "ellipse" => (
-                    X - Math.Max(RadiusX, RadiusZ),
-                    Z - Math.Max(RadiusX, RadiusZ),
-                    X + Math.Max(RadiusX, RadiusZ),
-                    Z + Math.Max(RadiusX, RadiusZ)
+                    X - EllipseHalfX(),
+                    Z - EllipseHalfZ(),
+                    X + EllipseHalfX(),
+                    Z + EllipseHalfZ()
                 ),
                 "capsule" => (
                     Points.Min(p => p.X) - Radius,
@@ -1250,6 +1264,140 @@ internal sealed partial class Server
         return strokes;
     }
 
+    /// <summary>Side of a terrain_shape view cell in nodes before splitting; session 4: offline pieces up to 70×75 world
+    /// units (35×38 nodes at scale 2) painted at default zoom, 1920×1080.</summary>
+    const int ShapeCellNodes = 32;
+
+    /// <summary>Smallest cell side in nodes; smaller unreachable cells are reported (host bound, 4 brush radii).</summary>
+    const int MinShapeCellNodes = 8;
+
+    /// <summary>Most unreachable cells listed in the preflight refusal (host output bound).</summary>
+    const int MaxUnreachableCells = 10;
+
+    /// <summary>Copy of <paramref name="mask"/> with everything outside the inclusive cell rectangle cleared.</summary>
+    /// <param name="mask">Mask-relative node mask.</param>
+    /// <param name="cell">Inclusive cell bounds (mask-relative).</param>
+    internal static bool[,] Clip(bool[,] mask, (int I0, int J0, int I1, int J1) cell)
+    {
+        var clip = new bool[mask.GetLength(0), mask.GetLength(1)];
+        for (var i = Math.Max(0, cell.I0); i <= Math.Min(mask.GetLength(0) - 1, cell.I1); i++)
+        for (var j = Math.Max(0, cell.J0); j <= Math.Min(mask.GetLength(1) - 1, cell.J1); j++)
+            clip[i, j] = mask[i, j];
+        return clip;
+    }
+
+    /// <summary>Inclusive square cells of side <paramref name="side"/> tiling the mask, empty cells dropped.</summary>
+    /// <param name="mask">Mask-relative node mask.</param>
+    /// <param name="side">Cell side in nodes.</param>
+    internal static List<(int I0, int J0, int I1, int J1)> Cells(bool[,] mask, int side)
+    {
+        var cells = new List<(int I0, int J0, int I1, int J1)>();
+        for (var i = 0; i < mask.GetLength(0); i += side)
+        for (var j = 0; j < mask.GetLength(1); j += side)
+        {
+            (int, int, int, int) cell = (
+                i,
+                j,
+                Math.Min(mask.GetLength(0), i + side) - 1,
+                Math.Min(mask.GetLength(1), j + side) - 1
+            );
+            if (Clip(mask, cell).Cast<bool>().Any(b => b))
+                cells.Add(cell);
+        }
+        return cells;
+    }
+
+    /// <summary>Cell halves (or quarters) used when a cell does not fit one view.</summary>
+    /// <param name="cell">Inclusive cell bounds.</param>
+    /// <param name="min">Smallest side that may still be split.</param>
+    /// <returns>Sub-cells covering the cell; empty when it is already at the minimum on both axes.</returns>
+    internal static (int I0, int J0, int I1, int J1)[] SplitCell(
+        (int I0, int J0, int I1, int J1) cell,
+        int min
+    )
+    {
+        int w = cell.I1 - cell.I0 + 1,
+            h = cell.J1 - cell.J0 + 1;
+        int mi = cell.I0 + w / 2 - 1,
+            mj = cell.J0 + h / 2 - 1;
+        return (w > min, h > min) switch
+        {
+            (true, true) =>
+            [
+                (cell.I0, cell.J0, mi, mj),
+                (cell.I0, mj + 1, mi, cell.J1),
+                (mi + 1, cell.J0, cell.I1, mj),
+                (mi + 1, mj + 1, cell.I1, cell.J1),
+            ],
+            (true, false) => [(cell.I0, cell.J0, mi, cell.J1), (mi + 1, cell.J0, cell.I1, cell.J1)],
+            (false, true) => [(cell.I0, cell.J0, cell.I1, mj), (cell.I0, mj + 1, cell.I1, cell.J1)],
+            _ => [],
+        };
+    }
+
+    /// <summary>terrain_shape preflight: tiles the eroded mask into cells, aims the camera at each (zoom-out and steeper
+    /// pitch fallback, no edits) and splits cells whose dab vertices do not fit one view, down to
+    /// <see cref="MinShapeCellNodes"/>.</summary>
+    /// <param name="game">Validated editor connection.</param>
+    /// <param name="m">Shape instance.</param>
+    /// <param name="moveCamera">Whether the camera may move.</param>
+    /// <param name="at">Projection height (target height).</param>
+    /// <param name="unreachable">Receives unreachable cells with the first failing point.</param>
+    /// <returns>Reachable cells in paint order.</returns>
+    List<(int I0, int J0, int I1, int J1)> PlanCells(
+        Game game,
+        ShapeMask m,
+        bool moveCamera,
+        float at,
+        List<object> unreachable
+    )
+    {
+        var view = EditorView.ReadView(game);
+        var half = view.Scale / 2;
+        var plan = new List<(int I0, int J0, int I1, int J1)>();
+        void Visit((int I0, int J0, int I1, int J1) cell)
+        {
+            var strokes = ScanStrokes(Clip(m.Eroded, cell), ShapeRowStepNodes);
+            if (strokes.Count == 0)
+                return;
+            (double X, double Z)[] pts =
+            [
+                .. strokes.SelectMany(st =>
+                    st.Select(p =>
+                        ((m.X0 + p.I) * view.Scale + half, (m.Z0 + p.J) * view.Scale + half)
+                    )
+                ),
+            ];
+            ProgressReporter.Report(plan.Count, null, $"shape {m.Name} preflight cell");
+            try
+            {
+                _ = Screen(game, pts, moveCamera, DefaultPickTolerance, at, moveCamera, moveCamera);
+                plan.Add(cell);
+            }
+            catch (WorkflowFailure f) when (f.Code == NotClickableCode)
+            {
+                var parts = SplitCell(cell, MinShapeCellNodes);
+                if (parts.Length == 0)
+                    unreachable.Add(
+                        new
+                        {
+                            instance = m.Name,
+                            minX = (m.X0 + cell.I0) * view.Scale,
+                            minZ = (m.Z0 + cell.J0) * view.Scale,
+                            maxX = (m.X0 + cell.I1) * view.Scale,
+                            maxZ = (m.Z0 + cell.J1) * view.Scale,
+                            reason = f.Message,
+                        }
+                    );
+                foreach (var part in parts)
+                    Visit(part);
+            }
+        }
+        foreach (var cell in Cells(m.Eroded, ShapeCellNodes))
+            Visit(cell);
+        return plan;
+    }
+
     /// <summary>editor_terrain_shape: fill a polygon/circle/ellipse/capsule with an exact node height (optionally water).</summary>
     /// <param name="game">Validated editor connection.</param>
     /// <param name="args">Tool arguments.</param>
@@ -1357,88 +1505,151 @@ internal sealed partial class Server
                     ((m.X0 + p.I) * view.Scale + half, (m.Z0 + p.J) * view.Scale + half)
                 ),
             ];
+        // Preflight (camera only, before the first edit): every cell of every instance must project clickable.
+        _pitchBefore = null;
+        var plans = new List<(int I0, int J0, int I1, int J1)>[masks.Length];
+        var unreachable = new List<object>();
         try
         {
-            foreach (var m in masks)
+            for (var k = 0; k < masks.Length; k++)
+                plans[k] = PlanCells(game, masks[k], moveCamera, goal, unreachable);
+        }
+        catch
+        {
+            _ = RestorePitch(game);
+            throw;
+        }
+        if (unreachable.Count > 0)
+        {
+            var restored = RestorePitch(game);
+            throw new WorkflowFailure(
+                NotClickableCode,
+                "preflight",
+                $"{unreachable.Count} cell(s) cannot be brought into a clickable view even at zoom {AutoZoomLimit} and pitch {SteepPitches[^1]}°: {JsonSerializer.Serialize(unreachable.Take(MaxUnreachableCells))}. Pitch restore: {JsonSerializer.Serialize(restored)}.",
+                false,
+                false,
+                "0 edits. Camera moved only. Shrink/move the shape away from the camera-side map edge, or rotate the camera (editor_camera), then retry."
+            );
+        }
+        try
+        {
+            for (var k = 0; k < masks.Length; k++)
             {
-                var (si, sj) = FlatSquare(view, m);
-                double minX = (m.X0 + si) * view.Scale,
-                    minZ = (m.Z0 + sj) * view.Scale,
-                    maxX = minX + (ShapeSampleNodes - 1) * view.Scale,
-                    maxZ = minZ + (ShapeSampleNodes - 1) * view.Scale;
-                // Bring the sample square into a clear view first (camera may move/zoom out).
-                var aim = Screen(
-                    game,
-                    [(minX, minZ), (maxX, maxZ), (minX, maxZ), (maxX, minZ)],
-                    moveCamera,
-                    4,
-                    // Flat square (FlatSquare): visibility/UI check at its height; SetSample checks its own picks.
-                    view.Height((minX + maxX) / 2, (minZ + maxZ) / 2).Height,
-                    zoomOut: moveCamera
-                );
-                steps.Add(
-                    new
-                    {
-                        instance = m.Name,
-                        nodes = m.Count,
-                        camera = aim.Camera,
-                    }
-                );
-                steps.AddRange(
-                    SetSample(
-                        game,
-                        height,
-                        (minX + maxX) / 2,
-                        (minZ + maxZ) / 2,
-                        minX,
-                        minZ,
-                        maxX,
-                        maxZ,
-                        tolerance,
-                        out var sampled
+                var m = masks[k];
+                if (k == 0)
+                {
+                    // One sample per call: the mirror instance and all cells reuse it (session 4: per-piece samples left
+                    // seams up to 0.27). Sample at the default zoom (session 4: the loop did not converge at zoom 190).
+                    var (si, sj) = FlatSquare(view, m);
+                    double minX = (m.X0 + si) * view.Scale,
+                        minZ = (m.Z0 + sj) * view.Scale,
+                        maxX = minX + (ShapeSampleNodes - 1) * view.Scale,
+                        maxZ = minZ + (ShapeSampleNodes - 1) * view.Scale;
+                    if (
+                        moveCamera
+                        && (PoseOf(EditorView.ReadView(game)).Zoom ?? DefaultZoom) > DefaultZoom
                     )
-                );
-                goal = (float)sampled;
-                var strokes = ScanStrokes(m.Eroded, ShapeRowStepNodes);
+                        SetZoom(game, DefaultZoom);
+                    // Bring the sample square into a clear view first (camera may move/zoom out).
+                    var aim = Screen(
+                        game,
+                        [(minX, minZ), (maxX, maxZ), (minX, maxZ), (maxX, minZ)],
+                        moveCamera,
+                        4,
+                        // Flat square (FlatSquare): visibility/UI check at its height; SetSample checks its own picks.
+                        view.Height((minX + maxX) / 2, (minZ + maxZ) / 2).Height,
+                        zoomOut: moveCamera,
+                        steepen: moveCamera
+                    );
+                    steps.Add(
+                        new
+                        {
+                            instance = m.Name,
+                            nodes = m.Count,
+                            sampleCamera = aim.Camera,
+                        }
+                    );
+                    steps.AddRange(
+                        SetSample(
+                            game,
+                            height,
+                            (minX + maxX) / 2,
+                            (minZ + maxZ) / 2,
+                            minX,
+                            minZ,
+                            maxX,
+                            maxZ,
+                            tolerance,
+                            out var sampled
+                        )
+                    );
+                    goal = (float)sampled;
+                }
+                else
+                    steps.Add(
+                        new
+                        {
+                            instance = m.Name,
+                            nodes = m.Count,
+                            sample = "reused",
+                        }
+                    );
+                var cells = plans[k];
                 var chunks = 0;
+                var scanStrokes = 0;
                 for (var pass = 0; pass < 2; pass++) // Two passes, as editor_elevation (nodes missed mid-change).
                 {
-                    var ordered =
-                        pass == 0
-                            ? strokes
-                            :
+                    var order = pass == 0 ? cells : [.. cells.AsEnumerable().Reverse()];
+                    for (var index = 0; index < order.Count; index++)
+                    {
+                        ProgressReporter.Report(
+                            index,
+                            order.Count,
+                            $"shape {m.Name} pass {pass + 1}/2 cell"
+                        );
+                        var strokes = ScanStrokes(Clip(m.Eroded, order[index]), ShapeRowStepNodes);
+                        if (pass == 1)
+                            strokes =
                             [
                                 .. strokes
                                     .AsEnumerable()
                                     .Reverse()
-                                    .Select(s => s.AsEnumerable().Reverse().ToList()),
+                                    .Select(st => st.AsEnumerable().Reverse().ToList()),
                             ];
-                    for (var index = 0; index < ordered.Count; index++)
-                    {
-                        ProgressReporter.Report(
-                            index,
-                            ordered.Count,
-                            $"shape pass {pass + 1}/2 scanline"
+                        else
+                            scanStrokes += strokes.Count;
+                        // Pose reuse: aim once at the whole cell (as in preflight) so its strokes need no camera move.
+                        _ = Screen(
+                            game,
+                            [.. strokes.SelectMany(st => World(m, st))],
+                            moveCamera,
+                            DefaultPickTolerance,
+                            goal,
+                            zoomOut: moveCamera,
+                            steepen: moveCamera
                         );
-                        var pts = World(m, ordered[index]);
-                        var prior = chunks;
-                        try
+                        foreach (var stroke in strokes)
                         {
-                            PaintChunks(
-                                game,
-                                pts,
-                                moveCamera,
-                                StrokeDuration(pts.Length),
-                                PathLength(pts),
-                                0,
-                                steps,
-                                ref chunks,
-                                goal
-                            );
-                        }
-                        finally
-                        {
-                            _elevationEdits += chunks - prior;
+                            var pts = World(m, stroke);
+                            var prior = chunks;
+                            try
+                            {
+                                PaintChunks(
+                                    game,
+                                    pts,
+                                    moveCamera,
+                                    StrokeDuration(pts.Length),
+                                    PathLength(pts),
+                                    0,
+                                    steps,
+                                    ref chunks,
+                                    goal
+                                );
+                            }
+                            finally
+                            {
+                                _elevationEdits += chunks - prior;
+                            }
                         }
                     }
                     Thread.Sleep(StrokeSettleMs / 2);
@@ -1447,7 +1658,8 @@ internal sealed partial class Server
                     new
                     {
                         instance = m.Name,
-                        scanStrokes = strokes.Count,
+                        cells = cells.Count,
+                        scanStrokes,
                         strokeChunks = chunks,
                     }
                 );
@@ -1485,29 +1697,32 @@ internal sealed partial class Server
                         false,
                         "Heights were set; water not painted."
                     );
-                foreach (var m in masks)
-                foreach (var stroke in ScanStrokes(m.Eroded, ShapeRowStepNodes))
-                {
-                    var pts = World(m, stroke);
-                    var prior = waterStrokes;
-                    try
+                for (var k = 0; k < masks.Length; k++)
+                    foreach (var cell in plans[k])
+                    foreach (
+                        var stroke in ScanStrokes(Clip(masks[k].Eroded, cell), ShapeRowStepNodes)
+                    )
                     {
-                        PaintChunks(
-                            game,
-                            pts,
-                            moveCamera,
-                            StrokeDuration(pts.Length),
-                            PathLength(pts),
-                            0,
-                            steps,
-                            ref waterStrokes
-                        );
+                        var pts = World(masks[k], stroke);
+                        var prior = waterStrokes;
+                        try
+                        {
+                            PaintChunks(
+                                game,
+                                pts,
+                                moveCamera,
+                                StrokeDuration(pts.Length),
+                                PathLength(pts),
+                                0,
+                                steps,
+                                ref waterStrokes
+                            );
+                        }
+                        finally
+                        {
+                            _elevationEdits += waterStrokes - prior;
+                        }
                     }
-                    finally
-                    {
-                        _elevationEdits += waterStrokes - prior;
-                    }
-                }
                 steps.Add(new { water, waterStrokes });
             }
             Thread.Sleep(StrokeSettleMs);
@@ -1523,14 +1738,17 @@ internal sealed partial class Server
                 $"{e.Message} {_elevationEdits} edit(s) were already applied.",
                 true,
                 false,
-                $"Scene changed: run editor_undo {_elevationEdits} time(s) to revert (check with editor_terrain_grid), then retry.",
+                $"Scene changed. The exact-height fill is idempotent: re-running the same call is safe (idempotentRetry). Or run editor_undo {_elevationEdits} time(s) to revert (check with editor_terrain_grid).",
                 inner: e,
-                undoSteps: _elevationEdits
+                undoSteps: _elevationEdits,
+                idempotentRetry: true
             );
         }
         finally
         {
             ExitEditModes(game);
+            if (RestorePitch(game) is { } restored)
+                steps.Add(new { pitch = restored });
         }
         var viewAfter = EditorView.ReadView(game);
         var after = Nodes(
@@ -2248,6 +2466,14 @@ internal sealed partial class Server
         Check(circle.Inside(10, 14.9) && !circle.Inside(10, 15.1), "circle");
         var ellipse = new ShapeSpec("ellipse", [], 0, 0, 0, 10, 2, Math.PI / 2);
         Check(ellipse.Inside(0, 9) && !ellipse.Inside(9, 0), "rotated ellipse");
+        var (eMinX, eMinZ, eMaxX, eMaxZ) = ellipse.Bounds();
+        Check(
+            Math.Abs(eMaxX - 2) < 1e-9
+                && Math.Abs(eMinX + 2) < 1e-9
+                && Math.Abs(eMaxZ - 10) < 1e-9
+                && Math.Abs(eMinZ + 10) < 1e-9,
+            "rotated ellipse bounds"
+        );
         var capsule = new ShapeSpec("capsule", [(0, 0), (10, 0)], 0, 0, 2, 0, 0, 0);
         Check(
             capsule.Inside(5, 1.9) && !capsule.Inside(5, 2.1) && capsule.Inside(11.5, 0),
@@ -2271,6 +2497,37 @@ internal sealed partial class Server
                 Check(SegmentInside(eroded, stroke[k], stroke[k + 1]), "stroke inside");
         var covered = strokes.SelectMany(st => st).Select(p => (int)p.I).Distinct().ToHashSet();
         Check(covered.Contains(2) && covered.Contains(28), "rows reach both arms");
+        // Cells: clipped strokes stay inside their cell, together they reach every eroded node row, and splitting
+        // covers a cell exactly.
+        var cells = Cells(eroded, MinShapeCellNodes * 2);
+        Check(cells.Count > 1, "cells");
+        var cellRows = new HashSet<int>();
+        foreach (var cell in cells)
+        foreach (var st in ScanStrokes(Clip(eroded, cell), ShapeRowStepNodes))
+        foreach (var (pi, pj) in st)
+        {
+            Check(
+                pi >= cell.I0 && pi <= cell.I1 && pj >= cell.J0 && pj <= cell.J1,
+                "clipped stroke inside cell"
+            );
+            cellRows.Add((int)pi);
+        }
+        for (var i = 0; i < eroded.GetLength(0); i++)
+            if (Enumerable.Range(0, eroded.GetLength(1)).Any(j => eroded[i, j]))
+                Check(
+                    cellRows.Contains(i) || cellRows.Contains(i - 1) || cellRows.Contains(i + 1),
+                    "cell rows cover mask"
+                );
+        var parts = SplitCell((0, 0, 15, 9), MinShapeCellNodes);
+        Check(
+            parts.Length == 4
+                && parts.Sum(c => (c.I1 - c.I0 + 1) * (c.J1 - c.J0 + 1)) == 16 * 10
+                && SplitCell(
+                    (0, 0, MinShapeCellNodes - 1, MinShapeCellNodes - 1),
+                    MinShapeCellNodes
+                ).Length == 0,
+            "split cell"
+        );
         Check(
             FindSquare(u, ShapeSampleNodes) is { } sq
                 && Enumerable
@@ -2443,7 +2700,7 @@ internal sealed partial class Server
         );
         yield return Spec(
             "editor_terrain_shape",
-            "Fill a WORLD shape with an exact node height (islands, lakes, plateaus): shape=polygon (points 3..64) | circle (x,z,radius) | ellipse (x,z,radiusX,radiusZ,angleDegrees) | capsule (points 2..64 polyline + radius). Exact-height sample loop in a 7×7-node square inside the shape (refuses AREA_TOO_SMALL before input), two passes of elevation-sample scanline strokes over the brush-eroded shape (concave shapes split), touch-up dabs. Optional water=<water type> paints water over it; mirror adds the mirrored shape. Verifies inside nodes (tolerance default 0.05), bleed in a 3-node ring, inside tile passability. edits = undo count. confirmDestructive=true required.",
+            "Fill a WORLD shape with an exact node height (islands, lakes, plateaus): shape=polygon (points 3..64) | circle (x,z,radius) | ellipse (x,z,radiusX,radiusZ,angleDegrees) | capsule (points 2..64 polyline + radius). Any size in one call: the brush-eroded shape is tiled into view cells (32 nodes, split down to 8 when needed) and a camera-only preflight aims every cell before the first edit (zoom-out to 130, then steeper pitch 60/75°, pitch restored at the end; yaw resets to default); unreachable cells refuse TARGET_NOT_CLICKABLE phase=preflight with 0 edits. One exact-height sample loop per call (7×7-node square inside the shape, default zoom; refuses AREA_TOO_SMALL before input); the mirror instance and all cells reuse the sampled height (no seams). Two passes of elevation-sample scanline strokes per cell, touch-up dabs. A mid-run failure reports undoSteps and idempotentRetry=true (re-running the same call is safe). Optional water=<water type> paints water over it; mirror adds the mirrored shape. Verifies inside nodes (tolerance default 0.05), bleed in a 3-node ring, inside tile passability. edits = undo count. confirmDestructive=true required.",
             new Dictionary<string, object>
             {
                 ["shape"] = new { type = "string", @enum = ShapeKinds },

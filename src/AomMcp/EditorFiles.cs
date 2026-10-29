@@ -24,7 +24,12 @@ internal static class EditorFiles
 
     // Live game-writer outputs and tracked BaseDefense.mythscn both carry four opaque bytes after zlib EOF.
     // Preserve, do not interpret as Adler-32 or claim their game-specific integrity semantics are verified.
+    // Required for loading (2026-10-29 live: cut or recomputed-stream copies "failed to load"); not CRC-32/Adler/xxHash32/
+    // Murmur3/MD5/SHA-1 of the stream, file or decoded payload, so host code cannot recreate it.
     const int ScenarioTrailerSize = 4;
+
+    /// <summary>Self-test writer delay before appending the trailer: several <see cref="PollMs"/> polls see a stable no-trailer file.</summary>
+    const int SelfTestTrailerDelayMs = 200;
 
     // Windows filename specification: reserved DOS device aliases, even when followed by an extension.
     static readonly string[] DeviceNames = ["CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"];
@@ -878,10 +883,18 @@ internal static class EditorFiles
                         ? ExportFormats.Scenario(bytes)
                         : ExportFormats.Trigger(bytes);
                     lastReason = check.Reason;
+                    // The game appends the trailer after the zlib stream; a stable no-trailer read is a write still in
+                    // progress. 2026-10-29 live: a copy taken before the trailer (AomMcp_s4_verify) and the user's
+                    // WakeIsland.mythscn with its 4 trailer bytes cut both "failed to load" in Load Scenario.
+                    var trailed = !scenario || check.SuffixBytes == ScenarioTrailerSize;
+                    if (check.Valid && !trailed)
+                        lastReason =
+                            "Zlib stream complete but the game trailer is not written yet (files without it fail to load).";
                     if (
                         previous is not null
                         && bytes.AsSpan().SequenceEqual(previous)
                         && check.Valid
+                        && trailed
                     )
                         return bytes;
                     previous = bytes;
@@ -1309,6 +1322,39 @@ internal static class EditorFiles
             }
             if (calls != 0)
                 throw new InvalidOperationException("Existing checkpoint fixture did not refuse.");
+            // Writer race: zlib stream first, trailer later. A stable no-trailer read must not be accepted.
+            var raced = Path.Combine(temporary, "raced.mythscn");
+            var full = memory.ToArray();
+            Task? appender = null;
+            var racedResult = Export(
+                raced,
+                true,
+                (_, args) =>
+                {
+                    var file = Path.Combine(
+                        temporary,
+                        args.GetProperty("fname").GetString()! + ".mythscn"
+                    );
+                    File.WriteAllBytes(file, full[..^ScenarioTrailerSize]);
+                    appender = Task.Run(() =>
+                    {
+                        Thread.Sleep(SelfTestTrailerDelayMs);
+                        using var stream = new FileStream(
+                            file,
+                            FileMode.Append,
+                            FileAccess.Write,
+                            FileShare.Read
+                        );
+                        stream.Write(full.AsSpan(full.Length - ScenarioTrailerSize));
+                    });
+                },
+                () => { }
+            );
+            appender?.Wait();
+            if (!racedResult.AsSpan().SequenceEqual(full))
+                throw new InvalidOperationException(
+                    "Checkpoint export accepted a scenario before its game trailer."
+                );
             var trigger = Path.Combine(temporary, "fixture.trg");
             var desired = TriggerCodec.Serialize(new("fixture", false, false, ""));
             calls = 0;

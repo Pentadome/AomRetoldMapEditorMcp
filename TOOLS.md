@@ -1,6 +1,6 @@
 # Complete Age of Mythology Retold editor MCP tool reference
 
-**Current full: 944 tools = 92 helpers + 434 native commands + 418 shipped editor actions. Default core: 94 = 85 core helpers (incl. `editor_unit_notes`) + nine essential native commands; `editor_call` reaches every other tool from core.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Twenty-one world editing helpers (core, incl. `editor_camera`/`editor_capture` and the seven map-building helpers): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
+**Current full: 947 tools = 95 helpers + 434 native commands + 418 shipped editor actions. Default core: 96 = 87 core helpers (incl. `editor_unit_notes`) + nine essential native commands; `editor_call` reaches every other tool from core.** Eleven world-space scene helpers (core): see [research/SCENE-TOOLS.md](research/SCENE-TOOLS.md). Twenty-one world editing helpers (core, incl. `editor_camera`/`editor_capture` and the seven map-building helpers): see [research/LIVE-WORLD.md](research/LIVE-WORLD.md).
 
 Authoritative source: production `aom-retold-editor` `0.1.0` `tools/list` with `--toolset full`, protocol `2025-11-25`. Executable SHA-256: `dd15d1d838e78faa1bc9854becc3994f4f3a4548ef30efd24108abedc1b84fff`.
 
@@ -8,6 +8,14 @@ The catalog below is a historical generated reference from an earlier 28-helper 
 
 ## Recent additions (see live `tools/list` for schemas)
 
+- Wake Island session 4 fixes (2026-10-29, build 100.19.17020.0; live-verified 1920×1080 normal and alternative UI; plan `plans/wake-session-4-fixes.md`, details `research/LIVE-WORLD.md` "Session 4 fixes"):
+  - `editor_playtest`: start/quit wait 30 s default (`timeoutMs` ≤ 60 s); `inspect` on `unknown` re-observes read-only and recovers to `returned`/`playing`; `start` behind an `unknown` session recovers first; new `operation=cheat` (`CLEAR SKIES`, `LAY OF THE LAND`, `confirmCheat`); Gaia units match by ID/player/proto only; mismatches are listed; `start` warns about human players without a camera start; `preview` hash optional, `profilePath` accepts registered `uilayouts/<file>` ids.
+  - Calls queued behind a running call send progress "queued behind <tool>".
+  - `editor_terrain_shape`: view cells + camera-only preflight (no partial edits on unreachable shapes), one height sample per call, `idempotentRetry`, exact rotated-ellipse bounds.
+  - `editor_paint_area kind=mix` and `band {distanceTo, minTiles, maxTiles}` coast rings.
+  - Dialogs: full-only `editor_dialog_calibrate`; shipped 1920×1080 signatures (normal 37, alternative 31 gadgets); window-name aliases (`resolvedFrom`); occlusion only by `open` dialogs; OCR-checked close (`DIALOG_CLOSE_UNVERIFIED`); ambiguous UI kind reported as null.
+  - New core `editor_camera_start` (get from checkpoint; set/show/delete through the Camera Start dialog).
+  - Checkpoint/export waits until the game's 4-byte trailer is written (files without it fail to load).
 - Wake Island session 3 fixes (2026-10-25, build 100.19.17020.0; live-verified 1920×1080 normal and alternative UI; plan `plans/wake-session-3-fixes.md`, details `research/LIVE-WORLD.md` "Session 3 fixes"):
   - Long calls send MCP `notifications/progress` every 10 s when the request carries `_meta.progressToken` (resets client timeouts; paint_area, stroke, terrain_shape, new_scenario and XS restore report their phase).
   - `editor_camera_look_at`: a target past the camera clamp returns `atLimit:true` + `reachable` instead of `MINIMAP_NO_EFFECT` (inward probe click proves the minimap responds; dead corner pixels are walked inward). `MINIMAP_NO_EFFECT` remains when the probe does not move the camera either.

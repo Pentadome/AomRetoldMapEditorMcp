@@ -39,6 +39,10 @@ Raw JSON, screenshots, original/edited snapshots, trigger exports and temporary 
 
 `editor_xs_scripts` and `editor_triggers apply scripts="restore"` now run on this UI at 2560x1440 (details in `WORKFLOW-LIVE-OBSERVATIONS.md`): ScriptManager signature in `uilayouts/dialogs-alt-en-2560x1440.json`; names are matched by their start because the list clips them.
 
+## Session 4 follow-up (2026-10-29, 1920×1080, same build)
+
+`editor_dialog_calibrate` wrote `uilayouts/dialogs-alt-en-1920x1080.json` (31 gadgets; the alternative UI has no BrushMask, BrushFunctionsWaterTool, GodPowers, MapElevation, NewScenario or WorldLighting gadget window). Live: Diplomacy, the `ATriggerGadget` → `trEditor` alias, `editor_paint_area kind=mix` + `band`, rotated-ellipse `editor_terrain_shape`, and `editor_camera_start` set (residual 0) / show / delete / `PLAYER_NOT_LISTED` for player 3. A Load Scenario of a tool-written checkpoint loaded on this UI. `alt-1920x1080.json` gained an `editorScene.detect` gate (12 points on the gold rings of the four top-right buttons, 8 needed): before it, a normal-UI frame whose menu bar was partly covered by stacked dialogs could fail the normal gate, and the alternative layout (which had no positive gate, only the minimap) won. Measured 12/12 on alternative frames, 0/12 on normal, dimmed and main-menu frames. The full-screen xsDebugger matches both UIs' signature files equally; `editor_dialog_state` then reports `uiKind` null with a warning. Clicks in the Settings menu need the pointer to approach the control first (hover); a single jump-and-click was ignored.
+
 ## Untested / unresolved
 
 Water, forest, cliff, wall, terrain-copy/paste, cinematics, lighting value edits, complex trigger shapes, XS execution, gameplay entry/exit and full remaining-tool semantic coverage remain unverified. Native reload crash remains undiagnosed; tool removal is mitigation, not a root-cause fix. Any reintroduction requires separate diagnosis and explicitly authorized retest; do not label full alternative-UI support on the strength of tool exposure or dispatcher acknowledgements.

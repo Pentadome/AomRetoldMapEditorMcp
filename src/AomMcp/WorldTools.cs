@@ -467,13 +467,16 @@ internal sealed partial class Server
     /// <param name="tolerance">Ground-hit back-check tolerance (world units).</param>
     /// <param name="atHeight">Projection height instead of terrain (skips the ground-hit back-check).</param>
     /// <param name="zoomOut">Zoom out stepwise (up to <see cref="AutoZoomLimit"/>) when the points still do not fit.</param>
+    /// <param name="steepen">After zooming out, steepen the pitch (<see cref="SteepPitches"/>) when points still do not
+    /// fit; the first pitch change records <see cref="_pitchBefore"/> so the caller restores it.</param>
     ScreenPath Screen(
         Game game,
         (double X, double Z)[] points,
         bool moveCamera,
         double tolerance,
         float? atHeight = null,
-        bool zoomOut = false
+        bool zoomOut = false,
+        bool steepen = false
     )
     {
         var (width, height) = Ui.ClientSize(game);
@@ -538,8 +541,30 @@ internal sealed partial class Server
                 Aim();
                 missing = Missing();
             }
-            if (zooms.Count > 0)
-                camera = new { lookAt = camera, zoomedOutTo = zooms };
+            // Session 4: near the camera-side map edge the look-at target clamps to the map, so points stay below the
+            // view even at the zoom limit; a steeper pitch brings them up (pitch resets yaw, native help text).
+            var pitches = new List<double>();
+            foreach (var pitch in SteepPitches)
+            {
+                if (!steepen || missing.Length == 0)
+                    break;
+                var current = PoseOf(view).Pitch;
+                if (current >= pitch - PitchTolerance)
+                    continue;
+                _pitchBefore ??= current;
+                CameraNative(game, PitchCommand, new { angle = pitch });
+                view = WaitCamera(game);
+                pitches.Add(PoseOf(view).Pitch);
+                Aim();
+                missing = Missing();
+            }
+            if (zooms.Count > 0 || pitches.Count > 0)
+                camera = new
+                {
+                    lookAt = camera,
+                    zoomedOutTo = zooms,
+                    pitchedTo = pitches,
+                };
             if (missing.Length > 0)
                 throw new WorkflowFailure(
                     NotClickableCode,
@@ -556,6 +581,30 @@ internal sealed partial class Server
     /// <summary>Largest auto zoom (native cameraMaxZoomSet distance) for areas that do not fit; 130 painted/sampled
     /// correctly in the 2026-10-20 Wake Island session (1600×900). Native accepts up to MaxZoom.</summary>
     const double AutoZoomLimit = 130;
+
+    /// <summary>Pitches (degrees) tried in order by <see cref="Screen"/> with steepen after the zoom limit; host choice
+    /// inside the live-tested 30..89 range (<see cref="MaxPitch"/>), steeper than the 47° default.</summary>
+    static readonly double[] SteepPitches = [60, 75];
+
+    /// <summary>Pitch before the first <see cref="Screen"/> steepen of the current call, or null when unchanged.
+    /// Calls are serialized, so one field is enough; the steepening tool restores and clears it.</summary>
+    double? _pitchBefore;
+
+    /// <summary>Restores the pitch recorded by <see cref="_pitchBefore"/> (yaw returns to the default, native help).</summary>
+    /// <param name="game">Validated editor connection.</param>
+    /// <returns>Restore report, or null when the pitch was not changed.</returns>
+    object? RestorePitch(Game game)
+    {
+        if (_pitchBefore is not { } pitch)
+            return null;
+        _pitchBefore = null;
+        CameraNative(game, PitchCommand, new { angle = pitch });
+        return new
+        {
+            restoredPitchDegrees = Math.Round(PoseOf(WaitCamera(game)).Pitch, 2),
+            note = "cameraPitchAngle resets yaw to the default (native help).",
+        };
+    }
 
     /// <summary>Auto zoom-out step factor; host choice (85 → 106 → 130).</summary>
     const double AutoZoomFactor = 1.25;
@@ -3385,7 +3434,7 @@ internal sealed partial class Server
         };
         yield return Spec(
             "editor_paint_area",
-            "Fill WORLD shapes with texture, water or forest (lakes, forests, biome patches): shapes 1..16 (same spec as editor_terrain_shape: polygon points | circle x,z,radius | ellipse x,z,radiusX,radiusZ,angleDegrees | capsule points+radius), optional exclude shapes and mirror copy. Plans serpentine strokes on tile centres eroded by the live-measured brush radius (texture/forest ≈0.45 tiles per brush size; water fixed ≈7-tile band, brushSize ignored), default brushSize = largest reaching 90 % predicted coverage (≤20). preview (default true) returns the plan (coverage/leak prediction, strokes) without input. preview=false + confirmDestructive: selects type (verified), sets brush (restored after), paints (camera re-aimed per chunk), verifies coverage/leak from live tiles (forest: new objects per tile), touch-up up to 2 passes (half brush, then size 1). strokes = undo count; failures after painting report undoSteps. Not saved.",
+            "Fill WORLD shapes with texture, mix, water or forest (lakes, forests, biome patches, beaches): shapes 1..16 (same spec as editor_terrain_shape: polygon points | circle x,z,radius | ellipse x,z,radiusX,radiusZ,angleDegrees | capsule points+radius), optional exclude shapes and mirror copy. kind=mix paints a terrain mix (editor_terrain_catalog kind=mix titles); coverage counts tiles carrying one of the mix's textures (generated/data/mixes, matched to live names; plan.mixTextures). band {distanceTo:water|land, minTiles, maxTiles} keeps only area tiles whose 8-connected tile distance to the nearest live water (land) tile is in [min,max] (0 = the water/land tile itself), e.g. a beach ring: shapes=island, band {distanceTo:\"water\",minTiles:1,maxTiles:2}; computed from live tiles at call time, preview reports band counts. Plans serpentine strokes on tile centres eroded by the live-measured brush radius (texture/forest ≈0.45 tiles per brush size; water fixed ≈7-tile band, brushSize ignored), default brushSize = largest reaching 90 % predicted coverage (≤20). preview (default true) returns the plan (coverage/leak prediction, strokes) without input. preview=false + confirmDestructive: selects type (verified), sets brush (restored after), paints (camera re-aimed per chunk), verifies coverage/leak from live tiles (forest: new objects per tile), touch-up up to 2 passes (half brush, then size 1). strokes = undo count; failures after painting report undoSteps. Not saved.",
             new Dictionary<string, object>
             {
                 ["kind"] = new { type = "string", @enum = AreaPaintKinds },
@@ -3405,6 +3454,28 @@ internal sealed partial class Server
                     items = areaShape,
                 },
                 ["mirror"] = new { type = "string", @enum = MirrorModes },
+                ["band"] = new
+                {
+                    type = "object",
+                    properties = new Dictionary<string, object>
+                    {
+                        ["distanceTo"] = new { type = "string", @enum = BandTargets },
+                        ["minTiles"] = new
+                        {
+                            type = "integer",
+                            minimum = 0,
+                            maximum = MaxBandTiles,
+                        },
+                        ["maxTiles"] = new
+                        {
+                            type = "integer",
+                            minimum = 0,
+                            maximum = MaxBandTiles,
+                        },
+                    },
+                    required = BandRequired,
+                    additionalProperties = false,
+                },
                 ["brushSize"] = new
                 {
                     type = "integer",

@@ -34,7 +34,10 @@ internal static class DialogState
 
     // Window geometry policy at the 2560-wide reference: observed signature bounds sit a few px inside the predicted
     // size1024 rect (changed-pixel box); 30 px per edge separates nominal windows from anchored/stretched ones.
-    const int NominalEdge = 30;
+    internal const int NominalEdge = 30;
+
+    /// <summary>Best-score difference below which two signature files tie (scores are point fractions, at least 1/24 apart).</summary>
+    const double TieEpsilon = 1e-6;
     const int FitRange = 24;
     const int FitStep = 4;
     const int FitMargin = 8;
@@ -279,11 +282,50 @@ internal static class DialogState
                 "UI kind not detected (a dialog may cover the minimap gate): scored every signature for this build. "
                     + reason
             );
-        // Several files may match (other UI kinds/sizes when undetected): pick exact size first, then the best total score.
-        var set = candidates
-            .OrderByDescending(s => s.Width == width && s.Height == height)
-            .ThenByDescending(s => s.Dialogs.Values.Sum(d => Score(frame, d, s).Score))
-            .FirstOrDefault();
+        // Several files may match (other UI kinds/sizes when undetected): pick exact size first, then the best single
+        // dialog score, then the fewest non-closed matches, then the best total. Session 4 alternative-UI live: under the
+        // modal dim of Forbidden Objects/Techs the normal file's dark chrome points matched 8 dialogs (total 5.5) while
+        // the alternative file matched the one open dialog exactly; the total alone picked the wrong file.
+        var ranked = candidates
+            .Select(s =>
+                (Set: s, Scores: s.Dialogs.Values.Select(d => Score(frame, d, s)).ToArray())
+            )
+            .Select(c =>
+                (
+                    c.Set,
+                    Key: (
+                        Exact: c.Set.Width == width && c.Set.Height == height,
+                        Best: c.Scores.Length == 0 ? 0 : c.Scores.Max(m => m.Score),
+                        Shown: c.Scores.Count(m => m.State != "closed"),
+                        Total: c.Scores.Sum(m => m.Score)
+                    ),
+                    Open: c.Scores.Where(m => m.State == "open")
+                        .Select(m => m.Signature.Gadget)
+                        .Order(StringComparer.Ordinal)
+                        .ToArray()
+                )
+            )
+            .OrderByDescending(c => c.Key.Exact)
+            .ThenByDescending(c => c.Key.Best)
+            .ThenBy(c => c.Key.Shown)
+            .ThenByDescending(c => c.Key.Total)
+            .ToArray();
+        var set = ranked.Length == 0 ? null : ranked[0].Set;
+        // A full-screen dialog (xsDebugger) hides both UIs and opens in both files at the same score (2026-10-29 normal-UI
+        // live: the alternative file won on a stray partial in the normal file). When the runner-up file of another UI kind
+        // claims the same open dialogs at the same best score, keep the set for open/close detection but claim no UI kind.
+        var ambiguousKind =
+            ui is null
+            && ranked.Length > 1
+            && ranked[1].Set.UiKind != ranked[0].Set.UiKind
+            && ranked[1].Key.Exact == ranked[0].Key.Exact
+            && Math.Abs(ranked[1].Key.Best - ranked[0].Key.Best) < TieEpsilon
+            && ranked[0].Open.Length > 0
+            && ranked[1].Open.SequenceEqual(ranked[0].Open, StringComparer.Ordinal);
+        if (ambiguousKind)
+            warnings.Add(
+                $"UI kind ambiguous: the {ranked[0].Set.UiKind} and {ranked[1].Set.UiKind} signature files match this frame equally (full-screen dialog?); uiKind unreported."
+            );
         if (set is null && ui is not null && sets.Any(s => s.BuildHash == hash))
             warnings.Add(
                 $"No calibrated dialog signatures for the {ui.Kind} UI; open/close detection and pixel clicks unavailable (script presses still work)."
@@ -306,7 +348,8 @@ internal static class DialogState
             UiKind =
                 ui?.Kind
                 ?? (
-                    set?.Dialogs.Values.Any(d => Score(frame, d, set).State == "open") == true
+                    !ambiguousKind
+                    && set?.Dialogs.Values.Any(d => Score(frame, d, set).State == "open") == true
                         ? set.UiKind
                         : null
                 ),
@@ -388,7 +431,9 @@ internal static class DialogState
         return [x, y, R(s[2] * fx) - x, R(s[3] * fy) - y];
     }
 
-    static double[]? TargetRect(Target t) =>
+    /// <summary>size1024 rect of the window (or its resolved target control); null when the catalog has none.</summary>
+    /// <param name="t">Resolved target.</param>
+    internal static double[]? TargetRect(Target t) =>
         t.TargetName == t.Window.Window
             ? t.Window.Size1024
             : t.Window.Controls.FirstOrDefault(c => c.Name == t.TargetName)?.Size1024;
@@ -826,10 +871,18 @@ internal static class DialogState
         var offset = args.TryGetProperty("offset", out var of) ? of.GetInt32() : 0;
         var limit = args.TryGetProperty("limit", out var li) ? li.GetInt32() : DefaultControlLimit;
         var o = Observe(game, hash, sets);
+        gadget = ResolveGadget(
+            o.Set,
+            catalog.Windows,
+            o.UiKind ?? o.Set?.UiKind,
+            gadget,
+            out var resolvedFrom
+        );
         if (gadget.Length > 0 && o.Set is not null && o.Find(gadget) is null)
             throw new ArgumentException(
                 $"Gadget '{gadget}' has no calibrated signature. Calibrated: {string.Join(", ", o.Set.Dialogs.Keys.Order(StringComparer.Ordinal))}. Use editor_dialogs for static metadata."
             );
+        // Catalog controls resolve against the matched file's UI kind; uiKind reports only an observed kind (null when ambiguous).
         var ui = o.UiKind ?? o.Set?.UiKind;
         var selected = o
             .Matches.Where(m =>
@@ -868,11 +921,13 @@ internal static class DialogState
             );
         return new
         {
-            uiKind = ui,
+            uiKind = o.UiKind,
             uiSource = o.UiSource,
             client = new { width = o.Width, height = o.Height },
             signatureFile = o.Set?.File,
             signatureReviewed = o.Exact,
+            gadget = gadget.Length > 0 ? gadget : null,
+            resolvedFrom,
             calibratedGadgets = o.Set?.Dialogs.Count ?? 0,
             catalog = catalog.Status,
             dialogs,
@@ -1078,16 +1133,108 @@ internal static class DialogState
         JsonElement args
     )
     {
-        var gadget = args.GetProperty("gadget").GetString()!.Trim();
+        var requested = args.GetProperty("gadget").GetString()!.Trim();
         var action = args.GetProperty("action").GetString()!;
         var timeout = args.TryGetProperty("timeout", out var t) ? t.GetInt32() : DefaultTimeout;
         var before = Observe(game, hash, sets);
+        var gadget = ResolveGadget(
+            before.Set,
+            catalog.Windows,
+            before.UiKind ?? before.Set?.UiKind,
+            requested,
+            out var resolvedFrom
+        );
+        if (resolvedFrom is not null)
+            before.Warnings.Add(
+                $"gadget '{resolvedFrom}' resolved to calibrated gadget '{gadget}'."
+            );
         return action switch
         {
             "open" => Open(game, hash, sets, native, before, gadget, timeout),
             "close" => Close(game, hash, sets, native, catalog, before, gadget, timeout),
             _ => Control(game, hash, catalog, sets, native, before, gadget, action, args, timeout),
         };
+    }
+
+    /// <summary>Least distinct control labels OCR must find inside a dialog's bounds to call it visibly open
+    /// (host choice: one label can be map text behind a closed dialog).</summary>
+    const int MinOcrLabels = 2;
+
+    /// <summary>Shortest normalized control label used for the OCR presence check (host choice: shorter labels such as
+    /// "x" or "ok" also occur in unrelated text).</summary>
+    const int MinOcrLabelLength = 3;
+
+    /// <summary>Resolves a window or close name (e.g. "CameraStartDlg", the window name editor_dialogs lists) to the
+    /// calibrated gadget open name ("CameraStartDialog"): exact signature key first, then <see cref="InnerClose"/>,
+    /// <see cref="Catalog.AlternativeCloseNames"/> and catalog windows named <paramref name="name"/>.</summary>
+    /// <param name="set">Signature set of the observation (null: unchanged).</param>
+    /// <param name="windows">Dialog catalog windows.</param>
+    /// <param name="ui">UI kind, if known.</param>
+    /// <param name="name">Requested gadget/window name.</param>
+    /// <param name="resolvedFrom">The requested name when it was resolved to another gadget; otherwise null.</param>
+    /// <returns>Gadget name to use.</returns>
+    internal static string ResolveGadget(
+        SignatureSet? set,
+        IReadOnlyList<DialogWindow> windows,
+        string? ui,
+        string name,
+        out string? resolvedFrom
+    )
+    {
+        resolvedFrom = null;
+        if (set is null || name.Length == 0 || set.Dialogs.ContainsKey(name))
+            return name;
+        var candidates = InnerClose
+            .Concat(Catalog.AlternativeCloseNames)
+            .Where(e => string.Equals(e.Value, name, StringComparison.OrdinalIgnoreCase))
+            .Select(e => e.Key)
+            .Concat(
+                windows
+                    .Where(w =>
+                        (ui is null || w.Ui == ui)
+                        && string.Equals(w.Window, name, StringComparison.OrdinalIgnoreCase)
+                    )
+                    .SelectMany(w => w.OpenNames.Select(n => n.Name))
+            )
+            .Concat(
+                set.Dialogs.Keys.Where(k =>
+                    string.Equals(k, name, StringComparison.OrdinalIgnoreCase)
+                )
+            )
+            .Where(set.Dialogs.ContainsKey)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (candidates.Length != 1)
+            return name;
+        resolvedFrom = name;
+        return candidates[0];
+    }
+
+    /// <summary>OCR presence check before trusting a "closed" score: true when at least <see cref="MinOcrLabels"/> distinct
+    /// control labels of the gadget's window are read inside its signature bounds (session 4: a scaled signature
+    /// scored 0.091 "closed" while Camera Start Settings was open).</summary>
+    /// <param name="game">Editor connection.</param>
+    /// <param name="o">Observation.</param>
+    /// <param name="signature">Gadget signature.</param>
+    /// <param name="target">Catalog target (null: unknown, false).</param>
+    /// <returns>Labels found, or an empty array when none/unknown.</returns>
+    static string[] OcrLabels(Game game, Observation o, Signature signature, Target? target)
+    {
+        if (target is null)
+            return [];
+        var labels = target
+            .Controls.Select(c => Norm(c.Label))
+            .Where(l => l.Length >= MinOcrLabelLength)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (labels.Length < MinOcrLabels)
+            return [];
+        var capture = Ui.CapturePixels(game, Ui.FullResolutionWidth);
+        var tiles = MaxTiles;
+        var text = string.Concat(
+            Read(capture, o.Bounds(signature), ref tiles).Select(l => Norm(l.Text))
+        );
+        return [.. labels.Where(l => text.Contains(l, StringComparison.Ordinal))];
     }
 
     static Signature Calibrated(Observation o, string gadget, string action)
@@ -1210,7 +1357,11 @@ internal static class DialogState
     {
         var signature = Calibrated(before, gadget, "close");
         var was = Score(before.Frame, signature, before.Set!);
-        if (was.State == "closed")
+        var ui = before.UiKind ?? before.Set!.UiKind;
+        var target = Resolve(catalog.Windows, ui, gadget);
+        // A low score is not proof of closed (scaled signatures; state-dependent pixels): OCR the control labels first.
+        var seen = was.State == "closed" ? OcrLabels(game, before, signature, target) : [];
+        if (was.State == "closed" && seen.Length < MinOcrLabels)
             return new
             {
                 gadget,
@@ -1218,10 +1369,9 @@ internal static class DialogState
                 skipped = true,
                 state = was.State,
                 score = was.Score,
+                ocrCheck = new { labelsFound = seen },
                 nativeDispatched = false,
             };
-        var ui = before.UiKind ?? before.Set!.UiKind;
-        var target = Resolve(catalog.Windows, ui, gadget);
         var command = Catalog.Require(native.Commands, "gadgetUnreal");
         var attempts = new List<object>();
         var dispatched = new List<string>();
@@ -1235,22 +1385,37 @@ internal static class DialogState
             Dispatch(native, expression, dispatched);
             dispatched.Add(expression);
             after = Poll(game, hash, sets, gadget, s => s == "closed", timeout);
+            var still = after?.State == "closed" ? OcrLabels(game, before, signature, target) : [];
+            if (still.Length >= MinOcrLabels)
+                after = after! with { State = "open" };
             attempts.Add(
                 new
                 {
                     name,
                     state = after?.State,
                     score = after?.Score,
+                    ocrLabels = still,
                 }
             );
             if (after?.State == "closed")
                 break;
         }
-        if (after?.State != "closed")
+        // Session 4 alternative-UI live: NewScenarioGadget was scored from the normal file under its modal dim; once it
+        // closed the gates matched the alternative file, which has no signature for it, so Poll had nothing to score.
+        if (after is null)
+            throw new WorkflowFailure(
+                "DIALOG_CLOSE_UNVERIFIED",
+                "verify",
+                $"{gadget} has no signature in the dialog set detected after {string.Join(", ", dispatched)} (UI kind changed when it closed?); close not verified.",
+                true,
+                true,
+                "Screenshot to check; never reopen with gadgetReal to 'restore'."
+            );
+        if (after.State != "closed")
             throw new WorkflowFailure(
                 "DIALOG_STILL_OPEN",
                 "verify",
-                $"{gadget} still scores {after?.Score} after {string.Join(", ", dispatched)}.",
+                $"{gadget} still scores {after.Score} after {string.Join(", ", dispatched)}.",
                 true,
                 true,
                 "Screenshot, then close via the dialog's own Close button (editor_dialog_act press) or ESC. Never reopen with gadgetReal to 'restore'."
@@ -1265,7 +1430,11 @@ internal static class DialogState
         };
     }
 
-    static object Dispatch(Native native, string expression, List<string> done)
+    /// <summary>Runs one native expression; bridge refusals/timeouts become WorkflowFailures naming what was already dispatched.</summary>
+    /// <param name="native">Native bridge.</param>
+    /// <param name="expression">Expression.</param>
+    /// <param name="done">Expressions already dispatched in this action.</param>
+    internal static object Dispatch(Native native, string expression, List<string> done)
     {
         try
         {
@@ -1297,7 +1466,9 @@ internal static class DialogState
         }
     }
 
-    static JsonElement Json(Dictionary<string, object?> values) =>
+    /// <summary>Serializes an argument dictionary for <see cref="Catalog.Build"/>.</summary>
+    /// <param name="values">Arguments.</param>
+    internal static JsonElement Json(Dictionary<string, object?> values) =>
         JsonSerializer.SerializeToElement(values);
 
     sealed record Resolved(Target Target, DialogControl Control, string Ui);
@@ -1729,20 +1900,24 @@ internal static class DialogState
                 false,
                 "No input sent."
             );
-        foreach (
-            var other in o.Matches.Where(m =>
-                m.Signature.Gadget != r.Target.Gadget && m.State != "closed"
+        var overlapping = o
+            .Matches.Where(m =>
+                m.Signature.Gadget != r.Target.Gadget
+                && m.State != "closed"
+                && Inside(cx, cy, o.Bounds(m.Signature))
             )
-        )
-            if (Inside(cx, cy, o.Bounds(other.Signature)))
-                throw new WorkflowFailure(
-                    "OCCLUDED",
-                    "preflight",
-                    $"Click point lies inside {other.Signature.Gadget} ({other.State}); stacking order unknown.",
-                    false,
-                    false,
-                    $"Close {other.Signature.Gadget} first; no input sent."
-                );
+            .ToArray();
+        // Session 4: a best-effort "partial" GodPowersGadget match blocked Camera Start Set although nothing covered it.
+        // Only "open" matches block outright; "partial" ones block unless OCR reads the target label at the point.
+        foreach (var other in overlapping.Where(m => m.State == "open"))
+            throw new WorkflowFailure(
+                "OCCLUDED",
+                "preflight",
+                $"Click point lies inside {other.Signature.Gadget} ({other.State}, score {other.Score}); stacking order unknown.",
+                false,
+                false,
+                $"Close {other.Signature.Gadget} first; no input sent."
+            );
         var (assigned, _) = Assign(placed, lines, o.Scale);
         var label = Norm(r.Control.Label);
         var own = assigned.GetValueOrDefault(control) ?? [];
@@ -1751,6 +1926,20 @@ internal static class DialogState
             && own.Any(l =>
                 Norm(l.Text).Contains(label, StringComparison.Ordinal)
                 || (o.BestEffort && NearLabel(Norm(l.Text), label))
+            );
+        var partial = overlapping.FirstOrDefault(m => m.State == "partial");
+        if (partial is not null && !labelVerified)
+            throw new WorkflowFailure(
+                "OCCLUDED",
+                "preflight",
+                $"Click point lies inside {partial.Signature.Gadget} (partial, score {partial.Score}) and OCR did not read the control label there.",
+                false,
+                false,
+                $"Screenshot; close {partial.Signature.Gadget} if it is open; no input sent."
+            );
+        if (partial is not null)
+            o.Warnings.Add(
+                $"{partial.Signature.Gadget} scores partial ({partial.Score}) over the click point; the control label was read there, so the click proceeds."
             );
         if (label.Length >= 2 && !labelVerified)
             throw new WorkflowFailure(
@@ -2040,6 +2229,19 @@ internal static class DialogState
             || normal.BuildHash.Length != 64
         )
             throw new InvalidDataException("Dialog signature file incomplete.");
+        // Session 4: the agent named the inner window "CameraStartDlg"; it must resolve to the calibrated open name.
+        if (
+            normal.Dialogs.ContainsKey("CameraStartDialog")
+            && (
+                ResolveGadget(normal, [], "normal", "CameraStartDlg", out var from)
+                    != "CameraStartDialog"
+                || from != "CameraStartDlg"
+                || ResolveGadget(normal, [], "normal", "CameraStartDialog", out var same)
+                    != "CameraStartDialog"
+                || same is not null
+            )
+        )
+            throw new InvalidOperationException("Dialog alias resolution self-test failed.");
         // Synthetic frame: paint one signature's points; it must score open and no other signature may score open.
         var rgb = new byte[1280 * 720 * 3];
         foreach (var p in signature.Points)

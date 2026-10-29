@@ -7,3 +7,19 @@ Moved verbatim from AGENTS.md; served by `editor_help topic=workflows`.
 - During a playtest editor reads answer `NOT_IN_EDITOR`. To see the whole map, type a chat cheat (Enter, code, Enter): `CLEAR SKIES` removes black map and fog of war (again re-enables), `LAY OF THE LAND` reveals the map. `start` returns them in `hints.cheats` once `playing`. Pass `expectedPid`/`expectedWindowThread` from `start` to `inspect`/`quit`/`dismiss`; verification gates tolerate ±10 per channel and 80% of pixels, result `gate` lists mismatches.
 - Trigger compile errors are NOT in MythLog: Play shows a modal "Trigger Error." dialog instead. `editor_playtest start`/`inspect` read it (state `dialog`, `dialog.parsed[{file,line,code,message,hint,source}]`, `compileEvidence`); `dismiss` (token + confirmDismiss) clicks its OK and reports the next dialog or the playing gate. `trigtemp.xs(N)` lines map to `editor_xs_diagnostics operation=trigtemp`. Live-verified normal UI 2560x1440 only.
 - `editor_build_campaign` packages saved scenarios and the profile XS they need (player AI + TR XS Scripts with includes) as a self-contained campaign mod; preview first, `operation=update` refreshes an existing mod with hash-pinned replacements. Details: `editor_help topic=campaign`.
+- Playtest recovery: `inspect` on an `unknown` session re-observes read-only (never input): editor flag 1 + editor
+  gate ≥ 80 % → `returned`; editor flag 0 + playing gate 100 % → `playing` (Quit re-authorized). A `start` behind an
+  `unknown` session runs the same recovery first. Start/quit waits default to 30 s (`timeoutMs` up to 60 s).
+- Cheats: `editor_playtest operation=cheat token=<t> code="CLEAR SKIES"|"LAY OF THE LAND" confirmCheat=true` (state
+  `playing`, gated before each key). `start` matches Gaia (player 0) units by ID/player/proto only (they may move);
+  other players stay position-strict and failures list up to 10 mismatches.
+- `start` warns (`warnings`) for each human player without a camera start in the disposable checkpoint (the playtest
+  may open on a black view).
+- Camera start: `editor_camera_start` (core). `operation=get` reads every player's stored start from a checkpoint
+  (`scenarioPath`, default `"latest"`; PL player P9 record) without UI. `set player x z confirmDestructive` centres the
+  camera, opens Camera Start Location, picks the Target Player (OCR of the dropdown list; `playerLabel` for renamed
+  players), clicks Set and verifies by Show (residual ≤ 2). `show` returns the stored start (camera restored);
+  `delete` (confirmDestructive) clears it, verified by Show no longer moving the camera. Native
+  `uiSetCameraStartLoc`/`uiDeleteCameraStartLoc` stored nothing live; do not use them. Live-verified normal and
+  alternative UI 1920×1080 (2026-10-29). The Target Player list OCR may show a stray "Set" row (the Set button
+  under the open list); it is ignored for matching.

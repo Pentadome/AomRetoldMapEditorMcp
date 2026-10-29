@@ -14,6 +14,11 @@ Served by `editor_help topic=map-building`. Live facts: `research/LIVE-WORLD.md`
   optional `water=<water type>` and `mirror=point|flipX|flipZ|swapXZ` for symmetric 1v1 maps. Needs a 7×7-node
   square inside the shape (`AREA_TOO_SMALL` otherwise; narrow parts are fine). `edits` = undo count. If sampling
   fails on steep relief (`SAMPLE_NOT_CONVERGED`), use `tolerance` 0.2–0.3.
+- One `editor_terrain_shape` call covers any shape: the mask is split into view cells and a camera-only preflight
+  aims each cell (zoom out, then steeper pitch) before the first edit; unreachable cells refuse
+  `TARGET_NOT_CLICKABLE phase=preflight` with 0 edits. Height is sampled once per call (mirror and all cells reuse
+  it), so do not split shapes yourself (separate calls give seams). A mid-run failure reports `idempotentRetry`:
+  re-running the same call is safe. Rotated ellipses use exact extents for the map-bounds check.
 - Land/water follows the tile corner rule: a tile is water only when a corner is under the water surface. An island
   needs height above the water surface (e.g. 8 on a surface of 6).
 - Fill areas (biome patches, forests, shallow lakes) with `editor_paint_area kind=texture|water|forest type=<exact
@@ -23,6 +28,11 @@ Served by `editor_help topic=map-building`. Live facts: `research/LIVE-WORLD.md`
   up with smaller brushes (`touchUp`, default on). `strokes` = undo count; failures after painting report
   `undoSteps`. Water ignores brush size (≈7-tile band) and paints a shore texture ring (`otherTilesChangedOutside`).
   Use `editor_terrain_shape water=` for deep lakes with a lowered bed.
+- `kind=mix type=<mix name>` paints a terrain mix (verified: every tile's texture is in the mix's texture set).
+  Coast rings: `band {distanceTo:"water"|"land", minTiles, maxTiles}` (≤32) keeps only shape tiles whose
+  8-connected tile distance to live water (or land) lies in [min,max], e.g. beach = shape of the island +
+  `band {distanceTo:"water",minTiles:1,maxTiles:3}`. Preview reports band tile counts. Steep relief can still
+  refuse `TARGET_NOT_CLICKABLE` (paint_area has no preflight ladder yet).
 - Ridges, valleys, coast shaping: `editor_stroke tool=raise|lower|smooth|roughen|flatten` along a world polyline
   (≤256 points; `passes`, `brushSize`, `mirror`). `strokes` = undo count. Flatten samples `referenceX/Z` (default first
   vertex).

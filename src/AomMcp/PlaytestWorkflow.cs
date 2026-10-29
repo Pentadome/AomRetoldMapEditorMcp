@@ -65,8 +65,15 @@ internal sealed class PlaytestWorkflow
         /// <summary>Game executable path (stock AI root for dialog source excerpts), when readable.</summary>
         internal string? Exe { get; set; }
 
-        /// <summary>Last verification gate report (matched/total/mismatches), null before the first verification.</summary>
+        /// <summary>Start-time warnings from the disposable checkpoint (human players without a camera start).</summary>
+        internal string[] Warnings { get; set; } = [];
+
+        /// <summary>Last verification gate report (matched/total/mismatches), null before the first verification and
+        /// after a failed one (the failure message carries that report).</summary>
         internal GateReport? Gate { get; set; }
+
+        /// <summary>Last read-only recovery of an unknown session (null when none ran).</summary>
+        internal object? Recovery { get; set; }
     }
 
     /// <summary>Result of one pixel gate check.</summary>
@@ -90,7 +97,11 @@ internal sealed class PlaytestWorkflow
     /// <summary>Chat cheat: reveals the map, a returning cheat from the original game (source: user-provided, AoM Retold).</summary>
     internal const string LayOfTheLandCheat = "LAY OF THE LAND";
 
-    /// <summary>Playing-state hints: editor reads do not work during a playtest (session 3: editor_units → NOT_IN_EDITOR).</summary>
+    /// <summary>Chat cheats operation=cheat may type (allowlist; other text is refused before connection).</summary>
+    internal static readonly string[] AllowedCheats = [ClearSkiesCheat, LayOfTheLandCheat];
+
+    /// <summary>Playing-state hints: editor reads and generic input tools do not work during a playtest (session 3:
+    /// editor_units → NOT_IN_EDITOR; session 4: editor_key/editor_text/editor_mouse_click → NOT_IN_EDITOR).</summary>
     internal static readonly object PlayingHints = new
     {
         cheats = new[]
@@ -106,7 +117,7 @@ internal sealed class PlaytestWorkflow
                 effect = "Reveals the map (returning cheat from the original game).",
             },
         },
-        howTo = "Type a cheat in chat: Enter, the code, Enter (editor_key ENTER, editor_text, editor_key ENTER). Check the result with editor_screenshot.",
+        howTo = "editor_playtest operation=cheat token=<token> code=\"LAY OF THE LAND\" confirmCheat=true types Enter, the code, Enter in chat (gated). Check the result with editor_screenshot. editor_key/editor_text/editor_mouse_click refuse NOT_IN_EDITOR during a playtest.",
         editorReads = "Editor read tools (editor_units, editor_terrain_info, ...) answer NOT_IN_EDITOR during a playtest; use screenshots, then quit.",
     };
 
@@ -131,8 +142,45 @@ internal sealed class PlaytestWorkflow
     /// <summary>Poll interval while waiting for the outcome of a dismiss.</summary>
     const int OutcomePollMs = 250;
 
-    /// <summary>Default transition wait when timeoutMs is omitted.</summary>
-    const int DefaultTimeoutMs = 5000;
+    /// <summary>Default transition wait when timeoutMs is omitted. Session 4: the quit back to the editor (2050-object
+    /// scene, 1920×1080) took longer than the former 5 s default; the editor was back about 3 s after the timeout.</summary>
+    const int DefaultTimeoutMs = 30_000;
+
+    /// <summary>Smallest accepted transition wait (host bound).</summary>
+    internal const int MinTimeoutMs = 1000;
+
+    /// <summary>Largest accepted transition wait (host bound; the progress heartbeat keeps clients alive meanwhile).</summary>
+    internal const int MaxTimeoutMs = 60_000;
+
+    /// <summary>Pause after each chat keystroke group of operation=cheat (host choice: one UI frame batch).</summary>
+    const int ChatSettleMs = 300;
+
+    /// <summary>Most mismatching units listed by <see cref="VerifyScene"/> (host output bound).</summary>
+    const int MaxSceneMismatches = 10;
+
+    /// <summary>Saved/live position tolerance for non-Gaia units in <see cref="VerifyScene"/> (world units; editor
+    /// objects of players 1..12 do not move while the editor runs).</summary>
+    const double ScenePositionTolerance = 0.001;
+
+    /// <summary>Directory of registered profile ids ("uilayouts/&lt;file&gt;", as Capabilities reports them).</summary>
+    const string ProfileDirectory = "uilayouts";
+
+    /// <summary>Required arguments of operation=start (checked with a named error before any file read).</summary>
+    static readonly string[] StartRequired =
+    [
+        "profilePath",
+        "expectedProfileSha256",
+        "runId",
+        "expectedPid",
+        "expectedWindowThread",
+        "expectedExeSha256",
+        "originalCheckpointPath",
+        "expectedOriginalSha256",
+        "disposableCheckpointPath",
+        "expectedDisposableSha256",
+        "triggerBackupPath",
+        "expectedTriggerSha256",
+    ];
 
     // Independently observed ordinary Play/Paused-Quit/YES paths; caller assertions cannot register profiles.
     internal sealed record Registered(string File, string Sha256, string Evidence);
@@ -182,10 +230,12 @@ internal sealed class PlaytestWorkflow
             profiles = ReviewedProfiles
                 .Select(r => new
                 {
-                    profile = "uilayouts/" + r.File,
+                    profile = ProfileDirectory + "/" + r.File,
+                    profilePath = Path.Combine(AppContext.BaseDirectory, ProfileDirectory, r.File),
                     expectedProfileSha256 = r.Sha256,
                 })
                 .ToArray(),
+            profilePathNote = "profilePath accepts the absolute path or the registered id uilayouts/<file>.",
             reason = "Reviewed English Player1/Standard ordinary Play/Paused-Quit/YES paths, one profile per editor UI (normal/alternative) and client size; pick the profile matching editor_ui_state uiKind/client. Exact pixels fail closed on other/loading/defeat/overlay states. No compiler/runtime/gameplay proof; existing editor guards unchanged.",
         };
 
@@ -236,15 +286,35 @@ internal sealed class PlaytestWorkflow
                     "expectedPid",
                     "expectedWindowThread",
                 ],
-                _ => throw new ArgumentException("operation: preview/start/inspect/dismiss/quit"),
+                "cheat" =>
+                [
+                    "operation",
+                    "token",
+                    "code",
+                    "confirmCheat",
+                    "expectedPid",
+                    "expectedWindowThread",
+                ],
+                _ => throw new ArgumentException(
+                    "operation: preview/start/inspect/dismiss/quit/cheat"
+                ),
             }
         );
-        if (args.TryGetProperty("timeoutMs", out var t) && t.GetInt32() is < 1000 or > 15_000)
-            throw new ArgumentException("Transition wait 1000..15000 ms.");
+        if (
+            args.TryGetProperty("timeoutMs", out var t)
+            && t.GetInt32() is < MinTimeoutMs or > MaxTimeoutMs
+        )
+            throw new ArgumentException($"Transition wait {MinTimeoutMs}..{MaxTimeoutMs} ms.");
+        if (operation == "start")
+            foreach (var key in StartRequired)
+                if (!args.TryGetProperty(key, out _))
+                    throw new ArgumentException($"start requires {key}.");
         if (operation is "start" or "preview" && args.TryGetProperty("profilePath", out var p))
         {
-            _ = EditorFiles.LocalPath(p.GetString()!);
-            Hash(args.GetProperty("expectedProfileSha256").GetString()!);
+            _ = ProfilePath(p.GetString()!);
+            // Preview may omit the pin (it reports the actual hash); start always pins it (checked above).
+            if (args.TryGetProperty("expectedProfileSha256", out var pin))
+                Hash(pin.GetString()!);
         }
         if (operation == "start")
         {
@@ -275,11 +345,9 @@ internal sealed class PlaytestWorkflow
                 }
             )
                 _ = EditorFiles.LocalPath(args.GetProperty(key).GetString()!);
-            _ = args.GetProperty("profilePath");
-            _ = args.GetProperty("expectedProfileSha256");
         }
         if (
-            operation is "inspect" or "quit" or "dismiss"
+            operation is "inspect" or "quit" or "dismiss" or "cheat"
             && (
                 !args.TryGetProperty("token", out var token)
                 || token.ValueKind != JsonValueKind.String
@@ -291,6 +359,38 @@ internal sealed class PlaytestWorkflow
             EditorFiles.Confirm(args, "confirmQuit");
         if (operation == "dismiss")
             EditorFiles.Confirm(args, "confirmDismiss");
+        if (operation == "cheat")
+        {
+            EditorFiles.Confirm(args, "confirmCheat");
+            var code = args.TryGetProperty("code", out var c) ? c.GetString() : null;
+            if (code is null || !AllowedCheats.Contains(code, StringComparer.Ordinal))
+                throw new ArgumentException(
+                    $"code must be one of: {string.Join(", ", AllowedCheats)} (exact, upper case)."
+                );
+        }
+    }
+
+    /// <summary>Resolves profilePath: a registered id "uilayouts/&lt;file&gt;" (either slash) maps to the packaged
+    /// file next to the host; anything else must be an explicit local path.</summary>
+    /// <param name="value">profilePath argument.</param>
+    /// <returns>Absolute local path.</returns>
+    internal static string ProfilePath(string value)
+    {
+        var normalized = value.Replace('\\', '/');
+        var prefix = ProfileDirectory + "/";
+        if (normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            var file = normalized[prefix.Length..];
+            var registered = ReviewedProfiles.FirstOrDefault(r =>
+                string.Equals(r.File, file, StringComparison.OrdinalIgnoreCase)
+            );
+            if (registered is null)
+                throw new ArgumentException(
+                    $"Unknown profile id '{value}'. Registered: {string.Join(", ", ReviewedProfiles.Select(r => prefix + r.File))}."
+                );
+            return Path.Combine(AppContext.BaseDirectory, ProfileDirectory, registered.File);
+        }
+        return EditorFiles.LocalPath(value);
     }
 
     static void Hash(string value)
@@ -345,13 +445,15 @@ internal sealed class PlaytestWorkflow
 
     static (Profile Profile, string Hash, bool Reviewed) ReadProfile(JsonElement args)
     {
-        var path = EditorFiles.LocalPath(args.GetProperty("profilePath").GetString()!);
+        var path = ProfilePath(args.GetProperty("profilePath").GetString()!);
         var info = new FileInfo(path);
         if (!info.Exists || info.Length is < 1 or > 128_000)
             throw new InvalidDataException("UI profile byte bound invalid.");
         var bytes = File.ReadAllBytes(path);
         var hash = CheckpointDocument.Hash(bytes);
-        CheckpointDocument.RequireHash(hash, args.GetProperty("expectedProfileSha256").GetString());
+        // Preview may omit the pin and learn the hash; start requires it (Preflight StartRequired).
+        if (args.TryGetProperty("expectedProfileSha256", out var pin))
+            CheckpointDocument.RequireHash(hash, pin.GetString());
         var profile =
             JsonSerializer.Deserialize<Profile>(bytes, ProfileJson)
             ?? throw new InvalidDataException("Empty UI profile.");
@@ -365,13 +467,13 @@ internal sealed class PlaytestWorkflow
         var operation = args.GetProperty("operation").GetString();
         if (operation == "start" && !ReadProfile(args).Reviewed)
             throw Unavailable();
-        if (operation is "inspect" or "quit" or "dismiss")
+        if (operation is "inspect" or "quit" or "dismiss" or "cheat")
         {
             var session = RequireToken(args.GetProperty("token").GetString()!);
             RequireIdentity(args, session.Identity);
-            if (operation == "quit" && session.State != "playing")
+            if (operation is "quit" or "cheat" && session.State != "playing")
                 throw new ArgumentException(
-                    "Unknown/inactive session cannot authorize Quit input."
+                    $"Session state \"{session.State}\" cannot authorize {operation} input; inspect first (an unknown session is re-observed read-only and may recover to playing/returned)."
                 );
             if (operation == "dismiss" && session.State != "dialog")
                 throw new ArgumentException(
@@ -403,6 +505,7 @@ internal sealed class PlaytestWorkflow
             {
                 preview = true,
                 candidate.Hash,
+                expectedProfileSha256 = candidate.Hash,
                 candidate.Reviewed,
                 candidate.Profile,
                 inputSent = false,
@@ -414,15 +517,25 @@ internal sealed class PlaytestWorkflow
             var candidate = ReadProfile(args);
             if (!candidate.Reviewed)
                 throw Unavailable();
-            if (
-                _session is { State: not "returned" }
-                || !_runIds.Add(args.GetProperty("runId").GetString()!)
-            )
+            var runId = args.GetProperty("runId").GetString()!;
+            if (_runIds.Contains(runId))
+                throw new ArgumentException("Reused run ID; no start retry.");
+            if (_session is { State: not "returned" and not "unknown" } active)
                 throw new ArgumentException(
-                    "Active/unknown session or reused run ID; no start retry."
+                    $"Active session {active.Token} is \"{active.State}\"; quit or inspect it first. No start."
                 );
             var backups = Backups(args);
             using var game = connect();
+            if (_session is { State: "unknown" } stuck)
+            {
+                // Read-only re-observation; only a recovered "returned" lets a new start proceed.
+                Recover(game, stuck);
+                if (stuck.State != "returned")
+                    throw new ArgumentException(
+                        $"Previous session {stuck.Token} is \"{stuck.State}\" after read-only re-observation ({JsonSerializer.Serialize(stuck.Recovery)}); editor_playtest inspect token={stuck.Token}, quit if playing. No start."
+                    );
+            }
+            _runIds.Add(runId);
             var identity = Observe(game, candidate.Profile, true);
             if (
                 identity.Pid != args.GetProperty("expectedPid").GetUInt32()
@@ -430,15 +543,12 @@ internal sealed class PlaytestWorkflow
                 || identity.ExeSha256 != args.GetProperty("expectedExeSha256").GetString()
             )
                 throw new InvalidDataException("Fresh process/build/thread assertions failed.");
-            VerifyScene(
-                CheckpointUnits.Read(
-                    CheckpointDocument.Read(
-                        backups[1],
-                        args.GetProperty("expectedDisposableSha256").GetString()
-                    )
-                ),
-                LiveUnits.Read(game)
+            var disposable = CheckpointDocument.Read(
+                backups[1],
+                args.GetProperty("expectedDisposableSha256").GetString()
             );
+            VerifyScene(CheckpointUnits.Read(disposable), LiveUnits.Read(game));
+            var startWarnings = CameraStartWarnings(disposable);
             RequirePixels(game, candidate.Profile, candidate.Profile.EditorGate);
             _session = new(
                 Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32)),
@@ -449,6 +559,7 @@ internal sealed class PlaytestWorkflow
             )
             {
                 Exe = ExePath(game),
+                Warnings = startWarnings,
             };
             Transition(game, _session, candidate.Profile.Start, false, args);
             return Describe(_session);
@@ -457,15 +568,37 @@ internal sealed class PlaytestWorkflow
         RequireIdentity(args, session.Identity);
         if (
             operation == "inspect"
-            && session.State is not "playing" and not "returned" and not "dialog"
+            && session.State is not "playing" and not "returned" and not "dialog" and not "unknown"
         )
             return Describe(session);
         if (operation == "dismiss" && session.State != "dialog")
             throw new ArgumentException("Dismiss requires state \"dialog\"; no input.");
-        if (operation == "quit" && session.State != "playing")
+        if (operation is "quit" or "cheat" && session.State != "playing")
             throw new ArgumentException(
-                "Quit requires known active playing session; unknown outcomes need inspection/manual recovery, never automatic input."
+                $"{operation} requires known active playing session; inspect re-observes an unknown session read-only, never with input."
             );
+        if (operation == "inspect" && session.State == "unknown")
+        {
+            Game observer;
+            try
+            {
+                observer = connect();
+            }
+            catch (Exception e)
+                when (e
+                        is InvalidDataException
+                            or InvalidOperationException
+                            or ArgumentException
+                            or System.ComponentModel.Win32Exception
+                )
+            {
+                session.Recovery = new { result = "unknown", reason = e.Message };
+                return Describe(session);
+            }
+            using (observer)
+                Recover(observer, session);
+            return Describe(session);
+        }
         Game current;
         try
         {
@@ -527,8 +660,159 @@ internal sealed class PlaytestWorkflow
             Dismiss(current, session, args);
             return Describe(session);
         }
+        if (operation == "cheat")
+            return Cheat(current, session, args.GetProperty("code").GetString()!);
         Transition(current, session, session.Profile.Quit, true, args);
         return Describe(session);
+    }
+
+    /// <summary>Recovery decision from one read-only observation of an unknown session.</summary>
+    /// <param name="editorFlag">Editor-mode flag (1 editor, 0 outside).</param>
+    /// <param name="gate">Gate report of the gate matching the flag (editor gate for 1, playing gate for 0).</param>
+    /// <returns>"returned", "playing", or null (stay unknown).</returns>
+    internal static string? RecoveryState(byte editorFlag, GateReport gate) =>
+        editorFlag switch
+        {
+            1 when gate.Matched >= Math.Ceiling(gate.Total * GateMatchFraction - FractionEpsilon) =>
+                "returned",
+            // Strict: every playing-gate pixel, since this state re-authorizes the token-bound Quit.
+            0 when gate.Matched == gate.Total => "playing",
+            _ => null,
+        };
+
+    /// <summary>Re-observes an unknown session without input: identity + editor flag + the matching pixel gate.
+    /// Recovers to "returned" (editor, gate ≥ <see cref="GateMatchFraction"/>) or "playing" (outside editor, every
+    /// playing-gate pixel); otherwise the session stays unknown. Records the fresh gate in
+    /// <see cref="Session.Recovery"/>.</summary>
+    /// <param name="game">Connected game.</param>
+    /// <param name="session">Session in state "unknown".</param>
+    static void Recover(Game game, Session session)
+    {
+        try
+        {
+            var flag = EditorFlag(game);
+            CheckIdentity(
+                session.Identity,
+                Observe(
+                    game,
+                    session.Profile,
+                    flag switch
+                    {
+                        1 => true,
+                        0 => false,
+                        _ => null,
+                    }
+                )
+            );
+            var gate = flag == 1 ? session.Profile.EditorGate : session.Profile.PlayingGate;
+            var image = Ui.CapturePixels(game, session.Profile.Width);
+            if (image.Width != session.Profile.Width || image.Height != session.Profile.Height)
+                throw new InvalidDataException("Playtest screenshot size changed.");
+            var report = GateMatch(image.Bgra, image.Width, gate);
+            var next = RecoveryState(flag, report);
+            session.Recovery = new
+            {
+                result = next ?? "unknown",
+                editorFlag = flag,
+                gateKind = flag == 1 ? "editor" : "playing",
+                gate = new
+                {
+                    report.Matched,
+                    report.Total,
+                    report.Mismatches,
+                    requiredFraction = flag == 1 ? GateMatchFraction : 1,
+                },
+                observedAtUtc = DateTimeOffset.UtcNow,
+                inputSent = false,
+            };
+            if (next is null)
+                return;
+            Advance(session, next, true);
+            session.Gate = report;
+        }
+        catch (Exception e)
+            when (e
+                    is InvalidDataException
+                        or InvalidOperationException
+                        or System.ComponentModel.Win32Exception
+            )
+        {
+            session.Recovery = new
+            {
+                result = "unknown",
+                reason = e.Message,
+                inputSent = false,
+            };
+        }
+    }
+
+    /// <summary>Reads the editor-mode flag (1 editor, 0 outside, 255 when the global is null).</summary>
+    /// <param name="game">Connected game.</param>
+    static byte EditorFlag(Game game)
+    {
+        var global = game.Pointer(game.Base + checked((int)game.Layout.EditorGlobalRva));
+        return global == 0
+            ? (byte)255
+            : game.Read(global + checked((int)game.Layout.EditorFlagOffset), 1)[0];
+    }
+
+    /// <summary>Types an allowlisted chat cheat: Enter, the code, Enter. Identity + playing gate are checked before
+    /// each keystroke group and the playing gate is re-read afterwards.</summary>
+    /// <param name="game">Connected game.</param>
+    /// <param name="session">Playing session.</param>
+    /// <param name="code">Allowlisted cheat (<see cref="AllowedCheats"/>).</param>
+    static object Cheat(Game game, Session session, string code)
+    {
+        const string enter = "ENTER";
+        void Gate()
+        {
+            CheckIdentity(session.Identity, Observe(game, session.Profile, false));
+            session.Gate = RequirePixels(
+                game,
+                session.Profile,
+                session.Profile.PlayingGate,
+                GateMatchFraction
+            );
+        }
+        var sent = 0;
+        try
+        {
+            foreach (
+                var action in new Action[]
+                {
+                    () => Ui.Press(game, enter, [], false),
+                    () => Ui.Text(game, code, false),
+                    () => Ui.Press(game, enter, [], false),
+                }
+            )
+            {
+                Gate();
+                action();
+                sent++;
+                Thread.Sleep(ChatSettleMs);
+            }
+            Gate();
+        }
+        catch (Exception e)
+            when (e
+                    is InvalidDataException
+                        or InvalidOperationException
+                        or System.ComponentModel.Win32Exception
+            )
+        {
+            if (sent == 0)
+                throw new InvalidDataException("Cheat refused before input: " + e.Message, e);
+            session.State = "unknown";
+            throw Unknown(session, e);
+        }
+        return new
+        {
+            cheat = code,
+            keystrokeGroups = sent,
+            effectVerified = false,
+            verify = "editor_screenshot shows the effect (e.g. revealed map).",
+            session = Describe(session),
+        };
     }
 
     /// <summary>Optional expectedPid/expectedWindowThread on inspect/quit/dismiss must equal the session identity
@@ -555,6 +839,33 @@ internal sealed class PlaytestWorkflow
             ? session
             : throw new ArgumentException("Unknown/stale/cross-host playtest token; no input.");
 
+    /// <summary>Human player control value in the PL P1 block (same mapping as PlayerSettings: 0 Human, 1 Computer;
+    /// session 4 checkpoint: Player 1 = 0, Player 2 = 1).</summary>
+    const int HumanControl = 0;
+
+    /// <summary>One warning per human player whose camera start is not set in the checkpoint (session 4: the playtest
+    /// opened on a black view without one); empty when the P9 layout is unreviewed.</summary>
+    /// <param name="document">Disposable checkpoint about to be playtested.</param>
+    static string[] CameraStartWarnings(CheckpointDocument document)
+    {
+        try
+        {
+            return
+            [
+                .. ScenarioReader
+                    .ReadPlayers(document.World.One("PL").ToArray())
+                    .Where(p => p.Id > 0 && p.Control == HumanControl && p.Camera is { Set: false })
+                    .Select(p =>
+                        $"Player {p.Id} ({p.DisplayName}) has no camera start; the playtest may open on a black/off-base view. Set one with editor_camera_start operation=set."
+                    ),
+            ];
+        }
+        catch (InvalidDataException)
+        {
+            return [];
+        }
+    }
+
     static object Describe(Session session) =>
         new
         {
@@ -571,7 +882,10 @@ internal sealed class PlaytestWorkflow
             uiKind = session.Profile.Interface,
             dialog = session.State == "dialog" ? session.DialogView : null,
             dismissed = session.Dismissed,
-            gate = session.Gate is { } gate
+            warnings = session.Warnings.Length > 0 ? session.Warnings : null,
+            recovery = session.Recovery,
+            // A gate from before an unknown outcome is stale; recovery carries the fresh one.
+            gate = session.State != "unknown" && session.Gate is { } gate
                 ? new
                 {
                     gate.Matched,
@@ -585,9 +899,14 @@ internal sealed class PlaytestWorkflow
                 ? null
                 : XsDiagnostics.PlaytestEvidence(session.StartedAtUtc.UtcDateTime),
             hints = session.State == "playing" ? PlayingHints : null,
-            next = session.State == "dialog"
-                ? "Fix the reported script in the editor later; now dismiss (confirmDismiss) to continue loading, inspect/dismiss further dialogs, then quit."
-                : null,
+            next = session.State switch
+            {
+                "dialog" =>
+                    "Fix the reported script in the editor later; now dismiss (confirmDismiss) to continue loading, inspect/dismiss further dialogs, then quit.",
+                "unknown" =>
+                    "inspect again (read-only re-observation; recovers to returned/playing when the gates match); take editor_screenshot to see the state. No automatic input.",
+                _ => null,
+            },
             limitation = "Mode + reviewed pixel gates only; not XS success, worker behavior, rebuilding or reload persistence. Quit does not load scenarios or restore viewport. "
                 + "Error dialogs (\"Trigger Error.\" + OK) are read by OCR; live-verified on the normal UI 2560x1440 only, other UIs/sizes untested. No dialog read is not proof that scripts compiled.",
         };
@@ -772,24 +1091,99 @@ internal sealed class PlaytestWorkflow
         return paths;
     }
 
+    /// <summary>Requires the disposable checkpoint to describe the live scene: same ID set, and per ID the same
+    /// player + prototype, and for players ≥ 1 the same position. Gaia (player 0, Mother Nature) units may be mobile
+    /// (session 4: flying Hawks drift in the editor; user: all Mother Nature units could be mobile), so their position
+    /// is not compared. Failures name up to <see cref="MaxSceneMismatches"/> units.</summary>
+    /// <param name="saved">Disposable checkpoint units.</param>
+    /// <param name="live">Live editor units.</param>
+    /// <exception cref="InvalidDataException">Coverage or tuple mismatch.</exception>
     internal static void VerifyScene(CheckpointUnits.Snapshot saved, LiveUnits.Unit[] live)
     {
-        if (saved.UnresolvedPrototypes != 0 || saved.Units.Length != live.Length)
-            throw new InvalidDataException("Disposable scene saved/live entity coverage differs.");
+        if (saved.UnresolvedPrototypes != 0)
+            throw new InvalidDataException(
+                $"Disposable checkpoint has {saved.UnresolvedPrototypes} unresolved prototype(s)."
+            );
         var map = live.ToDictionary(u => u.UnitId);
+        var savedIds = saved
+            .Units.Where(u => u.UnitId <= int.MaxValue)
+            .Select(u => (int)u.UnitId)
+            .ToHashSet();
+        var missing = saved.Units.Where(u =>
+            u.UnitId > int.MaxValue || !map.ContainsKey((int)u.UnitId)
+        );
+        var extra = live.Where(u => !savedIds.Contains(u.UnitId)).ToArray();
+        if (saved.Units.Length != live.Length || missing.Any() || extra.Length != 0)
+            throw new InvalidDataException(
+                $"Disposable scene saved/live entity coverage differs (saved {saved.Units.Length}, live {live.Length}); save a fresh disposable checkpoint. "
+                    + JsonSerializer.Serialize(
+                        new
+                        {
+                            missingLive = missing
+                                .Take(MaxSceneMismatches)
+                                .Select(u => new
+                                {
+                                    unitId = u.UnitId,
+                                    proto = u.Proto,
+                                    player = u.Player,
+                                }),
+                            extraLive = extra
+                                .Take(MaxSceneMismatches)
+                                .Select(u => new
+                                {
+                                    unitId = u.UnitId,
+                                    proto = u.Proto,
+                                    player = u.Player,
+                                }),
+                        }
+                    )
+            );
+        var mismatches = new List<object>();
+        var count = 0;
         foreach (var u in saved.Units)
-            if (
-                u.UnitId > int.MaxValue
-                || !map.TryGetValue((int)u.UnitId, out var v)
-                || v.Player != u.Player
-                || v.Proto != u.Proto
-                || Math.Abs(v.Position.X - u.X) > .001
-                || Math.Abs(v.Position.Y - u.Y) > .001
-                || Math.Abs(v.Position.Z - u.Z) > .001
-            )
-                throw new InvalidDataException(
-                    "Disposable saved/live entity tuple mismatch; IDs never assumed persistent. Player/TR proof additionally needs caller-confirmed game-written backups."
+        {
+            var v = map[(int)u.UnitId];
+            string? field =
+                v.Player != u.Player ? "player"
+                : v.Proto != u.Proto ? "proto"
+                : u.Player != 0
+                && (
+                    Math.Abs(v.Position.X - u.X) > ScenePositionTolerance
+                    || Math.Abs(v.Position.Y - u.Y) > ScenePositionTolerance
+                    || Math.Abs(v.Position.Z - u.Z) > ScenePositionTolerance
+                )
+                    ? "position"
+                : null;
+            if (field is null)
+                continue;
+            if (++count <= MaxSceneMismatches)
+                mismatches.Add(
+                    new
+                    {
+                        unitId = u.UnitId,
+                        proto = u.Proto,
+                        player = u.Player,
+                        field,
+                        saved = field switch
+                        {
+                            "player" => (object)u.Player,
+                            "proto" => u.Proto ?? "",
+                            _ => new[] { u.X, u.Y, u.Z },
+                        },
+                        live = field switch
+                        {
+                            "player" => (object)v.Player,
+                            "proto" => v.Proto ?? "",
+                            _ => new[] { v.Position.X, v.Position.Y, v.Position.Z },
+                        },
+                    }
                 );
+        }
+        if (count != 0)
+            throw new InvalidDataException(
+                $"Disposable saved/live entity tuple mismatch on {count} unit(s); IDs never assumed persistent, Gaia (player 0) positions not compared. Save a fresh disposable checkpoint after the scene settles. "
+                    + JsonSerializer.Serialize(mismatches)
+            );
     }
 
     static Identity Observe(Game game, Profile profile, bool? editor)
@@ -807,11 +1201,7 @@ internal sealed class PlaytestWorkflow
         var size = Ui.ClientSize(game);
         if (size.Width != profile.Width || size.Height != profile.Height)
             throw new InvalidDataException("Playtest client/profile size mismatch.");
-        var global = game.Pointer(game.Base + checked((int)game.Layout.EditorGlobalRva));
-        var flag =
-            global == 0
-                ? (byte)255
-                : game.Read(global + checked((int)game.Layout.EditorFlagOffset), 1)[0];
+        var flag = EditorFlag(game);
         if (flag is not 0 and not 1 || (editor is bool mode && (flag == 1) != mode))
             throw new InvalidDataException(
                 "Playtest editor-mode guard failed; menu/loading is not transition proof."
@@ -954,20 +1344,35 @@ internal sealed class PlaytestWorkflow
         }
     }
 
-    static WorkflowFailure Unknown(Session session, Exception e) =>
-        new(
+    /// <summary>Unknown-outcome failure; clears any earlier recovery record (it described an older observation).</summary>
+    /// <param name="session">Session (already set to "unknown").</param>
+    /// <param name="e">Cause.</param>
+    static WorkflowFailure Unknown(Session session, Exception e)
+    {
+        session.Recovery = null;
+        return new(
             "PLAYTEST_OUTCOME_UNKNOWN",
             "ui-transition",
             e.Message,
             false,
             true,
-            "Stop. Inspect screenshot and retained backups. No retries, rollback, native start/load, or automatic Quit. Use separately approved manual recovery.",
+            $"Stop. editor_playtest operation=inspect token={session.Token} re-observes read-only and recovers to returned/playing when the gates match; check editor_screenshot and retained backups. No retries, rollback, native start/load, or automatic Quit.",
             inner: e,
             retainedPaths: session.RetainedPaths
         );
+    }
 
-    internal static void Advance(Session session, string next)
+    /// <summary>Applies a registered state transition.</summary>
+    /// <param name="session">Session.</param>
+    /// <param name="next">Next state.</param>
+    /// <param name="recovery">True only from <see cref="Recover"/>: also allows unknown → returned/playing.</param>
+    internal static void Advance(Session session, string next, bool recovery = false)
     {
+        if (recovery && session.State == "unknown" && next is "returned" or "playing")
+        {
+            session.State = next;
+            return;
+        }
         if (
             (session.State, next)
             is not (
@@ -1250,14 +1655,71 @@ internal sealed class PlaytestWorkflow
         catch (InvalidOperationException e)
             when (e.Message.StartsWith("Invalid/repeated", StringComparison.Ordinal)) { }
         session.State = "unknown";
+        // Inspect on unknown re-observes read-only: a failed connection keeps the state and sends no input.
         _ = workflow.Execute(
             JsonSerializer.SerializeToElement(new { operation = "inspect", token = "owned" }),
-            () =>
-            {
-                called = true;
-                throw new InvalidOperationException();
-            }
+            () => throw new InvalidOperationException("no game")
         );
+        if (session.State != "unknown" || session.Recovery is null)
+            throw new InvalidOperationException(
+                "Unknown inspection changed state without observation."
+            );
+        GateReport Report(int matched, int total) => new(matched, total, []);
+        if (
+            RecoveryState(1, Report(12, 14)) != "returned"
+            || RecoveryState(1, Report(11, 14)) is not null
+            || RecoveryState(0, Report(5, 5)) != "playing"
+            || RecoveryState(0, Report(4, 5)) is not null
+            || RecoveryState(byte.MaxValue, Report(5, 5)) is not null
+        )
+            throw new InvalidOperationException("Playtest recovery decision self-test failed.");
+        try
+        {
+            Advance(session, "returned");
+            throw new InvalidOperationException("Unknown resumed outside recovery.");
+        }
+        catch (InvalidOperationException e)
+            when (e.Message.StartsWith("Invalid/repeated", StringComparison.Ordinal)) { }
+        foreach (
+            var bad in new object[]
+            {
+                new
+                {
+                    operation = "cheat",
+                    token = "owned",
+                    code = "ATM OF EREBUS",
+                    confirmCheat = true,
+                },
+                new
+                {
+                    operation = "cheat",
+                    token = "owned",
+                    code = LayOfTheLandCheat,
+                },
+                new
+                {
+                    operation = "cheat",
+                    token = "owned",
+                    code = LayOfTheLandCheat,
+                    confirmCheat = true,
+                }, // state unknown
+            }
+        )
+        {
+            try
+            {
+                _ = workflow.Execute(
+                    JsonSerializer.SerializeToElement(bad),
+                    () =>
+                    {
+                        called = true;
+                        throw new InvalidOperationException();
+                    }
+                );
+                throw new InvalidOperationException("Unsafe cheat request accepted.");
+            }
+            catch (ArgumentException) { }
+        }
         try
         {
             _ = workflow.Execute(
@@ -1300,6 +1762,37 @@ internal sealed class PlaytestWorkflow
             throw new InvalidOperationException("Stale saved identity accepted as live scene.");
         }
         catch (InvalidDataException) { }
+        var moved = liveUnit with { Position = new(11, 0, 20) };
+        try
+        {
+            VerifyScene(new([savedUnit], 0), [moved]);
+            throw new InvalidOperationException("Moved player unit accepted.");
+        }
+        catch (InvalidDataException e) when (e.Message.Contains("701", StringComparison.Ordinal))
+        { }
+        // Gaia (player 0) may be mobile: drift accepted, prototype still strict.
+        VerifyScene(new([savedUnit with { Player = 0 }], 0), [moved with { Player = 0 }]);
+        try
+        {
+            VerifyScene(
+                new([savedUnit with { Player = 0 }], 0),
+                [moved with { Player = 0, Proto = "Hawk" }]
+            );
+            throw new InvalidOperationException("Gaia prototype change accepted.");
+        }
+        catch (InvalidDataException) { }
+        foreach (var registered in ReviewedProfiles)
+            if (
+                ProfilePath(ProfileDirectory + "/" + registered.File)
+                != Path.Combine(AppContext.BaseDirectory, ProfileDirectory, registered.File)
+            )
+                throw new InvalidOperationException("Registered profile id did not resolve.");
+        try
+        {
+            _ = ProfilePath(ProfileDirectory + "/../secret.json");
+            throw new InvalidOperationException("Unregistered profile id accepted.");
+        }
+        catch (ArgumentException) { }
         var directory = Path.Combine(
             Path.GetTempPath(),
             "aom-playtest-fixture-" + Guid.NewGuid().ToString("N")

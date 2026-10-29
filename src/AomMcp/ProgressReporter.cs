@@ -21,15 +21,48 @@ internal static class ProgressReporter
     /// <summary>Short description of the latest report.</summary>
     static string? _message;
 
-    /// <summary>Clears the sink at the start of a tool call.</summary>
-    internal static void Begin()
+    /// <summary>Name of the tool call holding the host slot, or null when idle.</summary>
+    static string? _running;
+
+    /// <summary>Clears the sink at the start of a tool call and records its name for queued callers.</summary>
+    /// <param name="tool">Tool name of the call that now holds the slot.</param>
+    internal static void Begin(string? tool = null)
     {
         lock (Gate)
         {
             _done = null;
             _total = null;
             _message = null;
+            _running = tool;
         }
+    }
+
+    /// <summary>Marks the host slot idle (end of a tool call).</summary>
+    internal static void End()
+    {
+        lock (Gate)
+            _running = null;
+    }
+
+    /// <summary>Name of the tool call holding the slot, or null when idle.</summary>
+    internal static string? Running
+    {
+        get
+        {
+            lock (Gate)
+                return _running;
+        }
+    }
+
+    /// <summary>Heartbeat text while a call waits for the host slot (calls are serialized).</summary>
+    /// <param name="elapsed">Time since the call arrived.</param>
+    /// <returns>Notification message, e.g. "queued behind editor_terrain_shape, 12 s".</returns>
+    internal static string Queued(TimeSpan elapsed)
+    {
+        var seconds = ((int)elapsed.TotalSeconds).ToString(CultureInfo.InvariantCulture) + " s";
+        return Running is { } tool
+            ? "queued behind " + tool + ", " + seconds
+            : "queued, " + seconds;
     }
 
     /// <summary>Records progress of the running call (no I/O; the heartbeat sends it).</summary>
@@ -81,5 +114,11 @@ internal static class ProgressReporter
         Begin();
         if (Describe(elapsed) != "running, 12 s")
             throw new InvalidOperationException("Progress reset failed.");
+        Begin("editor_terrain_shape");
+        if (Queued(elapsed) != "queued behind editor_terrain_shape, 12 s")
+            throw new InvalidOperationException("Queued heartbeat text failed.");
+        End();
+        if (Queued(elapsed) != "queued, 12 s" || Running is not null)
+            throw new InvalidOperationException("Idle queued heartbeat text failed.");
     }
 }

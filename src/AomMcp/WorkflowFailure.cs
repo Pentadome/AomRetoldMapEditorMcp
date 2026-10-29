@@ -20,6 +20,10 @@ internal sealed class WorkflowFailure : Exception
     /// object after a rescan); null derives it from the dispatch/outcome flags.</summary>
     internal bool? RetrySafe { get; }
 
+    /// <summary>True when the failed tool's effect is idempotent (re-running the same call converges to the same
+    /// scene, e.g. the exact-height terrain_shape fill); null when not stated.</summary>
+    internal bool? IdempotentRetry { get; }
+
     internal WorkflowFailure(
         string code,
         string phase,
@@ -32,7 +36,8 @@ internal sealed class WorkflowFailure : Exception
         Exception? inner = null,
         string[]? retainedPaths = null,
         int? undoSteps = null,
-        bool? retrySafe = null
+        bool? retrySafe = null,
+        bool? idempotentRetry = null
     )
         : base(message, inner)
     {
@@ -46,6 +51,7 @@ internal sealed class WorkflowFailure : Exception
         RetainedPaths = retainedPaths ?? [];
         UndoSteps = undoSteps;
         RetrySafe = retrySafe;
+        IdempotentRetry = idempotentRetry;
     }
 
     internal object Details =>
@@ -62,5 +68,6 @@ internal sealed class WorkflowFailure : Exception
             destinationPath = DestinationPath,
             nextAction = NextAction,
             undoSteps = UndoSteps,
+            idempotentRetry = IdempotentRetry,
         };
 }

@@ -161,27 +161,43 @@ internal sealed partial class Server(
     /// of the pi MCP client (pi-mcp dist/client.js, re-armed on each notifications/progress).</summary>
     const int ProgressIntervalMs = 10_000;
 
+    /// <summary>Strictly increasing progress counter shared by the queued and the running heartbeat of one call.</summary>
+    sealed class ProgressSequence
+    {
+        /// <summary>Last progress value sent.</summary>
+        internal int Value;
+    }
+
     /// <summary>Sends notifications/progress every <see cref="ProgressIntervalMs"/> until <paramref name="work"/> ends,
     /// so clients that re-arm their timeout on progress do not abort long calls. Progress is the heartbeat sequence
-    /// (strictly increasing, as MCP requires); the message carries the tool's latest <see cref="ProgressReporter"/> report.</summary>
+    /// (strictly increasing, as MCP requires, shared across the queued and running phase); the message comes from
+    /// <paramref name="message"/> (queued text, or the tool's latest <see cref="ProgressReporter"/> report).</summary>
     /// <param name="server">Session that received the call.</param>
     /// <param name="token">Client progress token from the request _meta.</param>
-    /// <param name="work">Running tool call.</param>
-    static async Task Heartbeat(McpServer server, ProgressToken token, Task work)
+    /// <param name="work">Awaited task (slot wait or running tool call).</param>
+    /// <param name="message">Message for the elapsed time since the call arrived.</param>
+    /// <param name="sequence">Shared progress counter.</param>
+    /// <param name="clock">Clock started when the call arrived.</param>
+    static async Task Heartbeat(
+        McpServer server,
+        ProgressToken token,
+        Task work,
+        Func<TimeSpan, string> message,
+        ProgressSequence sequence,
+        System.Diagnostics.Stopwatch clock
+    )
     {
-        var clock = System.Diagnostics.Stopwatch.StartNew();
-        var sequence = 0;
         while (await Task.WhenAny(work, Task.Delay(ProgressIntervalMs)) != work)
         {
-            sequence++;
+            sequence.Value++;
             try
             {
                 await server.NotifyProgressAsync(
                     token,
                     new ProgressNotificationValue
                     {
-                        Progress = sequence,
-                        Message = ProgressReporter.Describe(clock.Elapsed),
+                        Progress = sequence.Value,
+                        Message = message(clock.Elapsed),
                     },
                     cancellationToken: CancellationToken.None
                 );
@@ -209,14 +225,28 @@ internal sealed partial class Server(
                 // Host identity/release version; not the MCP protocol version (negotiated by SDK).
                 ServerInfo = new() { Name = "aom-retold-editor", Version = "0.1.0" },
                 ServerInstructions =
-                    $"Initial tool set: {(_fullTools ? "full" : "core")}. Use editor_search_tools to find tools by name/description across the full catalog without switching modes; call any of them (native commands, action_* UI actions, workflow helpers) through editor_call with the target's arguments, using includeSchema=true for its schema. Use editor_toolset to inspect/switch core/full mid-session. Only currently listed tools are callable; refresh tools/list after tools/list_changed. Controls local offline scenario editor. Commands report native return, not semantic verification. Use screenshots/state to verify effects. Unknown game builds fail closed; regenerate layout/catalog after patches. Data-loss actions need explicit confirmation. Do not retry mutations after unknown-outcome timeouts. Task router: scenario -> campaign/Workshop mod: editor_build_campaign (check dependencies for profile-only XS); \"what did the user mark?\" (object notes): editor_unit_notes scenarioPath=\"latest\" (core); \"why do I get this error\": editor_xs_check scenarioPath=\"latest\" -> editor_xs_diagnostics -> editor_playtest inspect (trigger-script errors appear only as an in-game dialog); change triggers: editor_trigger_list -> editor_trigger_edit (preview, renderedXs) -> editor_triggers apply (resets Triggers -> XS Scripts; scripts=\"restore\" re-includes them, editor_xs_scripts lists/edits them). Saved-file workflow helpers (full toolset or editor_call; editor_unit_notes also core): editor_unit_notes, editor_scenario_diff, editor_startup_orders, editor_install_ai, editor_runtime_probe, editor_runtime_report, editor_playtest (editor_help topic=workflows); editor_build_campaign packages saved scenarios plus the XS they need as a campaign mod (topic=campaign).",
+                    $"Initial tool set: {(_fullTools ? "full" : "core")}. Use editor_search_tools to find tools by name/description across the full catalog without switching modes; call any of them (native commands, action_* UI actions, workflow helpers) through editor_call with the target's arguments, using includeSchema=true for its schema. Use editor_toolset to inspect/switch core/full mid-session. Only currently listed tools are callable; refresh tools/list after tools/list_changed. Controls local offline scenario editor. Commands report native return, not semantic verification. Use screenshots/state to verify effects. Unknown game builds fail closed; regenerate layout/catalog after patches. Data-loss actions need explicit confirmation. Tool calls run serialized (one at a time): parallel calls only queue (queued calls send progress \"queued behind <tool>\"), so issue mutating calls sequentially. Do not retry mutations after unknown-outcome timeouts. Task router: scenario -> campaign/Workshop mod: editor_build_campaign (check dependencies for profile-only XS); \"what did the user mark?\" (object notes): editor_unit_notes scenarioPath=\"latest\" (core); \"why do I get this error\": editor_xs_check scenarioPath=\"latest\" -> editor_xs_diagnostics -> editor_playtest inspect (trigger-script errors appear only as an in-game dialog); change triggers: editor_trigger_list -> editor_trigger_edit (preview, renderedXs) -> editor_triggers apply (resets Triggers -> XS Scripts; scripts=\"restore\" re-includes them, editor_xs_scripts lists/edits them). Saved-file workflow helpers (full toolset or editor_call; editor_unit_notes also core): editor_unit_notes, editor_scenario_diff, editor_startup_orders, editor_install_ai, editor_runtime_probe, editor_runtime_report, editor_playtest (editor_help topic=workflows); editor_build_campaign packages saved scenarios plus the XS they need as a campaign mod (topic=campaign). Camera start (where a playtest opens): editor_camera_start (core; get reads checkpoints, set/show/delete drive the dialog). Dialog pixel signatures for a new UI kind/client size: editor_dialog_calibrate (full only; writes a new uilayouts file, never overwrites).",
                 Capabilities = new() { Tools = new() { ListChanged = true } },
                 Handlers = new()
                 {
                     ListToolsHandler = (request, _) => ValueTask.FromResult(List(request.Params)),
                     CallToolHandler = async (request, cancellationToken) =>
                     {
-                        await calls.WaitAsync(cancellationToken);
+                        var clock = System.Diagnostics.Stopwatch.StartNew();
+                        var sequence = new ProgressSequence();
+                        var wait = calls.WaitAsync(cancellationToken);
+                        // Session 4: a parallel call waited silently for the slot and hit the client's 60 s timeout.
+                        if (request.Params.ProgressToken is { } queuedToken)
+                            await Heartbeat(
+                                request.Server,
+                                queuedToken,
+                                wait,
+                                ProgressReporter.Queued,
+                                sequence,
+                                clock
+                            );
+                        await wait;
+                        clock.Restart(); // Running text counts from slot acquisition.
                         try
                         {
                             cancellationToken.ThrowIfCancellationRequested();
@@ -226,10 +256,17 @@ internal sealed partial class Server(
                                 request.Params.Arguments,
                                 Json
                             );
-                            ProgressReporter.Begin();
+                            ProgressReporter.Begin(request.Params.Name);
                             var work = Task.Run(() => Call(request.Params.Name, arguments));
                             if (request.Params.ProgressToken is { } progressToken)
-                                await Heartbeat(request.Server, progressToken, work);
+                                await Heartbeat(
+                                    request.Server,
+                                    progressToken,
+                                    work,
+                                    ProgressReporter.Describe,
+                                    sequence,
+                                    clock
+                                );
                             var result = await work;
                             if (previous != _fullTools)
                                 // Surface already changed; announce it even if caller cancels afterward.
@@ -241,6 +278,7 @@ internal sealed partial class Server(
                         }
                         finally
                         {
+                            ProgressReporter.End();
                             calls.Release();
                         }
                     },
@@ -285,6 +323,7 @@ internal sealed partial class Server(
         field ??= Extras()
             .Append(UnitNotesSpec())
             .Concat(WorkflowExtras())
+            .Concat(DialogFullExtras())
             .Concat(_catalog.Tools())
             .Select(t =>
                 AddShaping(JsonSerializer.SerializeToElement(t, Json).Deserialize<Tool>(Json)!)
@@ -934,6 +973,8 @@ internal sealed partial class Server(
                 );
         }
         PreflightDialog(name, args);
+        if (name == CameraStartTool)
+            PreflightCameraStart(args);
         if (name == XsScriptsTool)
             PreflightXsScripts(args);
         PreflightScript(name, args);
@@ -974,6 +1015,8 @@ internal sealed partial class Server(
             return InvokeCamera(name, args, batchGame);
         if (DialogNames.Contains(name))
             return InvokeDialog(name, args, batchGame);
+        if (name == CameraStartTool)
+            return InvokeCameraStart(args, batchGame);
         if (name == XsScriptsTool)
             return InvokeXsScripts(args, batchGame);
         if (ScriptNames.Contains(name))
@@ -2626,6 +2669,7 @@ internal sealed partial class Server(
             yield return world;
         foreach (var dialog in DialogExtras())
             yield return dialog;
+        yield return CameraStartSpec();
         yield return XsScriptsSpec();
         foreach (var script in ScriptExtras())
             yield return script;

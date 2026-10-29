@@ -128,7 +128,7 @@ internal sealed class SceneUi
                 return ui;
             }
         reason =
-            "No reviewed UI detected (normal-UI menu bar+minimap gate and alternative-UI minimap gate both failed: dialog/menu open, minimap hidden, other language/UI scale). Gates (frame px, 1280-wide screenshot): "
+            "No reviewed UI detected (normal-UI menu bar+minimap gate and alternative-UI top-right buttons (1920 reviewed file; others minimap only)+minimap gate both failed: dialog/menu open, minimap hidden, other language/UI scale). Gates (frame px, 1280-wide screenshot): "
             + string.Join(
                 " | ",
                 candidates.Select(ui =>
@@ -188,7 +188,8 @@ internal sealed class SceneUi
     bool Gate(ScreenProbe.Frame frame, JsonElement gated) =>
         UiLayouts.GatePasses(frame, gated, Tolerance, Radius, out _);
 
-    /// <summary>UI-kind identification: optional detect gate (normal-UI menu bar) plus the minimap frame gate.</summary>
+    /// <summary>UI-kind identification: optional detect gate (normal-UI menu bar; alternative-UI top-right buttons, 1920x1080 file only) plus the minimap frame gate.
+    /// Without the alternative detect gate a normal frame whose menu bar is covered by stacked dialogs was detected as alternative (2026-10-29 live).</summary>
     internal bool Detected(ScreenProbe.Frame frame) =>
         (!_root.TryGetProperty("detect", out var detect) || Gate(frame, detect))
         && MinimapVisible(frame);

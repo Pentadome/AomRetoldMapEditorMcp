@@ -91,10 +91,12 @@ if (selfTest)
     Catalog.SelfTest();
     DialogCatalog.SelfTest();
     DialogState.SelfTest();
+    DialogCalibration.SelfTest();
     Ui.SelfTest();
     Server.OverviewSelfTest();
     Server.ShapeSelfTest();
     Server.PaintAreaSelfTest();
+    Server.CameraStartSelfTest();
     ScreenProbe.SelfTest();
     UiLayouts.SelfTest();
     UiRead.SelfTest();
