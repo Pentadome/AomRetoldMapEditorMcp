@@ -824,7 +824,7 @@ internal static class DialogCalibration
         return (best.X0, best.Y0, best.X1, best.Y1);
     }
 
-    /// <summary>Serializer options keeping the notes readable (no < escapes); the file is local data.</summary>
+    /// <summary>Serializer options keeping the notes readable (no &lt; escapes); the file is local data.</summary>
     static readonly JsonSerializerOptions Relaxed = new()
     {
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
